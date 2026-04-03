@@ -1,31 +1,36 @@
-console.clear();
-const config = require('./settings/config');
+// © 2026 Alpha. All Rights Reserved.
 
+console.clear();
+const config = () => require('./settings/config');
 process.on("uncaughtException", console.error);
 
-let makeWASocket, Browsers, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, jidDecode;
+// 🔥 LOAD BAILEYS DYNAMICALLY
+let makeWASocket, Browsers, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, jidDecode, downloadContentFromMessage, jidNormalizedUser, isPnUser;
 
 const loadBaileys = async () => {
   const baileys = await import('@whiskeysockets/baileys');
-
+  
   makeWASocket = baileys.default;
   Browsers = baileys.Browsers;
   useMultiFileAuthState = baileys.useMultiFileAuthState;
   DisconnectReason = baileys.DisconnectReason;
   fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
   jidDecode = baileys.jidDecode;
+  downloadContentFromMessage = baileys.downloadContentFromMessage;
+  jidNormalizedUser = baileys.jidNormalizedUser;
+  isPnUser = baileys.isPnUser;
 };
 
 const pino = require('pino');
 const readline = require("readline");
 const chalk = require("chalk");
-const fs = require('fs');
-
 const { Boom } = require('@hapi/boom');
+
+// 🔥 YOUR SYSTEM
 const { smsg } = require('./library/serialize');
+const { konek } = require('./library/connection/connection');
 
-let isRestarting = false;
-
+// 🔥 TERMINAL INPUT
 const question = (text) => {
     const rl = readline.createInterface({
         input: process.stdin,
@@ -39,15 +44,18 @@ const question = (text) => {
     });
 };
 
+let isRestarting = false;
+
+// 🚀 START CLIENT
 const clientstart = async () => {
     await loadBaileys();
 
-    const { state, saveCreds } = await useMultiFileAuthState(`./${config.session}`);
+    const { state, saveCreds } = await useMultiFileAuthState(`./${config().session}`);
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         logger: pino({ level: "silent" }),
-        printQRInTerminal: !config.status.terminal,
+        printQRInTerminal: !config().status.terminal,
         auth: state,
         version,
         browser: Browsers.macOS('Chrome')
@@ -62,95 +70,40 @@ const clientstart = async () => {
         } else return jid;
     };
 
-    // 🔥 PAIRING
-    if (config.status.terminal && !sock.authState.creds.registered) {
+    // 🔥 PAIRING CODE
+    if (config().status.terminal && !sock.authState.creds.registered) {
         const phoneNumber = await question('📱 Enter your WhatsApp number (263...):\n');
         const code = await sock.requestPairingCode(phoneNumber);
         console.log(chalk.green(`🔥 PAIRING CODE: ${code}`));
     }
 
+    // 💾 SAVE CREDS
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-
-        if (connection === 'connecting') {
-            console.log(chalk.yellow('🔄 Connecting to WhatsApp...'));
-        }
-
-        if (connection === 'open') {
-            console.log(chalk.green('✅ Connected successfully!'));
-
-            const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-
-            // 📢 STARTUP MESSAGE (CHANNEL STYLE)
-            await sock.sendMessage(botNumber, {
-                text:
-`👑 *${config.settings.title}* is Online!
-
-📌 User: ${sock.user.name || 'Unknown'}
-⚡ Prefix: ${config.prefix.join(" ")}
-🚀 Mode: ${config.status.public ? 'Public' : 'Self'}
-👑 Owner: Alpha
-
-📢 Channel: ${config.settings.channel}`,
-
-                contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: config.newsletter.id + "@newsletter",
-                        newsletterName: config.newsletter.name
-                    },
-                    externalAdReply: {
-                        title: config.settings.title,
-                        body: config.settings.description,
-                        thumbnailUrl: config.thumbUrl,
-                        sourceUrl: config.settings.channel,
-                        mediaType: 1
-                    }
-                }
-            }).catch(() => {});
-        }
-
-        if (connection === 'close') {
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-
-            console.log('❌ Disconnected:', statusCode);
-
-            if (statusCode === 440 || statusCode === DisconnectReason.loggedOut) {
-                console.log('🚫 Session issue. Delete session folder.');
-                process.exit(0);
-            }
-
-            if (!isRestarting) {
-                isRestarting = true;
-                console.log('🔄 Reconnecting...');
-                setTimeout(() => {
-                    clientstart();
-                    isRestarting = false;
-                }, 5000);
-            }
-        }
+    // 🔌 CONNECTION HANDLER (NEW SYSTEM)
+    sock.ev.on('connection.update', (update) => {
+        konek({ sock, update, clientstart, DisconnectReason, Boom });
     });
 
     // 📩 MESSAGE HANDLER
-    sock.ev.on('messages.upsert', async (chatUpdate) => {
+    sock.ev.on('messages.upsert', async chatUpdate => {
         try {
             const mek = chatUpdate.messages[0];
             if (!mek.message) return;
 
             const m = await smsg(sock, mek);
+
             require("./message")(sock, m, chatUpdate);
 
         } catch (err) {
-            console.log('❌ Message error:', err);
+            console.log("❌ Message Error:", err);
         }
     });
 
-    sock.public = config.status.public;
+    sock.public = config().status.public;
 
     return sock;
 };
 
+// 🚀 START BOT
 clientstart();
