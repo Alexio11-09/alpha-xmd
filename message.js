@@ -1,10 +1,10 @@
 const config = require('./settings/config');
 const fs = require('fs');
 const path = require("path");
-const chalk = require("chalk");
 
 let jidNormalizedUser, getContentType, isPnUser;
 
+// 🔥 LOAD BAILEYS UTILS
 const loadBaileysUtils = async () => {
     const baileys = await import('@whiskeysockets/baileys');
     jidNormalizedUser = baileys.jidNormalizedUser;
@@ -12,6 +12,25 @@ const loadBaileysUtils = async () => {
     isPnUser = baileys.isPnUser;
 };
 
+// 🔥 LOAD SETTINGS (SAFE)
+const settingsPath = './database/settings.json';
+let settings = {};
+
+const loadSettings = () => {
+    try {
+        settings = JSON.parse(fs.readFileSync(settingsPath));
+    } catch {
+        settings = {
+            autoread: false,
+            typing: false,
+            antidelete: false,
+            autoreact: false,
+            mode: "public"
+        };
+    }
+};
+
+// 🔥 PLUGIN LOADER
 class PluginLoader {
     constructor() {
         this.plugins = new Map();
@@ -19,263 +38,192 @@ class PluginLoader {
         this.pluginsDir = path.join(__dirname, 'plugins');
 
         this.defaultCategories = {
-            ai: '🤖 AI MENU',
-            downloader: '📥 DOWNLOAD MENU',
-            fun: '🎮 FUN MENU',
-            general: '⚡ GENERAL MENU',
-            group: '👥 GROUP MENU',
-            owner: '👑 OWNER MENU',
-            other: '📦 OTHER MENU',
-            tools: '🛠️ TOOLS MENU',
-            video: '🎬 VIDEO MENU'
+            general: "⚡ GENERAL",
+            downloader: "📥 DOWNLOADER",
+            group: "👥 GROUP",
+            owner: "👑 OWNER",
+            tools: "🛠️ TOOLS"
         };
 
         this.loadPlugins();
     }
 
     loadPlugins() {
-        if (!fs.existsSync(this.pluginsDir)) {
-            fs.mkdirSync(this.pluginsDir, { recursive: true });
-            return;
-        }
+        if (!fs.existsSync(this.pluginsDir)) return;
 
-        const pluginFiles = fs.readdirSync(this.pluginsDir)
-            .filter(file => file.endsWith('.js') && !file.startsWith('_'));
+        const files = fs.readdirSync(this.pluginsDir);
 
         this.plugins.clear();
         this.categories.clear();
 
-        Object.keys(this.defaultCategories).forEach(cat => {
-            this.categories.set(cat, []);
-        });
+        for (const file of files) {
+            const full = path.join(this.pluginsDir, file);
 
-        for (const file of pluginFiles) {
-            try {
-                const pluginPath = path.join(this.pluginsDir, file);
-                delete require.cache[require.resolve(pluginPath)];
-
-                const plugin = require(pluginPath);
-
-                if (plugin.command && typeof plugin.execute === 'function') {
-                    if (!plugin.category) plugin.category = 'general';
-
-                    if (!this.categories.has(plugin.category)) {
-                        this.categories.set(plugin.category, []);
-                    }
-
-                    this.plugins.set(plugin.command, plugin);
-                    this.categories.get(plugin.category).push(plugin.command);
+            if (fs.lstatSync(full).isDirectory()) {
+                const subFiles = fs.readdirSync(full);
+                for (const sub of subFiles) {
+                    if (!sub.endsWith('.js')) continue;
+                    this.loadPluginFile(path.join(full, sub));
                 }
-
-            } catch (err) {
-                console.log('❌ Plugin error:', err.message);
+            } else if (file.endsWith('.js')) {
+                this.loadPluginFile(full);
             }
         }
-
-        console.log(chalk.green(`✅ Loaded ${this.plugins.size} plugins`));
     }
 
-    async executePlugin(command, sock, m, context) {
+    loadPluginFile(filePath) {
+        try {
+            delete require.cache[require.resolve(filePath)];
+            const plugin = require(filePath);
+
+            if (!plugin.command || !plugin.execute) return;
+
+            const commands = Array.isArray(plugin.command)
+                ? plugin.command
+                : [plugin.command];
+
+            for (const cmd of commands) {
+                this.plugins.set(cmd, plugin);
+
+                const cat = plugin.category || 'general';
+                if (!this.categories.has(cat)) this.categories.set(cat, []);
+                this.categories.get(cat).push(cmd);
+            }
+        } catch (err) {
+            console.log('Plugin error:', err.message);
+        }
+    }
+
+    async execute(command, sock, m, context) {
         const plugin = this.plugins.get(command);
         if (!plugin) return false;
 
         try {
             if (plugin.owner && !context.isCreator) return true;
             if (plugin.group && !m.isGroup) return true;
-            if (plugin.admin && m.isGroup && !context.isAdmins && !context.isCreator) return true;
+            if (plugin.admin && !context.isAdmins) return true;
 
             await plugin.execute(sock, m, context);
             return true;
-
         } catch (err) {
-            console.log('❌ Execute error:', err);
+            console.log("Exec error:", err);
             return true;
         }
     }
 
-    getMenuSections() {
-        let sections = [];
+    menu() {
+        let text = "";
 
-        for (const [category, commands] of this.categories.entries()) {
-            if (!commands.length) continue;
-
-            const title = this.defaultCategories[category] || category;
-
-            const list = commands.map(cmd => {
-                const p = this.plugins.get(cmd);
-                return `• ${cmd}${p.description ? ` - ${p.description}` : ''}`;
-            }).join('\n');
-
-            sections.push(`╭─ ${title}\n${list}\n╰────────────`);
+        for (let [cat, cmds] of this.categories) {
+            text += `\n╭─ ${this.defaultCategories[cat] || cat}\n`;
+            text += cmds.map(c => `• ${c}`).join("\n");
+            text += "\n╰────────────\n";
         }
 
-        return sections.join('\n\n');
+        return text;
     }
 
-    getPluginCount() {
+    count() {
         return this.plugins.size;
-    }
-
-    reloadPlugins() {
-        this.loadPlugins();
     }
 }
 
-const pluginLoader = new PluginLoader();
+const plugins = new PluginLoader();
 
-module.exports = async (sock, m, chatUpdate, store) => {
+// 🔥 MAIN EXPORT
+module.exports = async (sock, m) => {
     try {
         if (!jidNormalizedUser) await loadBaileysUtils();
 
-        // 👁️ AUTO READ
-        if (config.status.autoRead) {
-            await sock.readMessages([m.key]);
-        }
+        loadSettings();
 
-        // ⚡ AUTO REACT
-        if (config.status.autoReact) {
-            const emojis = ["🔥","⚡","💀","👀","😈","✅"];
-            const random = emojis[Math.floor(Math.random() * emojis.length)];
-
-            await sock.sendMessage(m.chat, {
-                react: { text: random, key: m.key }
-            });
-        }
-
-        // ⌨️ TYPING EFFECT
-        if (config.status.typing) {
-            await sock.sendPresenceUpdate("composing", m.chat);
-            await new Promise(res => setTimeout(res, 800));
-        }
-
-        const body =
-            m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            m.text ||
-            '';
-
-        const prefix = config.prefix.find(p => body.startsWith(p)) || '.';
+        const body = m.text || '';
+        const prefix = '.';
         const isCmd = body.startsWith(prefix);
 
         const command = isCmd
-            ? body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase()
+            ? body.slice(1).trim().split(" ")[0].toLowerCase()
             : '';
 
         const args = body.trim().split(/ +/).slice(1);
-        const text = args.join(" ");
 
         const sender = m.sender;
         const botNumber = await sock.decodeJid(sock.user.id);
 
-        const isCreator = config.owner.includes(sender);
+        const isCreator = sender === botNumber;
 
-        const groupMetadata = m.isGroup
-            ? await sock.groupMetadata(m.chat).catch(() => ({}))
-            : {};
+        // 🔒 MODE SYSTEM
+        if (settings.mode === "self" && !m.fromMe) return;
 
-        const groupAdmins = m.isGroup
-            ? groupMetadata.participants?.filter(p => p.admin).map(p => p.id)
-            : [];
+        // 👁️ AUTO READ
+        if (settings.autoread) {
+            await sock.readMessages([m.key]);
+        }
 
-        const isAdmins = groupAdmins.includes(sender);
+        // ⌨️ AUTO TYPING
+        if (settings.typing) {
+            await sock.sendPresenceUpdate('composing', m.chat);
+        }
 
-        // 📢 GLOBAL SEND SYSTEM (CHANNEL STYLE)
-        const send = async (content) => {
-            try {
-                return await sock.sendMessage(m.chat, {
-                    ...content,
-                    contextInfo: {
-                        ...(content.contextInfo || {}),
-                        forwardingScore: 999,
-                        isForwarded: true,
-                        forwardedNewsletterMessageInfo: {
-                            newsletterJid: config.newsletter.id + "@newsletter",
-                            newsletterName: config.newsletter.name
-                        },
-                        externalAdReply: {
-                            title: config.settings.title,
-                            body: config.settings.description,
-                            thumbnailUrl: config.thumbUrl,
-                            sourceUrl: config.settings.channel,
-                            mediaType: 1
-                        }
-                    }
-                }, { quoted: m });
+        // ❤️ AUTO REACT
+        if (settings.autoreact) {
+            await sock.sendMessage(m.chat, {
+                react: { text: "🔥", key: m.key }
+            });
+        }
 
-            } catch (err) {
-                console.log("⚠️ Forward failed, fallback");
-
-                return await sock.sendMessage(m.chat, {
-                    ...content,
-                    contextInfo: {
-                        externalAdReply: {
-                            title: config.settings.title,
-                            body: config.settings.description,
-                            thumbnailUrl: config.thumbUrl
-                        }
-                    }
-                }, { quoted: m });
+        // 🔥 UNIVERSAL CONTEXT (CHANNEL TAG)
+        const ctx = {
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: config.newsletter.id + "@newsletter",
+                    newsletterName: config.newsletter.name
+                }
             }
         };
 
-        const reply = (txt) => send({ text: txt });
-
-        // 🔥 PLUGIN EXECUTION
-        const executed = await pluginLoader.executePlugin(command, sock, m, {
-            args,
+        const reply = (text) => sock.sendMessage(m.chat, {
             text,
-            sender,
-            isCreator,
-            isAdmins,
-            prefix,
+            ...ctx
+        }, { quoted: m });
+
+        // 🔥 EXECUTE PLUGINS
+        const done = await plugins.execute(command, sock, m, {
+            args,
             reply,
-            send,
-            config
+            command,
+            isCreator
         });
 
-        if (executed) return;
+        if (done) return;
 
-        // 🔥 BUILT-IN COMMANDS
+        // 🔥 DEFAULT COMMANDS
         switch (command) {
 
             case 'menu': {
-                const uptime = process.uptime().toFixed(0);
-                const mode = config.status.public ? 'Public' : 'Self';
+                const menu = `👑 ${config.settings.title}\n\n` +
+                    `⚡ Commands: ${plugins.count()}\n` +
+                    plugins.menu();
 
-                const menu = `
-👑 *${config.settings.title}*
-
-⚡ Mode: ${mode}
-⏱️ Uptime: ${uptime}s
-🧠 Plugins: ${pluginLoader.getPluginCount()}
-
-${pluginLoader.getMenuSections()}
-`;
-
-                await send({
+                await sock.sendMessage(m.chat, {
                     image: { url: config.thumbUrl },
-                    caption: menu
-                });
+                    caption: menu,
+                    ...ctx
+                }, { quoted: m });
                 break;
             }
 
-            case 'reload': {
-                if (!isCreator) return reply(config.message.owner);
-                pluginLoader.reloadPlugins();
-                reply("✅ Plugins reloaded");
+            case 'ping': {
+                const start = Date.now();
+                const speed = Date.now() - start;
+                reply(`🏓 Pong: ${speed}ms`);
                 break;
             }
         }
 
     } catch (err) {
-        console.log('❌ Main error:', err);
+        console.log(err);
     }
 };
-
-// 🔥 HOT RELOAD
-let file = require.resolve(__filename);
-fs.watchFile(file, () => {
-    fs.unwatchFile(file);
-    delete require.cache[file];
-    require(file);
-});
