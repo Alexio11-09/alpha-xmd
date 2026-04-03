@@ -3,7 +3,9 @@
 const fs = require('fs')
 
 const config = {
-    owner: "2637XXXXXXXX",
+    // 🔥 OWNER (VERY IMPORTANT)
+    owner: ["2637XXXXXXXX"], // ✅ MUST BE ARRAY
+
     botNumber: "2637XXXXXXXX",
 
     setPair: "ALPHA-XMD",
@@ -18,10 +20,12 @@ const config = {
         reactsw: false
     },
 
-    // 🔥 ADD THIS (IMPORTANT)
+    // 🔥 GLOBAL TOGGLES DEFAULT
     auto: {
         read: false,
-        typing: false
+        typing: false,
+        react: false,
+        antidelete: false
     },
 
     message: {
@@ -46,6 +50,7 @@ const config = {
         footer: "⚡ Powered by Alpha-XMD"
     },
 
+    // 🔥 CHANNEL FORWARD (FIXED)
     newsletter: {
         name: "ALPHA-XMD BOT",
         id: "120363423969349257"
@@ -64,6 +69,7 @@ const config = {
 
 module.exports = config;
 
+// 🔥 HOT RELOAD
 let file = require.resolve(__filename)
 fs.watchFile(file, () => {
   fs.unwatchFile(file)
