@@ -1,3 +1,5 @@
+// © 2026 Alpha
+
 const config = require("../settings/config");
 
 function runtime(seconds) {
@@ -17,6 +19,7 @@ module.exports = {
         try {
             const start = Date.now();
 
+            // react start
             await sock.sendMessage(m.chat, {
                 react: { text: "⚡", key: m.key }
             });
@@ -36,8 +39,14 @@ module.exports = {
 ║ 🤖 Bot: ${config.settings.title}
 ╚══════════════════⬣`;
 
-            await send({ text: result });
+            // 🔥 FIX: fallback if send is broken
+            if (typeof send === "function") {
+                await send({ text: result });
+            } else {
+                await sock.sendMessage(m.chat, { text: result }, { quoted: m });
+            }
 
+            // react success
             await sock.sendMessage(m.chat, {
                 react: { text: "✅", key: m.key }
             });
@@ -49,7 +58,11 @@ module.exports = {
                 react: { text: "❌", key: m.key }
             });
 
-            reply("❌ Failed to check ping");
+            if (typeof reply === "function") {
+                reply("❌ Failed to check ping");
+            } else {
+                sock.sendMessage(m.chat, { text: "❌ Failed to check ping" }, { quoted: m });
+            }
         }
     }
 };
