@@ -3,38 +3,38 @@ const yts = require('yt-search');
 
 module.exports = {
     command: 'video',
-    description: 'Fast YouTube video downloader',
-    category: 'downloader',
+    description: 'YouTube video downloader',
+    category: 'download',
 
-    execute: async (sock, m, { text, prefix, reply, send, config }) => {
+    execute: async (sock, m, { args, reply }) => {
         try {
-            if (!text) {
-                return reply(`🎥 Usage: ${prefix}video <name/url>\nEx: ${prefix}video drake - gods plan`);
+            if (!args[0]) {
+                return reply("🎥 Use: .video <name/link>");
             }
 
             await sock.sendMessage(m.chat, {
                 react: { text: "⚡", key: m.key }
             });
 
-            let videoUrl = text;
+            let query = args.join(" ");
+            let videoUrl = query;
             let videoInfo = null;
 
             // 🔍 SEARCH IF NOT LINK
-            if (!text.startsWith('http')) {
-                const search = await yts(text);
+            if (!query.startsWith('http')) {
+                const search = await yts(query);
 
                 if (!search.videos.length) {
                     await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
-                    return reply("❌ No videos found");
+                    return reply("❌ No results found");
                 }
 
                 videoInfo = search.videos[0];
                 videoUrl = videoInfo.url;
             }
 
-            // ❌ VALIDATION
+            // ❌ VALIDATE LINK
             if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
-                await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
                 return reply("❌ Invalid YouTube link");
             }
 
@@ -44,79 +44,61 @@ module.exports = {
 
             let data = null;
 
-            // 🔥 API 1
+            // 🔥 API 1 (BEST)
             try {
-                const res1 = await axios.get(
+                const res = await axios.get(
                     `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`,
                     { timeout: 15000 }
                 );
 
-                if (res1.data?.status && res1.data?.video) {
+                if (res.data?.status && res.data?.video) {
                     data = {
-                        title: res1.data.title,
-                        thumbnail: res1.data.thumbnail,
-                        video: res1.data.video
+                        title: res.data.title,
+                        thumbnail: res.data.thumbnail,
+                        video: res.data.video
                     };
                 }
             } catch {}
 
-            // 🔥 API 2
+            // 🔥 API 2 (FALLBACK)
             if (!data) {
                 try {
-                    const res2 = await axios.get(
+                    const res = await axios.get(
                         `https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(videoUrl)}`,
                         { timeout: 15000 }
                     );
 
-                    if (res2.data?.result?.download) {
+                    if (res.data?.result?.download) {
                         data = {
-                            title: res2.data.result.title,
-                            thumbnail: res2.data.result.thumbnail,
-                            video: res2.data.result.download
-                        };
-                    }
-                } catch {}
-            }
-
-            // 🔥 API 3
-            if (!data) {
-                try {
-                    const res3 = await axios.get(
-                        `https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(videoUrl)}`,
-                        { timeout: 15000 }
-                    );
-
-                    if (res3.data?.result?.link) {
-                        data = {
-                            title: res3.data.result.title,
-                            thumbnail: res3.data.result.thumbnail,
-                            video: res3.data.result.link
+                            title: res.data.result.title,
+                            thumbnail: res.data.result.thumbnail,
+                            video: res.data.result.download
                         };
                     }
                 } catch {}
             }
 
             if (!data || !data.video) {
-                await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
-                return reply("⚠️ All download servers failed. Try again later.");
+                await sock.sendMessage(m.chat, {
+                    react: { text: "❌", key: m.key }
+                });
+                return reply("⚠️ Download failed. Try again later.");
             }
 
             const title = data.title || videoInfo?.title || "Video";
-            const filename = title.replace(/[^a-zA-Z0-9]/g, "_") + ".mp4";
 
-            // 📸 PREVIEW (GLOBAL SYSTEM)
-            await send({
+            // 📸 SEND PREVIEW
+            await sock.sendMessage(m.chat, {
                 image: { url: data.thumbnail || videoInfo?.thumbnail },
-                caption: `🎬 *${title}*\n⬇️ Downloading video...\n\n👑 ${config.settings.title}`
-            });
+                caption: `🎬 *${title}*\n⬇️ Downloading...`
+            }, { quoted: m });
 
-            // 🎥 SEND VIDEO (GLOBAL SYSTEM)
-            await send({
+            // 🎥 SEND VIDEO
+            await sock.sendMessage(m.chat, {
                 video: { url: data.video },
                 mimetype: 'video/mp4',
-                fileName: filename,
-                caption: `✅ Done\n\n🎬 ${title}\n\n👑 ${config.settings.title}`
-            });
+                caption: `✅ Done\n\n🎬 ${title}`
+            }, { quoted: m });
 
             await sock.sendMessage(m.chat, {
                 react: { text: "✅", key: m.key }
@@ -129,7 +111,7 @@ module.exports = {
                 react: { text: "❌", key: m.key }
             });
 
-            reply("❌ Download failed. Try again.");
+            reply("❌ Download failed");
         }
     }
 };
