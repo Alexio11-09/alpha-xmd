@@ -12,9 +12,17 @@ async function updateBot() {
         const zipPath = path.join(__dirname, "../update.zip");
         const extractPath = path.join(__dirname, "../update");
 
+        console.log("📥 Downloading update...");
+
         // 📥 DOWNLOAD ZIP
-        const res = await axios.get(url, { responseType: "arraybuffer" });
+        const res = await axios.get(url, { 
+            responseType: "arraybuffer",
+            timeout: 20000
+        });
+
         fs.writeFileSync(zipPath, res.data);
+
+        console.log("📦 Extracting update...");
 
         // 📦 EXTRACT
         const zip = new AdmZip(zipPath);
@@ -23,36 +31,7 @@ async function updateBot() {
         const folder = fs.readdirSync(extractPath)[0];
         const newFiles = path.join(extractPath, folder);
 
+        console.log("🔁 Updating files...");
+
         // 🔁 COPY FILES
-        const copy = (src, dest) => {
-            if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-
-            for (let file of fs.readdirSync(src)) {
-                const s = path.join(src, file);
-                const d = path.join(dest, file);
-
-                // ❌ SKIP IMPORTANT FILES
-                if (file === "node_modules" || file === "session" || file === "sessions") continue;
-
-                if (fs.lstatSync(s).isDirectory()) {
-                    copy(s, d);
-                } else {
-                    fs.copyFileSync(s, d);
-                }
-            }
-        };
-
-        copy(newFiles, path.join(__dirname, "../"));
-
-        // 🧹 CLEAN
-        fs.rmSync(zipPath, { force: true });
-        fs.rmSync(extractPath, { recursive: true, force: true });
-
-        return "done";
-
-    } catch (err) {
-        throw err;
-    }
-}
-
-module.exports = { updateBot };
+        const
