@@ -1,26 +1,56 @@
+// © 2026 Alpha
+
 module.exports = {
-    command: ["autoread", "typing", "autoreact"],
+    command: "toggle",
+    description: "Enable or disable bot features",
+    category: "settings",
     owner: true,
 
-    execute: async (sock, m, { command, args, settings, saveSettings, reply }) => {
+    execute: async (sock, m, { args, settings, saveSettings, reply }) => {
+        try {
+            const feature = args[0]?.toLowerCase();
+            const state = args[1]?.toLowerCase();
 
-        const state = args[0]; // on / off
+            // ❌ Missing input
+            if (!feature || !state) {
+                return reply(
+`⚙️ Usage:
+.toggle autoread on/off
+.toggle typing on/off
+.toggle react on/off
+.toggle antidelete on/off`
+                );
+            }
 
-        // ❌ if user didn’t type on/off
-        if (!state) {
-            return reply(`Usage:\n.${command} on\n.${command} off`);
+            // 🔥 VALID FEATURES
+            const valid = ["autoread", "typing", "react", "antidelete"];
+
+            if (!valid.includes(feature)) {
+                return reply(`❌ Invalid feature\n\nAvailable: ${valid.join(", ")}`);
+            }
+
+            if (!["on", "off"].includes(state)) {
+                return reply("❌ Use on or off only");
+            }
+
+            // 🔥 MAP FEATURE → SETTINGS KEY
+            const map = {
+                autoread: "autoread",
+                typing: "typing",
+                react: "autoreact",
+                antidelete: "antidelete"
+            };
+
+            settings[map[feature]] = state === "on";
+
+            // 💾 SAVE
+            saveSettings(settings);
+
+            reply(`✅ ${feature} is now ${state}`);
+
+        } catch (err) {
+            console.log("Toggle error:", err);
+            reply("❌ Failed to toggle setting");
         }
-
-        if (state !== "on" && state !== "off") {
-            return reply("❌ Use on or off only");
-        }
-
-        // 🔥 change setting
-        settings[command] = state === "on";
-
-        // 💾 save to file
-        saveSettings(settings);
-
-        reply(`✅ ${command} is now ${state}`);
     }
 };
