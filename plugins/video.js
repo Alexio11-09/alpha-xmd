@@ -13,12 +13,12 @@ module.exports = {
         try {
             if (!text) return reply("🎥 Use: .video name");
 
-            // 🎬 Start reaction
+            // 🎬 reaction
             await sock.sendMessage(m.chat, {
                 react: { text: "🎬", key: m.key }
             });
 
-            // 🔍 SEARCH
+            // 🔍 search
             const search = await yts(text);
             if (!search.videos.length) {
                 await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
@@ -33,47 +33,36 @@ module.exports = {
 
             let videoUrl = null;
 
-            // 🔥 PRIMARY API (VERY RELIABLE)
+            // 🔥 WORKING API (REAL DOWNLOAD)
             try {
                 const res = await axios.get(
-                    `https://api.vevioz.com/api/button/mp4/${encodeURIComponent(vid.url)}`,
+                    `https://api.lolhuman.xyz/api/ytvideo?apikey=GataDios&url=${encodeURIComponent(vid.url)}`,
                     { timeout: 15000 }
                 );
 
-                if (res.data) {
-                    videoUrl = `https://api.vevioz.com/api/button/mp4/${encodeURIComponent(vid.url)}`;
+                if (res.data?.result?.link) {
+                    videoUrl = res.data.result.link;
                 }
-            } catch {}
 
-            // 🔥 BACKUP API
-            if (!videoUrl) {
-                try {
-                    const res2 = await axios.get(
-                        `https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(vid.url)}`,
-                        { timeout: 15000 }
-                    );
-
-                    if (res2.data?.result?.download) {
-                        videoUrl = res2.data.result.download;
-                    }
-                } catch {}
+            } catch (e) {
+                console.log("API error:", e.message);
             }
 
             if (!videoUrl) {
                 await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
-                return reply("⚠️ Video server failed. Try again later.");
+                return reply("⚠️ Failed to fetch video. Try another one.");
             }
 
             const title = vid.title;
             const filename = title.replace(/[^a-zA-Z0-9]/g, "_") + ".mp4";
 
-            // 📸 PREVIEW
+            // 📸 preview
             await send({
                 image: { url: vid.thumbnail },
                 caption: `🎬 *${title}*\n\n⬇️ Downloading video...\n\n👑 ${config.settings.title}`
             });
 
-            // 🎥 SEND VIDEO
+            // 🎥 send video
             await send({
                 video: { url: videoUrl },
                 mimetype: "video/mp4",
@@ -81,7 +70,6 @@ module.exports = {
                 caption: `✅ Done\n\n🎬 ${title}\n\n👑 ${config.settings.title}`
             });
 
-            // ✅ Done
             await sock.sendMessage(m.chat, {
                 react: { text: "✅", key: m.key }
             });
