@@ -13,24 +13,17 @@ module.exports = {
     description: 'Check bot speed',
     category: 'general',
 
-    execute: async (sock, m, { reply }) => {
+    execute: async (sock, m, { reply, send }) => {
         try {
             const start = Date.now();
 
-            // ⚡ reaction start
             await sock.sendMessage(m.chat, {
                 react: { text: "⚡", key: m.key }
             });
 
-            // send initial message
-            const msg = await sock.sendMessage(m.chat, {
-                text: "🏓 *Pinging server...*"
-            }, { quoted: m });
-
             const latency = Date.now() - start;
             const uptime = runtime(process.uptime());
 
-            // smarter speed indicator
             let speedIcon = "🐢";
             if (latency < 100) speedIcon = "⚡";
             else if (latency < 300) speedIcon = "🚀";
@@ -43,29 +36,8 @@ module.exports = {
 ║ 🤖 Bot: ${config.settings.title}
 ╚══════════════════⬣`;
 
-            // edit message (safer fallback)
-            try {
-                await sock.sendMessage(m.chat, {
-                    text: result,
-                    edit: msg.key,
-                    contextInfo: {
-                        mentionedJid: [m.sender],
-                        externalAdReply: {
-                            title: config.settings.title,
-                            body: "Real-time speed check ⚡",
-                            thumbnailUrl: config.thumbUrl,
-                            mediaType: 1
-                        }
-                    }
-                });
-            } catch {
-                // fallback if edit fails
-                await sock.sendMessage(m.chat, {
-                    text: result
-                }, { quoted: m });
-            }
+            await send({ text: result });
 
-            // ✅ done reaction
             await sock.sendMessage(m.chat, {
                 react: { text: "✅", key: m.key }
             });
