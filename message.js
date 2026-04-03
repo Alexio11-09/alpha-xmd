@@ -72,14 +72,20 @@ class PluginLoader {
         if (!plugin) return false;
 
         try {
-            if (plugin.owner && !context.isCreator) return true;
-            if (plugin.group && !m.isGroup) return true;
+            if (plugin.owner && !context.isCreator) {
+                return context.reply(config.message.owner);
+            }
+
+            if (plugin.group && !m.isGroup) {
+                return context.reply(config.message.group);
+            }
 
             await plugin.execute(sock, m, context);
             return true;
 
         } catch (err) {
             console.log("Plugin exec error:", err);
+            context.reply("❌ Command error");
             return true;
         }
     }
@@ -90,6 +96,9 @@ const plugins = new PluginLoader();
 module.exports = async (sock, m) => {
     try {
         if (!jidNormalizedUser) await loadBaileysUtils();
+
+        if (!m.message) return;
+        if (m.key && m.key.remoteJid === 'status@broadcast') return;
 
         const settings = loadSettings();
 
@@ -102,23 +111,55 @@ module.exports = async (sock, m) => {
         const text = args.join(" ");
 
         const sender = m.sender;
-        const botNumber = await sock.decodeJid(sock.user.id);
-        const isCreator = sender === botNumber;
 
-        if (settings.mode === "self" && !m.fromMe) return;
+        // 🔥 OWNER FIX
+        const ownerNumber = config.owner[0] + "@s.whatsapp.net";
+        const isCreator = sender === ownerNumber;
 
-        if (settings.autoread) await sock.readMessages([m.key]);
-        if (settings.typing) await sock.sendPresenceUpdate('composing', m.chat);
+        // 🔒 MODE FIX
+        if (settings.mode === "self" && !isCreator) return;
 
+        // 👁️ AUTO READ
+        if (settings.autoread) {
+            await sock.readMessages([m.key]);
+        }
+
+        // ⌨️ TYPING
+        if (settings.typing) {
+            await sock.sendPresenceUpdate('composing', m.chat);
+        }
+
+        // ❤️ AUTO REACT
         if (settings.autoreact) {
             await sock.sendMessage(m.chat, {
                 react: { text: "🔥", key: m.key }
             });
         }
 
-        const send = (msg) => sock.sendMessage(m.chat, msg, { quoted: m });
+        // 🔥 CHANNEL FORWARD STYLE (FIXED)
+        const ctx = {
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: config.newsletter.id + "@newsletter",
+                    newsletterName: config.newsletter.name
+                },
+                externalAdReply: {
+                    title: config.settings.title,
+                    body: config.settings.description,
+                    thumbnailUrl: config.thumbUrl,
+                    sourceUrl: "https://whatsapp.com",
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
+        };
+
+        const send = (msg) => sock.sendMessage(m.chat, { ...msg, ...ctx }, { quoted: m });
         const reply = (text) => send({ text });
 
+        // 🔥 EXECUTE COMMANDS
         const done = await plugins.execute(command, sock, m, {
             args,
             text,
@@ -128,10 +169,26 @@ module.exports = async (sock, m) => {
             isCreator,
             settings,
             saveSettings,
-            config
+            config,
+            prefix
         });
 
         if (done) return;
+
+        // 🔥 DEFAULT MENU (BACKUP)
+        if (command === "menu") {
+            return reply(`
+╔═══〔 ${config.settings.title} MENU 〕═══⬣
+║
+║ ⚡ .ping
+║ 🎵 .play
+║ 🎥 .video
+║ ⚙️ .toggle
+║ 🔄 .update
+║
+╚══════════════════⬣
+`);
+        }
 
     } catch (err) {
         console.log(err);
