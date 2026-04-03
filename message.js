@@ -127,15 +127,34 @@ module.exports = async (sock, m, chatUpdate, store) => {
     try {
         if (!jidNormalizedUser) await loadBaileysUtils();
 
+        // 👁️ AUTO READ
+        if (config.status.autoRead) {
+            await sock.readMessages([m.key]);
+        }
+
+        // ⚡ AUTO REACT
+        if (config.status.autoReact) {
+            const emojis = ["🔥","⚡","💀","👀","😈","✅"];
+            const random = emojis[Math.floor(Math.random() * emojis.length)];
+
+            await sock.sendMessage(m.chat, {
+                react: { text: random, key: m.key }
+            });
+        }
+
+        // ⌨️ TYPING EFFECT
+        if (config.status.typing) {
+            await sock.sendPresenceUpdate("composing", m.chat);
+            await new Promise(res => setTimeout(res, 800));
+        }
+
         const body =
             m.message?.conversation ||
             m.message?.extendedTextMessage?.text ||
             m.text ||
             '';
 
-        const prefixes = ['.', '!', '/'];
-        const prefix = prefixes.find(p => body.startsWith(p)) || '.';
-
+        const prefix = config.prefix.find(p => body.startsWith(p)) || '.';
         const isCmd = body.startsWith(prefix);
 
         const command = isCmd
@@ -148,8 +167,7 @@ module.exports = async (sock, m, chatUpdate, store) => {
         const sender = m.sender;
         const botNumber = await sock.decodeJid(sock.user.id);
 
-        const isCreator =
-            jidNormalizedUser(sender) === jidNormalizedUser(botNumber);
+        const isCreator = config.owner.includes(sender);
 
         const groupMetadata = m.isGroup
             ? await sock.groupMetadata(m.chat).catch(() => ({}))
@@ -161,7 +179,7 @@ module.exports = async (sock, m, chatUpdate, store) => {
 
         const isAdmins = groupAdmins.includes(sender);
 
-        // 🔥 GLOBAL SEND SYSTEM (FORWARDED CHANNEL STYLE)
+        // 📢 GLOBAL SEND SYSTEM (CHANNEL STYLE)
         const send = async (content) => {
             try {
                 return await sock.sendMessage(m.chat, {
@@ -171,14 +189,14 @@ module.exports = async (sock, m, chatUpdate, store) => {
                         forwardingScore: 999,
                         isForwarded: true,
                         forwardedNewsletterMessageInfo: {
-                            newsletterJid: "120363423969349257@newsletter",
-                            newsletterName: config.settings.title
+                            newsletterJid: config.newsletter.id + "@newsletter",
+                            newsletterName: config.newsletter.name
                         },
                         externalAdReply: {
                             title: config.settings.title,
                             body: config.settings.description,
                             thumbnailUrl: config.thumbUrl,
-                            sourceUrl: config.settings.channel || "",
+                            sourceUrl: config.settings.channel,
                             mediaType: 1
                         }
                     }
@@ -222,7 +240,7 @@ module.exports = async (sock, m, chatUpdate, store) => {
 
             case 'menu': {
                 const uptime = process.uptime().toFixed(0);
-                const mode = sock.public ? 'Public' : 'Self';
+                const mode = config.status.public ? 'Public' : 'Self';
 
                 const menu = `
 👑 *${config.settings.title}*
@@ -242,7 +260,7 @@ ${pluginLoader.getMenuSections()}
             }
 
             case 'reload': {
-                if (!isCreator) return;
+                if (!isCreator) return reply(config.message.owner);
                 pluginLoader.reloadPlugins();
                 reply("✅ Plugins reloaded");
                 break;
