@@ -1,25 +1,12 @@
-const axios = require("axios");
+const { exec } = require("child_process");
 
-let currentVersion = null;
-
-async function checkUpdate() {
-    try {
-        const res = await axios.get("https://api.github.com/repos/Alexio11-09/alpha-xmd/commits/main");
-        const latest = res.data.sha;
-
-        if (!currentVersion) {
-            currentVersion = latest;
-            return;
-        }
-
-        if (latest !== currentVersion) {
-            console.log("🔥 New update detected! Restarting...");
-            process.exit(0);
-        }
-
-    } catch (e) {
-        console.log("Update check failed");
-    }
+function updateBot() {
+    return new Promise((resolve, reject) => {
+        exec("git pull", (err, stdout) => {
+            if (err) return reject(err.message);
+            resolve(stdout);
+        });
+    });
 }
 
-module.exports = { checkUpdate };
+module.exports = { updateBot };
