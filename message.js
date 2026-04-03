@@ -1,3 +1,5 @@
+// © 2026 Alpha
+
 const config = require('./settings/config');
 const fs = require('fs');
 const path = require("path");
@@ -112,11 +114,10 @@ module.exports = async (sock, m) => {
 
         const sender = m.sender;
 
-        // 🔥 OWNER FIX
-        const ownerNumber = config.owner[0] + "@s.whatsapp.net";
-        const isCreator = sender === ownerNumber;
+        // 🔥 FIXED OWNER SYSTEM (IMPORTANT)
+        const isCreator = config.owner.some(num => sender.includes(num));
 
-        // 🔒 MODE FIX
+        // 🔒 MODE FIX (PUBLIC WORKS FOR EVERYONE)
         if (settings.mode === "self" && !isCreator) return;
 
         // 👁️ AUTO READ
@@ -136,7 +137,7 @@ module.exports = async (sock, m) => {
             });
         }
 
-        // 🔥 CHANNEL FORWARD STYLE (FIXED)
+        // 🔥 CHANNEL FORWARD STYLE (UNCHANGED ✅)
         const ctx = {
             contextInfo: {
                 forwardingScore: 999,
