@@ -4,14 +4,14 @@ const path = require("path");
 
 let jidNormalizedUser, getContentType;
 
-// 🔥 LOAD BAILEYS
+// 🔥 LOAD BAILEYS UTILS
 const loadBaileysUtils = async () => {
     const baileys = await import('@whiskeysockets/baileys');
     jidNormalizedUser = baileys.jidNormalizedUser;
     getContentType = baileys.getContentType;
 };
 
-// 🔥 SETTINGS
+// 🔥 SETTINGS PATH
 const settingsPath = './database/settings.json';
 
 const loadSettings = () => {
@@ -42,6 +42,7 @@ class PluginLoader {
         const load = (dir) => {
             for (let file of fs.readdirSync(dir)) {
                 let full = path.join(dir, file);
+
                 if (fs.lstatSync(full).isDirectory()) load(full);
                 else if (file.endsWith('.js')) {
                     try {
@@ -82,11 +83,25 @@ class PluginLoader {
             return true;
         }
     }
+
+    // 🔥 GET ALL COMMANDS (FOR MENU)
+    getAllCommands() {
+        let cmds = [];
+
+        for (let [name, plugin] of this.plugins) {
+            cmds.push({
+                command: name,
+                category: plugin.category || "misc"
+            });
+        }
+
+        return cmds;
+    }
 }
 
 const plugins = new PluginLoader();
 
-// 🔥 MAIN
+// 🔥 MAIN HANDLER
 module.exports = async (sock, m) => {
     try {
         if (!jidNormalizedUser) await loadBaileysUtils();
@@ -124,7 +139,7 @@ module.exports = async (sock, m) => {
             });
         }
 
-        // 🔥 UNIVERSAL CONTEXT
+        // 🔥 UNIVERSAL CONTEXT (CHANNEL FORWARD)
         const ctx = {
             contextInfo: {
                 forwardingScore: 999,
@@ -136,31 +151,73 @@ module.exports = async (sock, m) => {
             }
         };
 
-        // ✅ UNIVERSAL REPLY
-        const reply = (text) =>
-            sock.sendMessage(m.chat, { text, ...ctx }, { quoted: m });
+        // ✅ REPLY SYSTEM (APPLIED TO ALL COMMANDS)
+        const reply = (text, extra = {}) =>
+            sock.sendMessage(m.chat, {
+                text,
+                ...ctx,
+                ...extra
+            }, { quoted: m });
 
-        // ✅ BACKWARD COMPATIBILITY
         const send = reply;
 
         // 🔥 EXECUTE PLUGIN
         const done = await plugins.execute(command, sock, m, {
             args,
             reply,
-            send, // 🔥 FIX FOR OLD COMMANDS
+            send,
             command,
-            isCreator
+            isCreator,
+            config
         });
 
         if (done) return;
 
+        // =============================
         // 🔥 DEFAULT COMMANDS
+        // =============================
+
+        // 🏓 PING
         if (command === "ping") {
             return reply("🏓 Pong!");
         }
 
+        // 📜 MENU (FIXED PROPERLY)
         if (command === "menu") {
-            return reply("📜 Menu loaded!");
+            const all = plugins.getAllCommands();
+
+            if (!all.length) {
+                return reply("❌ No commands loaded");
+            }
+
+            // GROUP BY CATEGORY
+            let grouped = {};
+            all.forEach(cmd => {
+                if (!grouped[cmd.category]) grouped[cmd.category] = [];
+                grouped[cmd.category].push(cmd.command);
+            });
+
+            let text = 
+`╔═══〔 🤖 ${config.settings.title} 〕═══⬣
+║ 👑 Owner: Alpha
+║ ⚡ Prefix: .
+╚════════════════════⬣\n\n`;
+
+            for (let cat in grouped) {
+                text += `╭─〔 ${cat.toUpperCase()} 〕\n`;
+                grouped[cat].forEach(c => {
+                    text += `│ ➤ .${c}\n`;
+                });
+                text += `╰──────────────\n\n`;
+            }
+
+            text += `> ${config.settings.footer}`;
+
+            return sock.sendMessage(m.chat, {
+                image: { url: config.thumbUrl },
+                caption: text,
+                ...ctx
+            }, { quoted: m });
         }
 
     } catch (err) {
