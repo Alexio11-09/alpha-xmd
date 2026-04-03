@@ -3,8 +3,9 @@
 const fs = require('fs')
 
 const config = {
-    // 🔥 OWNER (VERY IMPORTANT)
-    owner: ["2637XXXXXXXX"], // ✅ MUST BE ARRAY
+    // 🔥 OWNER (FINAL)
+    owner: ["2637XXXXXXXX"],
+    ownerJid: ["2637XXXXXXXX@s.whatsapp.net"],
 
     botNumber: "2637XXXXXXXX",
 
@@ -20,7 +21,6 @@ const config = {
         reactsw: false
     },
 
-    // 🔥 GLOBAL TOGGLES DEFAULT
     auto: {
         read: false,
         typing: false,
@@ -50,7 +50,6 @@ const config = {
         footer: "⚡ Powered by Alpha-XMD"
     },
 
-    // 🔥 CHANNEL FORWARD (FIXED)
     newsletter: {
         name: "ALPHA-XMD BOT",
         id: "120363423969349257"
