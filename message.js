@@ -26,12 +26,10 @@ const loadSettings = () => {
     }
 };
 
-// 🔥 SAVE SETTINGS
 const saveSettings = (data) => {
     fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
 };
 
-// 🔥 PLUGIN LOADER
 class PluginLoader {
     constructor() {
         this.plugins = new Map();
@@ -89,7 +87,6 @@ class PluginLoader {
 
 const plugins = new PluginLoader();
 
-// 🔥 MAIN HANDLER
 module.exports = async (sock, m) => {
     try {
         if (!jidNormalizedUser) await loadBaileysUtils();
@@ -119,15 +116,12 @@ module.exports = async (sock, m) => {
             });
         }
 
-        // 🔥 FIXED SEND FUNCTION (MAIN FIX)
         const send = (msg) => sock.sendMessage(m.chat, msg, { quoted: m });
-
         const reply = (text) => send({ text });
 
-        // 🔥 EXECUTE
         const done = await plugins.execute(command, sock, m, {
             args,
-            text, // 🔥 IMPORTANT FIX
+            text,
             reply,
             send,
             command,
