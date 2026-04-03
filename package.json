@@ -1,0 +1,41 @@
+{
+  "name": "alpha-xmd",
+  "version": "1.0.0",
+  "description": "Advanced WhatsApp Bot by Alpha",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "whatsapp-bot",
+    "baileys",
+    "alpha-xmd",
+    "bot"
+  ],
+  "author": "Alpha",
+  "license": "MIT",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.5",
+    "axios": "^1.6.8",
+    "chalk": "^4.1.2",
+    "crypto-js": "^4.2.0",
+    "file-type": "^18.7.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "form-data": "^4.0.0",
+    "fs-extra": "^11.2.0",
+    "human-readable": "^0.2.1",
+    "jimp": "^0.22.10",
+    "moment-timezone": "^0.5.45",
+    "node-fetch": "^2.6.7",
+    "node-webpmux": "^3.1.0",
+    "pino": "^8.17.0",
+    "yt-search": "^2.10.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
