@@ -3,11 +3,6 @@ const fs = require('fs');
 const path = require("path");
 const chalk = require("chalk");
 
-const { dechtml, fetchWithTimeout } = require('./library/function');       
-const { tempfiles } = require("./library/uploader");
-const { fquoted } = require('./library/quoted');     
-const Api = require('./library/Api');
-
 let jidNormalizedUser, getContentType, isPnUser;
 
 const loadBaileysUtils = async () => {
@@ -166,11 +161,34 @@ module.exports = async (sock, m, chatUpdate, store) => {
 
         const isAdmins = groupAdmins.includes(sender);
 
-        const reply = (txt) =>
-            sock.sendMessage(
-                m.chat,
-                {
-                    text: txt,
+        // 🔥 GLOBAL SEND SYSTEM (FORWARDED CHANNEL STYLE)
+        const send = async (content) => {
+            try {
+                return await sock.sendMessage(m.chat, {
+                    ...content,
+                    contextInfo: {
+                        ...(content.contextInfo || {}),
+                        forwardingScore: 999,
+                        isForwarded: true,
+                        forwardedNewsletterMessageInfo: {
+                            newsletterJid: "120363423969349257@newsletter",
+                            newsletterName: config.settings.title
+                        },
+                        externalAdReply: {
+                            title: config.settings.title,
+                            body: config.settings.description,
+                            thumbnailUrl: config.thumbUrl,
+                            sourceUrl: config.settings.channel || "",
+                            mediaType: 1
+                        }
+                    }
+                }, { quoted: m });
+
+            } catch (err) {
+                console.log("⚠️ Forward failed, fallback");
+
+                return await sock.sendMessage(m.chat, {
+                    ...content,
                     contextInfo: {
                         externalAdReply: {
                             title: config.settings.title,
@@ -178,11 +196,13 @@ module.exports = async (sock, m, chatUpdate, store) => {
                             thumbnailUrl: config.thumbUrl
                         }
                     }
-                },
-                { quoted: m }
-            );
+                }, { quoted: m });
+            }
+        };
 
-        // 🔥 execute plugin
+        const reply = (txt) => send({ text: txt });
+
+        // 🔥 PLUGIN EXECUTION
         const executed = await pluginLoader.executePlugin(command, sock, m, {
             args,
             text,
@@ -191,12 +211,13 @@ module.exports = async (sock, m, chatUpdate, store) => {
             isAdmins,
             prefix,
             reply,
+            send,
             config
         });
 
         if (executed) return;
 
-        // 🔥 built-in
+        // 🔥 BUILT-IN COMMANDS
         switch (command) {
 
             case 'menu': {
@@ -213,10 +234,10 @@ module.exports = async (sock, m, chatUpdate, store) => {
 ${pluginLoader.getMenuSections()}
 `;
 
-                await sock.sendMessage(m.chat, {
+                await send({
                     image: { url: config.thumbUrl },
                     caption: menu
-                }, { quoted: m });
+                });
                 break;
             }
 
@@ -233,7 +254,7 @@ ${pluginLoader.getMenuSections()}
     }
 };
 
-// 🔥 Hot reload
+// 🔥 HOT RELOAD
 let file = require.resolve(__filename);
 fs.watchFile(file, () => {
     fs.unwatchFile(file);
