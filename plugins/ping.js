@@ -12,11 +12,14 @@ function runtime(seconds) {
 
 module.exports = {
     command: 'ping',
+    description: 'Check bot speed',
+    category: 'general',
 
     execute: async (sock, m, { reply, send }) => {
         try {
             const start = Date.now();
 
+            // ⚡ Start reaction
             await sock.sendMessage(m.chat, {
                 react: { text: "⚡", key: m.key }
             });
@@ -24,15 +27,34 @@ module.exports = {
             const latency = Date.now() - start;
             const uptime = runtime(process.uptime());
 
-            const result = 
-`⚡ PING
-Speed: ${latency} ms
-Uptime: ${uptime}
-Bot: ${config.settings.title}`;
+            // 🔥 Speed indicator
+            let speedIcon = "🐢";
+            if (latency < 100) speedIcon = "⚡";
+            else if (latency < 300) speedIcon = "🚀";
 
+            const result = 
+`╔═══〔 ⚡ PING STATUS 〕═══⬣
+║ 🏓 Pong Response
+║ ${speedIcon} Speed: ${latency} ms
+║ ⏱ Uptime: ${uptime}
+║ 🤖 Bot: ${config.settings.title}
+╚══════════════════⬣`;
+
+            // 📤 Send message
             await send({ text: result });
 
+            // ✅ Done reaction
+            await sock.sendMessage(m.chat, {
+                react: { text: "✅", key: m.key }
+            });
+
         } catch (err) {
+            console.log("Ping error:", err);
+
+            await sock.sendMessage(m.chat, {
+                react: { text: "❌", key: m.key }
+            });
+
             reply("❌ Failed to check ping");
         }
     }
