@@ -2,10 +2,11 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 
 let autoUpdateInterval = null;
+let lastCommit = null;
 
 module.exports = {
     command: 'update',
-    description: 'Update system',
+    description: 'Advanced update system',
     category: 'owner',
     owner: true,
 
@@ -18,23 +19,60 @@ module.exports = {
             });
 
             // ===============================
-            // 🔥 NORMAL UPDATE
+            // 🔥 SMART UPDATE FUNCTION
+            // ===============================
+            const runUpdate = async (notify = true) => {
+                try {
+                    const current = execSync("git rev-parse HEAD").toString().trim();
+                    execSync("git fetch origin");
+                    const latest = execSync("git rev-parse origin/main").toString().trim();
+
+                    if (current === latest) {
+                        if (notify) reply("✅ Already up to date");
+                        return false;
+                    }
+
+                    // 💾 BACKUP
+                    const backupName = `backup-${Date.now()}.zip`;
+                    execSync(`zip -r ${backupName} . -x "node_modules/*"`, { stdio: "ignore" });
+
+                    if (notify) reply("💾 Backup created");
+
+                    // 🔄 UPDATE
+                    execSync("git reset --hard origin/main", { stdio: "inherit" });
+
+                    if (notify) reply("📦 Installing packages...");
+                    execSync("npm install", { stdio: "inherit" });
+
+                    // 📢 NOTIFY
+                    if (notify) {
+                        await sock.sendMessage(m.chat, {
+                            text: "✅ Bot updated successfully 🚀"
+                        });
+                    }
+
+                    return true;
+
+                } catch (err) {
+                    console.log("Update error:", err);
+                    if (notify) reply("❌ Update failed:\n" + err.message);
+                    return false;
+                }
+            };
+
+            // ===============================
+            // 🔄 MANUAL UPDATE
             // ===============================
             if (!sub) {
-                reply("🔄 Updating bot...");
-
-                execSync("git fetch origin", { stdio: "inherit" });
-                execSync("git reset --hard origin/main", { stdio: "inherit" });
-
-                reply("📦 Installing packages...");
-                execSync("npm install", { stdio: "inherit" });
-
-                reply("♻️ Restarting...");
-                process.exit();
+                const updated = await runUpdate(true);
+                if (updated) {
+                    reply("♻️ Restarting...");
+                    process.exit();
+                }
             }
 
             // ===============================
-            // 📜 UPDATE LOG
+            // 📜 LOG
             // ===============================
             if (sub === "log") {
                 const log = execSync("git log -5 --pretty=format:'%h - %an: %s'").toString();
@@ -45,17 +83,15 @@ module.exports = {
             // 🔙 ROLLBACK
             // ===============================
             if (sub === "rollback") {
-                reply("⏪ Rolling back to previous version...");
-
+                reply("⏪ Rolling back...");
                 execSync("git reset --hard HEAD~1", { stdio: "inherit" });
                 execSync("npm install", { stdio: "inherit" });
-
-                reply("♻️ Restarting after rollback...");
+                reply("♻️ Restarting...");
                 process.exit();
             }
 
             // ===============================
-            // 🤖 AUTO UPDATE
+            // 🤖 AUTO UPDATE (SMART)
             // ===============================
             if (sub === "auto") {
                 const state = args[1];
@@ -65,21 +101,24 @@ module.exports = {
                         return reply("⚠️ Auto update already running");
                     }
 
-                    reply("🤖 Auto update enabled (every 10 mins)");
+                    reply("🤖 Smart auto-update ON (checks every 10 mins)");
 
-                    autoUpdateInterval = setInterval(() => {
-                        try {
-                            console.log("🔄 Auto updating...");
+                    autoUpdateInterval = setInterval(async () => {
+                        console.log("🔍 Checking for updates...");
 
-                            execSync("git fetch origin");
-                            execSync("git reset --hard origin/main");
-                            execSync("npm install");
+                        const updated = await runUpdate(false);
 
-                            console.log("✅ Auto update complete");
-                        } catch (err) {
-                            console.log("Auto update error:", err.message);
+                        if (updated) {
+                            console.log("✅ Auto update applied");
+
+                            await sock.sendMessage(m.chat, {
+                                text: "🤖 Auto update applied successfully 🚀"
+                            });
+
+                            process.exit();
                         }
-                    }, 10 * 60 * 1000); // 10 mins
+
+                    }, 10 * 60 * 1000);
                 }
 
                 else if (state === "off") {
@@ -90,7 +129,7 @@ module.exports = {
                     clearInterval(autoUpdateInterval);
                     autoUpdateInterval = null;
 
-                    reply("🛑 Auto update disabled");
+                    reply("🛑 Auto update OFF");
                 }
 
                 else {
@@ -100,7 +139,7 @@ module.exports = {
 
         } catch (err) {
             console.log(err);
-            reply("❌ Update system error:\n" + err.message);
+            reply("❌ System error:\n" + err.message);
         }
     }
 };
