@@ -1,6 +1,6 @@
 // © 2026 Alpha
 
-const config = require("../settings/config");
+const config = require("../../settings/config");
 
 function runtime(seconds) {
     seconds = Number(seconds);
@@ -12,14 +12,12 @@ function runtime(seconds) {
 
 module.exports = {
     command: 'ping',
-    description: 'Check bot speed',
     category: 'general',
 
-    execute: async (sock, m, { reply, send }) => {
+    execute: async (sock, m, { reply }) => {
         try {
             const start = Date.now();
 
-            // react start
             await sock.sendMessage(m.chat, {
                 react: { text: "⚡", key: m.key }
             });
@@ -31,38 +29,22 @@ module.exports = {
             if (latency < 100) speedIcon = "⚡";
             else if (latency < 300) speedIcon = "🚀";
 
-            const result = 
-`╔═══〔 ⚡ PING STATUS 〕═══⬣
+            const result = `╔═══〔 ⚡ PING STATUS 〕═══⬣
 ║ 🏓 Pong Response
 ║ ${speedIcon} Speed: ${latency} ms
 ║ ⏱ Uptime: ${uptime}
 ║ 🤖 Bot: ${config.settings.title}
 ╚══════════════════⬣`;
 
-            // 🔥 FIX: fallback if send is broken
-            if (typeof send === "function") {
-                await send({ text: result });
-            } else {
-                await sock.sendMessage(m.chat, { text: result }, { quoted: m });
-            }
+            reply(result);
 
-            // react success
             await sock.sendMessage(m.chat, {
                 react: { text: "✅", key: m.key }
             });
 
         } catch (err) {
-            console.error("Ping error:", err);
-
-            await sock.sendMessage(m.chat, {
-                react: { text: "❌", key: m.key }
-            });
-
-            if (typeof reply === "function") {
-                reply("❌ Failed to check ping");
-            } else {
-                sock.sendMessage(m.chat, { text: "❌ Failed to check ping" }, { quoted: m });
-            }
+            console.log("Ping error:", err);
+            reply("❌ Failed to check ping");
         }
     }
 };
