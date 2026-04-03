@@ -19,7 +19,8 @@ const modules = [
   "fluent-ffmpeg",
   "@ffmpeg-installer/ffmpeg",
   "node-webpmux",
-  "crypto-js"
+  "crypto-js",
+  "adm-zip"
 ];
 
 modules.forEach(mod => {
@@ -159,18 +160,20 @@ const clientstart = async () => {
     }
   });
 
-  // 🔥 MESSAGE HANDLER
-  sock.ev.on('messages.upsert', async chatUpdate => {
+  // 🔥 FIXED MESSAGE HANDLER
+  sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
       const mek = chatUpdate.messages[0];
       if (!mek.message) return;
+      if (mek.key && mek.key.remoteJid === 'status@broadcast') return;
 
       const m = await smsg(sock, mek);
 
-      require("./message")(sock, m, chatUpdate);
+      // ✅ FIX HERE
+      require("./message")(sock, m);
 
     } catch (err) {
-      console.log(err);
+      console.log("Message error:", err);
     }
   });
 
