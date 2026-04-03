@@ -4,14 +4,12 @@ const path = require("path");
 
 let jidNormalizedUser, getContentType;
 
-// 🔥 LOAD BAILEYS UTILS
 const loadBaileysUtils = async () => {
     const baileys = await import('@whiskeysockets/baileys');
     jidNormalizedUser = baileys.jidNormalizedUser;
     getContentType = baileys.getContentType;
 };
 
-// 🔥 SETTINGS PATH
 const settingsPath = './database/settings.json';
 
 const loadSettings = () => {
@@ -28,6 +26,11 @@ const loadSettings = () => {
     }
 };
 
+// 🔥 SAVE SETTINGS
+const saveSettings = (data) => {
+    fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
+};
+
 // 🔥 PLUGIN LOADER
 class PluginLoader {
     constructor() {
@@ -42,7 +45,6 @@ class PluginLoader {
         const load = (dir) => {
             for (let file of fs.readdirSync(dir)) {
                 let full = path.join(dir, file);
-
                 if (fs.lstatSync(full).isDirectory()) load(full);
                 else if (file.endsWith('.js')) {
                     try {
@@ -83,20 +85,6 @@ class PluginLoader {
             return true;
         }
     }
-
-    // 🔥 GET ALL COMMANDS (FOR MENU)
-    getAllCommands() {
-        let cmds = [];
-
-        for (let [name, plugin] of this.plugins) {
-            cmds.push({
-                command: name,
-                category: plugin.category || "misc"
-            });
-        }
-
-        return cmds;
-    }
 }
 
 const plugins = new PluginLoader();
@@ -114,111 +102,42 @@ module.exports = async (sock, m) => {
 
         const command = isCmd ? body.slice(1).split(" ")[0].toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
+        const text = args.join(" ");
 
         const sender = m.sender;
         const botNumber = await sock.decodeJid(sock.user.id);
         const isCreator = sender === botNumber;
 
-        // 🔒 MODE
         if (settings.mode === "self" && !m.fromMe) return;
 
-        // 👁️ AUTO READ
-        if (settings.autoread) {
-            await sock.readMessages([m.key]);
-        }
+        if (settings.autoread) await sock.readMessages([m.key]);
+        if (settings.typing) await sock.sendPresenceUpdate('composing', m.chat);
 
-        // ⌨️ TYPING
-        if (settings.typing) {
-            await sock.sendPresenceUpdate('composing', m.chat);
-        }
-
-        // ❤️ AUTO REACT
         if (settings.autoreact) {
             await sock.sendMessage(m.chat, {
                 react: { text: "🔥", key: m.key }
             });
         }
 
-        // 🔥 UNIVERSAL CONTEXT (CHANNEL FORWARD)
-        const ctx = {
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: config.newsletter.id + "@newsletter",
-                    newsletterName: config.newsletter.name
-                }
-            }
-        };
+        // 🔥 FIXED SEND FUNCTION (MAIN FIX)
+        const send = (msg) => sock.sendMessage(m.chat, msg, { quoted: m });
 
-        // ✅ REPLY SYSTEM (APPLIED TO ALL COMMANDS)
-        const reply = (text, extra = {}) =>
-            sock.sendMessage(m.chat, {
-                text,
-                ...ctx,
-                ...extra
-            }, { quoted: m });
+        const reply = (text) => send({ text });
 
-        const send = reply;
-
-        // 🔥 EXECUTE PLUGIN
+        // 🔥 EXECUTE
         const done = await plugins.execute(command, sock, m, {
             args,
+            text, // 🔥 IMPORTANT FIX
             reply,
             send,
             command,
             isCreator,
+            settings,
+            saveSettings,
             config
         });
 
         if (done) return;
-
-        // =============================
-        // 🔥 DEFAULT COMMANDS
-        // =============================
-
-        // 🏓 PING
-        if (command === "ping") {
-            return reply("🏓 Pong!");
-        }
-
-        // 📜 MENU (FIXED PROPERLY)
-        if (command === "menu") {
-            const all = plugins.getAllCommands();
-
-            if (!all.length) {
-                return reply("❌ No commands loaded");
-            }
-
-            // GROUP BY CATEGORY
-            let grouped = {};
-            all.forEach(cmd => {
-                if (!grouped[cmd.category]) grouped[cmd.category] = [];
-                grouped[cmd.category].push(cmd.command);
-            });
-
-            let text = 
-`╔═══〔 🤖 ${config.settings.title} 〕═══⬣
-║ 👑 Owner: Alpha
-║ ⚡ Prefix: .
-╚════════════════════⬣\n\n`;
-
-            for (let cat in grouped) {
-                text += `╭─〔 ${cat.toUpperCase()} 〕\n`;
-                grouped[cat].forEach(c => {
-                    text += `│ ➤ .${c}\n`;
-                });
-                text += `╰──────────────\n\n`;
-            }
-
-            text += `> ${config.settings.footer}`;
-
-            return sock.sendMessage(m.chat, {
-                image: { url: config.thumbUrl },
-                caption: text,
-                ...ctx
-            }, { quoted: m });
-        }
 
     } catch (err) {
         console.log(err);
