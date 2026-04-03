@@ -10,6 +10,11 @@ module.exports = {
 
     execute: async (sock, m, { reply }) => {
         try {
+            if (!reply) {
+                await sock.sendMessage(m.chat, { text: "❌ Reply system error" }, { quoted: m });
+                return;
+            }
+
             await reply("🔄 *Updating bot...*\nPlease wait...");
 
             // 🔥 RUN UPDATER
@@ -21,12 +26,14 @@ module.exports = {
 
             await reply("✅ *Update completed!*\nRestarting bot...");
 
-            // 🔄 RESTART BOT (IMPORTANT FOR PANEL)
-            process.exit(0);
+            // 🔄 RESTART (PTERODACTYL SAFE)
+            setTimeout(() => {
+                process.exit(0);
+            }, 2000);
 
         } catch (err) {
             console.log("Update error:", err);
-            reply("❌ Update failed:\n" + err.message);
+            reply("❌ Update failed:\n" + (err.message || err));
         }
     }
 };
