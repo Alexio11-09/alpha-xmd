@@ -4,14 +4,6 @@ const config = require('./settings/config');
 const fs = require('fs');
 const path = require("path");
 
-let jidNormalizedUser, getContentType;
-
-const loadBaileysUtils = async () => {
-    const baileys = await import('@whiskeysockets/baileys');
-    jidNormalizedUser = baileys.jidNormalizedUser;
-    getContentType = baileys.getContentType;
-};
-
 const settingsPath = './database/settings.json';
 
 const loadSettings = () => {
@@ -21,7 +13,6 @@ const loadSettings = () => {
         return {
             autoread: false,
             typing: false,
-            antidelete: false,
             autoreact: false,
             mode: "public"
         };
@@ -76,12 +67,10 @@ class PluginLoader {
         if (!plugin) return false;
 
         try {
-            // ✅ OWNER CHECK (FIXED)
             if (plugin.owner && !context.isCreator) {
                 return context.reply(config.message.owner);
             }
 
-            // ✅ GROUP CHECK
             if (plugin.group && !m.isGroup) {
                 return context.reply(config.message.group);
             }
@@ -101,10 +90,7 @@ const plugins = new PluginLoader();
 
 module.exports = async (sock, m) => {
     try {
-        if (!jidNormalizedUser) await loadBaileysUtils();
-
         if (!m.message) return;
-        if (!m.chat) return;
         if (m.key?.remoteJid === 'status@broadcast') return;
 
         const settings = loadSettings();
@@ -119,31 +105,24 @@ module.exports = async (sock, m) => {
 
         const sender = m.sender || "";
 
-        // ✅ FINAL OWNER FIX (100% WORKING)
+        // ✅ FINAL OWNER FIX (WORKS 100%)
         const cleanSender = sender.replace(/\D/g, '');
-        const isCreator = config.owner.some(num => cleanSender.endsWith(num));
+        const isCreator = config.owner.includes(cleanSender);
 
-        // 🔒 MODE
+        // ✅ FIX PRIVATE CHAT (VERY IMPORTANT)
         if (settings.mode === "self" && !isCreator) return;
 
-        // 👁️ AUTO READ
-        if (settings.autoread) {
-            await sock.readMessages([m.key]);
-        }
+        // AUTO FEATURES
+        if (settings.autoread) await sock.readMessages([m.key]);
+        if (settings.typing) await sock.sendPresenceUpdate('composing', m.chat);
 
-        // ⌨️ TYPING
-        if (settings.typing) {
-            await sock.sendPresenceUpdate('composing', m.chat);
-        }
-
-        // ❤️ AUTO REACT
         if (settings.autoreact) {
             await sock.sendMessage(m.chat, {
                 react: { text: "🔥", key: m.key }
             });
         }
 
-        // 🔥 CHANNEL FORWARD (UNCHANGED ✅)
+        // ✅ CHANNEL STYLE (UNCHANGED)
         const ctx = {
             contextInfo: {
                 forwardingScore: 999,
@@ -168,8 +147,7 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
-        // 🔥 EXECUTE COMMAND
-        if (isCmd && command) {
+        if (isCmd) {
             const done = await plugins.execute(command, sock, m, {
                 args,
                 text,
@@ -184,21 +162,6 @@ module.exports = async (sock, m) => {
             });
 
             if (done) return;
-        }
-
-        // 🔥 DEFAULT MENU
-        if (command === "menu") {
-            return reply(`
-╔═══〔 ${config.settings.title} MENU 〕═══⬣
-║
-║ ⚡ .ping
-║ 🎵 .play
-║ 🎥 .video
-║ ⚙️ .autoread / .typing / .autoreact
-║ 🔄 .update
-║
-╚══════════════════⬣
-`);
         }
 
     } catch (err) {
