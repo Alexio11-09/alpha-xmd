@@ -4,6 +4,14 @@ const config = require('./settings/config');
 const fs = require('fs');
 const path = require("path");
 
+let jidNormalizedUser, getContentType;
+
+const loadBaileysUtils = async () => {
+    const baileys = await import('@whiskeysockets/baileys');
+    jidNormalizedUser = baileys.jidNormalizedUser;
+    getContentType = baileys.getContentType;
+};
+
 const settingsPath = './database/settings.json';
 
 const loadSettings = () => {
@@ -13,6 +21,7 @@ const loadSettings = () => {
         return {
             autoread: false,
             typing: false,
+            antidelete: false,
             autoreact: false,
             mode: "public"
         };
@@ -90,6 +99,8 @@ const plugins = new PluginLoader();
 
 module.exports = async (sock, m) => {
     try {
+        if (!jidNormalizedUser) await loadBaileysUtils();
+
         if (!m.message) return;
         if (m.key?.remoteJid === 'status@broadcast') return;
 
@@ -98,8 +109,10 @@ module.exports = async (sock, m) => {
         const body = m.text || '';
         const prefix = '.';
 
-        const isCmd = body.startsWith(prefix);
-        const command = isCmd ? body.slice(1).split(" ")[0].toLowerCase() : '';
+        // ✅ ONLY COMMANDS
+        if (!body.startsWith(prefix)) return;
+
+        const command = body.slice(1).split(" ")[0].toLowerCase();
         const args = body.trim().split(/ +/).slice(1);
         const text = args.join(" ");
 
@@ -109,20 +122,10 @@ module.exports = async (sock, m) => {
         const cleanSender = sender.replace(/\D/g, '');
         const isCreator = config.owner.includes(cleanSender);
 
-        // ✅ FIX PRIVATE CHAT (VERY IMPORTANT)
+        // ✅ MODE FIX
         if (settings.mode === "self" && !isCreator) return;
 
-        // AUTO FEATURES
-        if (settings.autoread) await sock.readMessages([m.key]);
-        if (settings.typing) await sock.sendPresenceUpdate('composing', m.chat);
-
-        if (settings.autoreact) {
-            await sock.sendMessage(m.chat, {
-                react: { text: "🔥", key: m.key }
-            });
-        }
-
-        // ✅ CHANNEL STYLE (UNCHANGED)
+        // 🔥 CHANNEL STYLE (UNCHANGED)
         const ctx = {
             contextInfo: {
                 forwardingScore: 999,
@@ -147,22 +150,21 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
-        if (isCmd) {
-            const done = await plugins.execute(command, sock, m, {
-                args,
-                text,
-                reply,
-                send,
-                command,
-                isCreator,
-                settings,
-                saveSettings,
-                config,
-                prefix
-            });
+        // ✅ RUN COMMAND
+        const done = await plugins.execute(command, sock, m, {
+            args,
+            text,
+            reply,
+            send,
+            command,
+            isCreator,
+            settings,
+            saveSettings,
+            config,
+            prefix
+        });
 
-            if (done) return;
-        }
+        if (done) return;
 
     } catch (err) {
         console.log(err);
