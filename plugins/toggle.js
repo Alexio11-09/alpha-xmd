@@ -6,8 +6,15 @@ module.exports = {
     category: "settings",
     owner: true,
 
-    execute: async (sock, m, { args, settings, saveSettings, reply }) => {
+    execute: async (sock, m, context) => {
         try {
+            const { args, settings, saveSettings, reply, isCreator } = context;
+
+            // 🔥 FIXED OWNER CHECK
+            if (!isCreator) {
+                return reply("❌ Owner only command");
+            }
+
             const feature = args[0]?.toLowerCase();
             const state = args[1]?.toLowerCase();
 
