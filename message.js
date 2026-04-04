@@ -115,10 +115,11 @@ module.exports = async (sock, m) => {
         const text = args.join(" ");
 
         const sender = m.sender || "";
+        const senderNumber = sender.split("@")[0].replace(/\D/g, "");
 
-        // 🔥 FINAL OWNER FIX (ULTRA SAFE)
-        const senderNumber = sender.split("@")[0].replace(/\D/g, '');
-        const isCreator = config.owner.some(num => num === senderNumber);
+        // 🔥 AUTO OWNER SYSTEM (DEPLOYER = OWNER)
+        const botNumber = sock.user?.id?.split(":")[0];
+        const isCreator = senderNumber === botNumber;
 
         // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
