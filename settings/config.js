@@ -3,9 +3,8 @@
 const fs = require('fs')
 
 const config = {
-    // 🔥 OWNER (FINAL)
+    // ✅ PUT YOUR REAL NUMBER (NO X)
     owner: ["2637XXXXXXXX"],
-    ownerJid: ["2637XXXXXXXX@s.whatsapp.net"],
 
     botNumber: "2637XXXXXXXX",
 
@@ -35,44 +34,15 @@ const config = {
         private: "This command is for private chat."
     },
 
-    mess: {
-        owner: 'This command is only for the bot owner!',
-        done: 'Action completed successfully!',
-        error: 'Something went wrong!',
-        wait: 'Please wait...'
-    },
-
     settings: {
         title: "ALPHA-XMD BOT",
-        packname: 'ALPHA-XMD',
-        description: "Custom WhatsApp Bot by Alpha",
-        author: 'Alpha',
-        footer: "⚡ Powered by Alpha-XMD"
+        description: "Custom WhatsApp Bot by Alpha"
     },
 
     newsletter: {
         name: "ALPHA-XMD BOT",
         id: "120363423969349257"
-    },
-
-    api: {
-        baseurl: "https://hector-api.vercel.app/",
-        apikey: "hector"
-    },
-
-    sticker: {
-        packname: "ALPHA-XMD",
-        author: "Alpha"
     }
 }
 
 module.exports = config;
-
-// 🔥 HOT RELOAD
-let file = require.resolve(__filename)
-fs.watchFile(file, () => {
-  fs.unwatchFile(file)
-  console.log('\x1b[0;32m'+__filename+' updated!\x1b[0m')
-  delete require.cache[file]
-  require(file)
-})
