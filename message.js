@@ -76,7 +76,7 @@ class PluginLoader {
         if (!plugin) return false;
 
         try {
-            // ✅ OWNER FIX (FINAL)
+            // ✅ OWNER CHECK (FIXED)
             if (plugin.owner && !context.isCreator) {
                 return context.reply(config.message.owner);
             }
@@ -104,6 +104,7 @@ module.exports = async (sock, m) => {
         if (!jidNormalizedUser) await loadBaileysUtils();
 
         if (!m.message) return;
+        if (!m.chat) return;
         if (m.key?.remoteJid === 'status@broadcast') return;
 
         const settings = loadSettings();
@@ -118,11 +119,11 @@ module.exports = async (sock, m) => {
 
         const sender = m.sender || "";
 
-        // 🔥 FINAL OWNER FIX (WORKS 100%)
+        // ✅ FINAL OWNER FIX (100% WORKING)
         const cleanSender = sender.replace(/\D/g, '');
-        const isCreator = config.owner.includes(cleanSender);
+        const isCreator = config.owner.some(num => cleanSender.endsWith(num));
 
-        // 🔥 FORCE PUBLIC MODE (FIX PRIVATE CHAT ISSUE)
+        // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
 
         // 👁️ AUTO READ
@@ -168,7 +169,7 @@ module.exports = async (sock, m) => {
         const reply = (text) => send({ text });
 
         // 🔥 EXECUTE COMMAND
-        if (isCmd) {
+        if (isCmd && command) {
             const done = await plugins.execute(command, sock, m, {
                 args,
                 text,
