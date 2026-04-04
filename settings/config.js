@@ -3,10 +3,10 @@
 const fs = require('fs')
 
 const config = {
-    // ✅ PUT YOUR REAL NUMBER (NO X)
-    owner: ["2637XXXXXXXX"],
+    // ✅ PUT YOUR REAL NUMBER HERE (IMPORTANT)
+    owner: ["263786641436"],
 
-    botNumber: "2637XXXXXXXX",
+    botNumber: "263786641436",
 
     setPair: "ALPHA-XMD",
 
@@ -28,15 +28,16 @@ const config = {
     },
 
     message: {
-        owner: "This command is for the bot owner only.",
-        group: "This command works in groups only.",
-        admin: "Admin only command.",
-        private: "This command is for private chat."
+        owner: "❌ This command is for the bot owner only.",
+        group: "❌ This command works in groups only.",
+        admin: "❌ Admin only command.",
+        private: "❌ This command is for private chat."
     },
 
     settings: {
         title: "ALPHA-XMD BOT",
-        description: "Custom WhatsApp Bot by Alpha"
+        description: "Custom WhatsApp Bot by Alpha",
+        footer: "⚡ Powered by Alpha-XMD"
     },
 
     newsletter: {
@@ -46,3 +47,12 @@ const config = {
 }
 
 module.exports = config;
+
+// 🔄 HOT RELOAD
+let file = require.resolve(__filename)
+fs.watchFile(file, () => {
+  fs.unwatchFile(file)
+  console.log(__filename + ' updated!')
+  delete require.cache[file]
+  require(file)
+})
