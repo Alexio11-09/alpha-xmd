@@ -1,4 +1,4 @@
-// © 2026 Alpha
+// © 2026 Alpha (FINAL FIXED VERSION)
 
 const config = require('./settings/config');
 const fs = require('fs');
@@ -33,28 +33,45 @@ class PluginLoader {
     loadPlugins() {
         if (!fs.existsSync(this.pluginsDir)) return;
 
-        const files = fs.readdirSync(this.pluginsDir);
-        for (let file of files) {
-            if (!file.endsWith('.js')) continue;
+        const load = (dir) => {
+            for (let file of fs.readdirSync(dir)) {
+                let full = path.join(dir, file);
 
-            const plugin = require(`./plugins/${file}`);
+                if (fs.lstatSync(full).isDirectory()) {
+                    load(full);
+                } else if (file.endsWith('.js')) {
+                    try {
+                        delete require.cache[require.resolve(full)];
+                        const plugin = require(full);
 
-            const cmds = Array.isArray(plugin.command)
-                ? plugin.command
-                : [plugin.command];
+                        if (!plugin.command || !plugin.execute) continue;
 
-            cmds.forEach(cmd => this.plugins.set(cmd, plugin));
-        }
+                        const cmds = Array.isArray(plugin.command)
+                            ? plugin.command
+                            : [plugin.command];
+
+                        cmds.forEach(cmd => this.plugins.set(cmd, plugin));
+
+                    } catch (e) {
+                        console.log("Plugin load error:", e.message);
+                    }
+                }
+            }
+        };
+
+        load(this.pluginsDir);
     }
 
     async execute(command, sock, m, ctx) {
         const plugin = this.plugins.get(command);
         if (!plugin) return false;
 
+        // 🔥 OWNER CHECK (FIXED)
         if (plugin.owner && !ctx.isCreator) {
             return ctx.reply(config.message.owner);
         }
 
+        // 🔥 GROUP CHECK
         if (plugin.group && !m.isGroup) {
             return ctx.reply(config.message.group);
         }
@@ -69,25 +86,49 @@ const plugins = new PluginLoader();
 module.exports = async (sock, m) => {
     try {
         if (!m.message) return;
-        if (m.key.remoteJid === 'status@broadcast') return;
+        if (m.key?.remoteJid === 'status@broadcast') return;
 
         const settings = loadSettings();
 
         const body = m.text || '';
         const prefix = '.';
 
-        if (!body.startsWith(prefix)) return;
-
-        const command = body.slice(1).split(" ")[0].toLowerCase();
+        const isCmd = body.startsWith(prefix);
+        const command = isCmd ? body.slice(1).split(" ")[0].toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const text = args.join(" ");
 
-        // ✅ OWNER FIX (FINAL)
-        const sender = (m.sender || "").replace(/\D/g, '');
-        const isCreator = config.owner.includes(sender);
+        // 🔥 FINAL OWNER FIX (SUPER RELIABLE)
+        const sender = m.sender || "";
+        const cleanSender = sender.replace(/\D/g, '');
 
+        const isCreator = config.owner.some(num => cleanSender === num);
+
+        // 🧠 DEBUG (remove later if you want)
+        console.log("SENDER:", cleanSender);
+        console.log("OWNER:", config.owner);
+
+        // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
 
+        // 👁️ AUTO READ
+        if (settings.autoread) {
+            await sock.readMessages([m.key]);
+        }
+
+        // ⌨️ TYPING
+        if (settings.typing) {
+            await sock.sendPresenceUpdate('composing', m.chat);
+        }
+
+        // ❤️ AUTO REACT
+        if (settings.autoreact) {
+            await sock.sendMessage(m.chat, {
+                react: { text: "🔥", key: m.key }
+            });
+        }
+
+        // 🔥 KEEP CHANNEL FORWARD (UNCHANGED ✅)
         const ctx = {
             contextInfo: {
                 forwardingScore: 999,
@@ -101,7 +142,8 @@ module.exports = async (sock, m) => {
                     body: config.settings.description,
                     thumbnailUrl: config.thumbUrl,
                     sourceUrl: "https://whatsapp.com",
-                    mediaType: 1
+                    mediaType: 1,
+                    renderLargerThumbnail: true
                 }
             }
         };
@@ -111,18 +153,23 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
-        const done = await plugins.execute(command, sock, m, {
-            args,
-            text,
-            reply,
-            send,
-            isCreator,
-            settings,
-            saveSettings,
-            config
-        });
+        // 🔥 RUN COMMAND ONLY IF COMMAND
+        if (isCmd) {
+            const done = await plugins.execute(command, sock, m, {
+                args,
+                text,
+                reply,
+                send,
+                command,
+                isCreator,
+                settings,
+                saveSettings,
+                config,
+                prefix
+            });
 
-        if (done) return;
+            if (done) return;
+        }
 
     } catch (err) {
         console.log(err);
