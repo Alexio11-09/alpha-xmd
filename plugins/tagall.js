@@ -1,59 +1,35 @@
-module.exports = {
-    command: 'tagall',
-    description: 'Tag everyone in group',
-    category: 'group',
-    group: true,
-    admin: true,
+// © 2026 Alpha
 
-    execute: async (sock, m, { reply, send }) => {
+module.exports = {
+    command: "tagall",
+    category: "group", // ✅ FIXED (shows in menu)
+    group: true,
+
+    async execute(sock, m, context) {
+        const { reply } = context;
+
         try {
             if (!m.isGroup) {
-                return reply("❌ This is for groups only");
+                return reply("❌ This command works in groups only");
             }
 
-            // ⚡ reaction start
-            await sock.sendMessage(m.chat, {
-                react: { text: "👥", key: m.key }
-            });
-
-            // 🔥 FETCH GROUP DATA
             const metadata = await sock.groupMetadata(m.chat);
-            const participants = metadata.participants || [];
+            const participants = metadata.participants;
 
-            if (!participants.length) {
-                await sock.sendMessage(m.chat, {
-                    react: { text: "❌", key: m.key }
-                });
-                return reply("❌ Failed to get members");
+            let teks = "👥 *TAG ALL MEMBERS*\n\n";
+
+            for (let mem of participants) {
+                teks += `➤ @${mem.id.split("@")[0]}\n`;
             }
 
-            let text = "👥 *TAG ALL MEMBERS*\n\n";
-            let mentions = [];
-
-            for (let user of participants) {
-                mentions.push(user.id);
-                text += `➤ @${user.id.split('@')[0]}\n`;
-            }
-
-            // 🔥 USE GLOBAL SEND (CHANNEL STYLE INCLUDED)
-            await send({
-                text,
-                mentions
-            });
-
-            // ✅ done reaction
             await sock.sendMessage(m.chat, {
-                react: { text: "✅", key: m.key }
+                text: teks,
+                mentions: participants.map(a => a.id)
             });
 
         } catch (err) {
             console.log("Tagall error:", err);
-
-            await sock.sendMessage(m.chat, {
-                react: { text: "❌", key: m.key }
-            });
-
-            reply("❌ Error tagging members");
+            reply("❌ Failed to tag all");
         }
     }
 };
