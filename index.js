@@ -140,7 +140,7 @@ const clientstart = async () => {
     }
   });
 
-  // 🔥🔥🔥 FINAL MESSAGE HANDLER (PRIVATE FIXED)
+  // 🔥🔥🔥 FINAL MESSAGE HANDLER (PRIVATE + FORCE FIX)
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
       const messages = chatUpdate.messages;
@@ -152,8 +152,19 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔥 FORCE ALL MESSAGES THROUGH HANDLER
+        console.log("📩 MESSAGE FROM:", m.chat);
+
+        // 🔥 FORCE WAKE
+        await sock.sendPresenceUpdate('available', m.chat);
+
+        // 🔥 MARK AS READ
+        await sock.readMessages([mek.key]);
+
+        // 🔥 EXECUTE YOUR SYSTEM
         await require("./message")(sock, m);
+
+        // 🔥 ANTI-HOST DELAY
+        await new Promise(r => setTimeout(r, 200));
       }
 
     } catch (err) {
