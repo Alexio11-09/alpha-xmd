@@ -76,6 +76,7 @@ class PluginLoader {
         if (!plugin) return false;
 
         try {
+            // 🔐 OWNER CHECK (WORKING)
             if (plugin.owner && !context.isCreator) {
                 return context.reply(config.message.owner);
             }
@@ -115,11 +116,12 @@ module.exports = async (sock, m) => {
         const text = args.join(" ");
 
         const sender = m.sender || "";
-        const senderNumber = sender.split("@")[0].replace(/\D/g, "");
 
-        // 🔥 AUTO OWNER SYSTEM (DEPLOYER = OWNER)
-        const botNumber = sock.user?.id?.split(":")[0];
-        const isCreator = senderNumber === botNumber;
+        // 🔥 FINAL OWNER FIX (BULLETPROOF)
+        const senderJid = sender.split(":")[0];
+        const botJid = (sock.user?.id || "").split(":")[0];
+
+        const isCreator = senderJid === botJid;
 
         // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
@@ -192,7 +194,7 @@ module.exports = async (sock, m) => {
 ║ ⚡ .ping
 ║ 🎵 .play
 ║ 🎥 .video
-║ ⚙️ .autoread / .typing / .autoreact
+║ ⚙️ .toggle autoread on/off
 ║ 🔄 .update
 ║
 ╚══════════════════⬣
