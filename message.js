@@ -116,11 +116,9 @@ module.exports = async (sock, m) => {
 
         const sender = m.sender || "";
 
-        // 🔥 FINAL OWNER FIX (SAFE)
-        const cleanSender = sender.replace(/\D/g, '');
-        const isCreator =
-            config.owner.includes(cleanSender) ||
-            (config.ownerJid && config.ownerJid.includes(sender));
+        // 🔥 FINAL OWNER FIX (ULTRA SAFE)
+        const senderNumber = sender.split("@")[0].replace(/\D/g, '');
+        const isCreator = config.owner.some(num => num === senderNumber);
 
         // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
