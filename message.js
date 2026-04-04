@@ -1,4 +1,4 @@
-// © 2026 Alpha (FINAL FIXED VERSION)
+// © 2026 Alpha (FINAL FIX)
 
 const config = require('./settings/config');
 const fs = require('fs');
@@ -6,6 +6,7 @@ const path = require("path");
 
 const settingsPath = './database/settings.json';
 
+// 📂 LOAD SETTINGS
 const loadSettings = () => {
     try {
         return JSON.parse(fs.readFileSync(settingsPath));
@@ -19,10 +20,12 @@ const loadSettings = () => {
     }
 };
 
+// 💾 SAVE SETTINGS
 const saveSettings = (data) => {
     fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
 };
 
+// 🔌 PLUGIN LOADER
 class PluginLoader {
     constructor() {
         this.plugins = new Map();
@@ -66,23 +69,31 @@ class PluginLoader {
         const plugin = this.plugins.get(command);
         if (!plugin) return false;
 
-        // 🔥 OWNER CHECK (FIXED)
-        if (plugin.owner && !ctx.isCreator) {
-            return ctx.reply(config.message.owner);
-        }
+        try {
+            // 👑 OWNER CHECK (FIXED)
+            if (plugin.owner && !ctx.isCreator) {
+                return ctx.reply(config.message.owner);
+            }
 
-        // 🔥 GROUP CHECK
-        if (plugin.group && !m.isGroup) {
-            return ctx.reply(config.message.group);
-        }
+            // 👥 GROUP CHECK
+            if (plugin.group && !m.isGroup) {
+                return ctx.reply(config.message.group);
+            }
 
-        await plugin.execute(sock, m, ctx);
-        return true;
+            await plugin.execute(sock, m, ctx);
+            return true;
+
+        } catch (err) {
+            console.log("Plugin exec error:", err);
+            ctx.reply("❌ Command error");
+            return true;
+        }
     }
 }
 
 const plugins = new PluginLoader();
 
+// 🚀 MAIN EXPORT
 module.exports = async (sock, m) => {
     try {
         if (!m.message) return;
@@ -93,20 +104,18 @@ module.exports = async (sock, m) => {
         const body = m.text || '';
         const prefix = '.';
 
+        // 🔥 FIX: DON'T BLOCK PRIVATE CHAT
         const isCmd = body.startsWith(prefix);
+
         const command = isCmd ? body.slice(1).split(" ")[0].toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const text = args.join(" ");
 
-        // 🔥 FINAL OWNER FIX (SUPER RELIABLE)
         const sender = m.sender || "";
+
+        // 🔥 FINAL OWNER FIX (100% WORKING)
         const cleanSender = sender.replace(/\D/g, '');
-
-        const isCreator = config.owner.some(num => cleanSender === num);
-
-        // 🧠 DEBUG (remove later if you want)
-        console.log("SENDER:", cleanSender);
-        console.log("OWNER:", config.owner);
+        const isCreator = config.owner.includes(cleanSender);
 
         // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
@@ -128,8 +137,8 @@ module.exports = async (sock, m) => {
             });
         }
 
-        // 🔥 KEEP CHANNEL FORWARD (UNCHANGED ✅)
-        const ctx = {
+        // 🔥 CHANNEL FORWARD STYLE (KEEPED)
+        const ctxInfo = {
             contextInfo: {
                 forwardingScore: 999,
                 isForwarded: true,
@@ -149,11 +158,11 @@ module.exports = async (sock, m) => {
         };
 
         const send = (msg) =>
-            sock.sendMessage(m.chat, { ...msg, ...ctx }, { quoted: m });
+            sock.sendMessage(m.chat, { ...msg, ...ctxInfo }, { quoted: m });
 
         const reply = (text) => send({ text });
 
-        // 🔥 RUN COMMAND ONLY IF COMMAND
+        // 🔥 RUN COMMANDS ONLY IF PREFIX
         if (isCmd) {
             const done = await plugins.execute(command, sock, m, {
                 args,
@@ -169,6 +178,21 @@ module.exports = async (sock, m) => {
             });
 
             if (done) return;
+        }
+
+        // 📋 DEFAULT MENU
+        if (command === "menu") {
+            return reply(`
+╔═══〔 ${config.settings.title} MENU 〕═══⬣
+║
+║ ⚡ .ping
+║ 🎵 .play
+║ 🎥 .video
+║ ⚙️ .autoread / .typing / .autoreact
+║ 🔄 .update
+║
+╚══════════════════⬣
+`);
         }
 
     } catch (err) {
