@@ -6,19 +6,15 @@ const config = require("../settings/config");
 
 module.exports = {
     command: 'video',
-    description: 'Download YouTube video',
-    category: 'downloader',
 
     execute: async (sock, m, { text, reply, send }) => {
         try {
             if (!text) return reply("🎥 Use: .video name");
 
-            // 🎬 reaction
             await sock.sendMessage(m.chat, {
                 react: { text: "🎬", key: m.key }
             });
 
-            // 🔍 search
             const search = await yts(text);
             if (!search.videos.length) {
                 await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
@@ -33,41 +29,43 @@ module.exports = {
 
             let videoUrl = null;
 
-            // 🔥 WORKING API (REAL DOWNLOAD)
+            // 🔥 API 1 (BEST)
             try {
-                const res = await axios.get(
-                    `https://api.lolhuman.xyz/api/ytvideo?apikey=GataDios&url=${encodeURIComponent(vid.url)}`,
-                    { timeout: 15000 }
-                );
+                videoUrl = `https://api.vevioz.com/api/button/mp4/${encodeURIComponent(vid.url)}`;
+            } catch {}
 
-                if (res.data?.result?.link) {
-                    videoUrl = res.data.result.link;
-                }
+            // 🔥 API 2 (BACKUP)
+            if (!videoUrl) {
+                try {
+                    const res = await axios.get(
+                        `https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(vid.url)}`,
+                        { timeout: 15000 }
+                    );
 
-            } catch (e) {
-                console.log("API error:", e.message);
+                    if (res.data?.result?.download) {
+                        videoUrl = res.data.result.download;
+                    }
+                } catch {}
             }
 
             if (!videoUrl) {
                 await sock.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
-                return reply("⚠️ Failed to fetch video. Try another one.");
+                return reply("⚠️ Video servers failed. Try again later.");
             }
 
             const title = vid.title;
             const filename = title.replace(/[^a-zA-Z0-9]/g, "_") + ".mp4";
 
-            // 📸 preview
             await send({
                 image: { url: vid.thumbnail },
-                caption: `🎬 *${title}*\n\n⬇️ Downloading video...\n\n👑 ${config.settings.title}`
+                caption: `🎬 *${title}*\n\n⬇️ Downloading...\n\n👑 ${config.settings.title}`
             });
 
-            // 🎥 send video
             await send({
                 video: { url: videoUrl },
                 mimetype: "video/mp4",
                 fileName: filename,
-                caption: `✅ Done\n\n🎬 ${title}\n\n👑 ${config.settings.title}`
+                caption: `✅ Done\n\n🎬 ${title}`
             });
 
             await sock.sendMessage(m.chat, {
