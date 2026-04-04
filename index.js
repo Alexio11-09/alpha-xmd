@@ -1,6 +1,6 @@
 // © 2026 Alpha. All Rights Reserved.
 
-// 🔥 AUTO INSTALL MISSING MODULES (PTERODACTYL FIX)
+// 🔥 AUTO INSTALL MISSING MODULES
 const { execSync } = require("child_process");
 
 const modules = [
@@ -27,7 +27,7 @@ modules.forEach(mod => {
   try {
     require.resolve(mod);
   } catch {
-    console.log(`📦 Installing missing module: ${mod}`);
+    console.log(`📦 Installing ${mod}`);
     execSync(`npm install ${mod} --force`, { stdio: "inherit" });
   }
 });
@@ -51,7 +51,6 @@ const loadBaileys = async () => {
 
 const pino = require('pino');
 const readline = require("readline");
-const fs = require('fs');
 const chalk = require("chalk");
 const { Boom } = require('@hapi/boom');
 
@@ -59,6 +58,7 @@ const { smsg } = require('./library/serialize');
 
 let isRestarting = false;
 
+// 📲 INPUT
 const question = (text) => {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -82,16 +82,20 @@ const clientstart = async () => {
     logger: pino({ level: "silent" }),
     printQRInTerminal: !config().status.terminal,
     auth: state,
-    version: version,
+    version,
     browser: Browsers.macOS('Chrome')
   });
 
+  // 🔄 JID FIX
   sock.decodeJid = (jid) => {
     if (!jid) return jid;
     if (/:\d+@/gi.test(jid)) {
       let decode = jidDecode(jid) || {};
-      return decode.user && decode.server ? decode.user + '@' + decode.server : jid;
-    } else return jid;
+      return decode.user && decode.server
+        ? decode.user + '@' + decode.server
+        : jid;
+    }
+    return jid;
   };
 
   // 🔥 PAIRING
@@ -103,40 +107,16 @@ const clientstart = async () => {
 
   sock.ev.on('creds.update', saveCreds);
 
+  // 🔌 CONNECTION
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
 
     if (connection === 'connecting') {
-      console.log(chalk.yellow('🔄 Connecting to WhatsApp...'));
+      console.log('🔄 Connecting...');
     }
 
     if (connection === 'open') {
-      console.log(chalk.green('✅ Connected successfully!'));
-
-      const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-
-      sock.sendMessage(botNumber, {
-        text:
-          `👑 *${config().settings.title}* is Online!\n\n` +
-          `> ⚡ Status: Running\n` +
-          `> 👑 Owner: Alpha\n\n` +
-          `📢 Channel: ${config().newsletter.id}`,
-        contextInfo: {
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: config().newsletter.id + "@newsletter",
-            newsletterName: config().newsletter.name
-          },
-          forwardingScore: 999,
-          isForwarded: true,
-          externalAdReply: {
-            title: config().settings.title,
-            body: config().settings.description,
-            thumbnailUrl: config().thumbUrl,
-            sourceUrl: "https://whatsapp.com",
-            mediaType: 1
-          }
-        }
-      }).catch(() => {});
+      console.log('✅ Connected!');
     }
 
     if (connection === 'close') {
@@ -160,20 +140,24 @@ const clientstart = async () => {
     }
   });
 
-  // 🔥 FIXED MESSAGE HANDLER
+  // 🔥🔥🔥 FINAL MESSAGE HANDLER (PRIVATE FIXED)
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
-      const mek = chatUpdate.messages[0];
-      if (!mek.message) return;
-      if (mek.key && mek.key.remoteJid === 'status@broadcast') return;
+      const messages = chatUpdate.messages;
+      if (!messages || !messages.length) return;
 
-      const m = await smsg(sock, mek);
+      for (let mek of messages) {
+        if (!mek.message) continue;
+        if (mek.key?.remoteJid === 'status@broadcast') continue;
 
-      // ✅ FIX HERE
-      require("./message")(sock, m);
+        const m = await smsg(sock, mek);
+
+        // 🔥 FORCE ALL MESSAGES THROUGH HANDLER
+        await require("./message")(sock, m);
+      }
 
     } catch (err) {
-      console.log("Message error:", err);
+      console.log("MESSAGE ERROR:", err);
     }
   });
 
