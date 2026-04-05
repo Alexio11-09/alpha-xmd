@@ -1,4 +1,4 @@
-// © 2026 Alpha
+// © 2026 Alpha - AUTO MENU (UPGRADED)
 
 const config = require("../settings/config");
 const path = require("path");
@@ -12,66 +12,90 @@ module.exports = {
     execute: async (sock, m, { send }) => {
         try {
             const pluginsDir = path.join(__dirname);
-            const grouped = {
-                general: [],
-                downloader: [],
-                group: [],
-                settings: [],
-                owner: []
+            let grouped = {};
+
+            // 🔥 LOAD ALL PLUGINS (SAFE + RECURSIVE)
+            const load = (dir) => {
+                const files = fs.readdirSync(dir);
+
+                for (let file of files) {
+                    let full = path.join(dir, file);
+
+                    if (fs.lstatSync(full).isDirectory()) {
+                        load(full); // 🔁 support subfolders
+                    } else if (file.endsWith(".js") && file !== "menu.js") {
+                        try {
+                            delete require.cache[require.resolve(full)];
+
+                            const plugin = require(full);
+                            if (!plugin.command) continue;
+
+                            const cmds = Array.isArray(plugin.command)
+                                ? plugin.command
+                                : [plugin.command];
+
+                            const cat = (plugin.category || "general").toLowerCase();
+
+                            if (!grouped[cat]) grouped[cat] = [];
+
+                            cmds.forEach(cmd => {
+                                if (!grouped[cat].includes(cmd)) {
+                                    grouped[cat].push(cmd);
+                                }
+                            });
+
+                        } catch (e) {
+                            console.log("Menu load error:", e.message);
+                        }
+                    }
+                }
             };
 
-            // 🔥 READ ALL PLUGINS
-            const files = fs.readdirSync(pluginsDir);
+            load(pluginsDir);
 
-            for (let file of files) {
-                if (!file.endsWith(".js")) continue;
-                if (file === "menu.js") continue;
+            // 🔥 CATEGORY ORDER (your style)
+            const order = ["general", "downloader", "group", "settings", "owner"];
 
-                const plugin = require(path.join(pluginsDir, file));
+            const format = (arr) =>
+                arr && arr.length
+                    ? arr.map(c => `║ • .${c}`).join("\n")
+                    : "║ • -";
 
-                if (!plugin.command) continue;
+            let text = `╔═══〔 ${config.settings.title} 〕═══⬣\n║\n`;
 
-                const cmds = Array.isArray(plugin.command)
-                    ? plugin.command
-                    : [plugin.command];
-
-                const cat = (plugin.category || "general").toLowerCase();
-
-                if (!grouped[cat]) grouped[cat] = [];
-
-                cmds.forEach(cmd => grouped[cat].push(cmd));
+            // 🔥 PRINT ORDERED CATEGORIES FIRST
+            for (let cat of order) {
+                if (grouped[cat]) {
+                    text += `║ ${getIcon(cat)} *${cat.toUpperCase()}*\n`;
+                    text += format(grouped[cat]) + "\n║\n";
+                    delete grouped[cat];
+                }
             }
 
-            // 🔥 BUILD MENU (YOUR STYLE)
-            const format = (arr) => arr.map(c => `║ • .${c}`).join("\n") || "║ • -";
+            // 🔥 PRINT ANY NEW CATEGORIES AUTO
+            for (let cat in grouped) {
+                text += `║ 🔹 *${cat.toUpperCase()}*\n`;
+                text += format(grouped[cat]) + "\n║\n";
+            }
 
-            const menu = `
-╔═══〔 ${config.settings.title} 〕═══⬣
-║
-║ ⚡ *GENERAL*
-${format(grouped.general)}
-║
-║ 🎧 *DOWNLOADER*
-${format(grouped.downloader)}
-║
-║ 👥 *GROUP*
-${format(grouped.group)}
-║
-║ ⚙️ *SETTINGS*
-${format(grouped.settings)}
-║
-║ 👑 *OWNER*
-${format(grouped.owner)}
-║
-╚══════════════════⬣
+            text += `╚══════════════════⬣\n\n${config.settings.footer}`;
 
-${config.settings.footer}
-`;
-
-            await send({ text: menu });
+            await send({ text });
 
         } catch (err) {
             console.log("Menu error:", err);
         }
     }
 };
+
+// 🔥 ICON SYSTEM
+function getIcon(cat) {
+    switch (cat) {
+        case "general": return "⚡";
+        case "downloader": return "🎧";
+        case "group": return "👥";
+        case "settings": return "⚙️";
+        case "owner": return "👑";
+        default: return "🔹";
+    }
+}
