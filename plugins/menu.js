@@ -1,4 +1,4 @@
-// © 2026 Alpha - MENU V2 (PREMIUM AUTO 😈)
+// © 2026 Alpha - MENU V3 (AUTO CLEAN VERTICAL 😈🔥)
 
 const config = require("../settings/config");
 const moment = require("moment-timezone");
@@ -40,10 +40,10 @@ module.exports = {
             const OFF = "OFF ❌";
 
             let text = `╔═══〔 🤖 ${config.settings.title} 〕═══⬣\n`;
-            text += `║ 👤 User: ${name}\n`;
-            text += `║ ⏱️ Uptime: ${h}h ${mnt}m ${s}s\n`;
-            text += `║ 🕒 Time: ${time}\n`;
-            text += `║ 📅 Date: ${date}\n`;
+            text += `║ User: ${name}\n`;
+            text += `║ Uptime: ${h}h ${mnt}m ${s}s\n`;
+            text += `║ Time: ${time}\n`;
+            text += `║ Date: ${date}\n`;
 
             // 🔥 AUTO LOAD COMMANDS
             const pluginsPath = path.join(__dirname, "../plugins");
@@ -70,7 +70,12 @@ module.exports = {
                                 categories[category] = [];
                             }
 
-                            categories[category].push(cmd.command);
+                            // ✅ FIX ARRAY COMMANDS (IMPORTANT 🔥)
+                            if (Array.isArray(cmd.command)) {
+                                cmd.command.forEach(c => categories[category].push(c));
+                            } else {
+                                categories[category].push(cmd.command);
+                            }
 
                         } catch (e) {
                             console.log("Menu load error:", file);
@@ -90,37 +95,39 @@ module.exports = {
                 other: "📦"
             };
 
-            // 🔥 BUILD MENU
+            // 🔥 BUILD CLEAN MENU
             for (let cat in categories) {
                 text += `╠═══════════════════════⬣\n`;
                 text += `║ ${emojis[cat] || "📂"} ${cat.toUpperCase()}\n`;
 
                 categories[cat].forEach(cmd => {
-                    text += `║ • .${cmd}\n`;
+                    // 🔥 CAPITALIZE FIRST LETTER
+                    const name = cmd.charAt(0).toUpperCase() + cmd.slice(1);
+                    text += `║ ${name}\n`;
                 });
             }
 
             // ⚙️ SETTINGS
             text += `╠═══════════════════════⬣\n`;
             text += `║ ⚙️ SETTINGS\n`;
-            text += `║ • Autoread: ${settings.autoread ? ON : OFF}\n`;
-            text += `║ • Typing: ${settings.typing ? ON : OFF}\n`;
-            text += `║ • React: ${settings.autoreact ? ON : OFF}\n`;
-            text += `║ • Antidelete: ${
+            text += `║ Autoread: ${settings.autoread ? ON : OFF}\n`;
+            text += `║ Typing: ${settings.typing ? ON : OFF}\n`;
+            text += `║ React: ${settings.autoreact ? ON : OFF}\n`;
+            text += `║ Antidelete: ${
                 settings.antidelete
                     ? `ON (${settings.antidelete_mode || "chat"}) ✅`
                     : OFF
             }\n`;
-            text += `║ • Ignore Admins: ${settings.ignore_admins ? ON : OFF}\n`;
+            text += `║ Ignore Admins: ${settings.ignore_admins ? ON : OFF}\n`;
 
             // 📘 GUIDE
             text += `╠═══════════════════════⬣\n`;
-            text += `║ 📘 COMMAND GUIDE\n`;
-            text += `║ • .toggle autoread on/off\n`;
-            text += `║ • .toggle typing on/off\n`;
-            text += `║ • .toggle react on/off\n`;
-            text += `║ • .toggle antidelete on/off\n`;
-            text += `║ • .toggle antidelete chat/dm/both\n`;
+            text += `║ 📘 GUIDE\n`;
+            text += `║ .toggle autoread\n`;
+            text += `║ .toggle typing\n`;
+            text += `║ .toggle react\n`;
+            text += `║ .toggle antidelete\n`;
+            text += `║ .toggle antidelete chat/dm/both\n`;
 
             text += `╚═══════════════════════⬣\n`;
             text += `⚡ Powered by Alpha-XMD`;
