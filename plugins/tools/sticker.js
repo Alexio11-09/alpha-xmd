@@ -1,4 +1,4 @@
-// © 2026 Alpha - FINAL STICKER (USING library/exif)
+// © 2026 Alpha - FINAL STICKER (AUTO TRIM + EXIF)
 
 const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
 const { writeExif } = require("../../library/exif");
@@ -21,11 +21,12 @@ module.exports = {
                 return reply("📩 Reply to image/video with .sticker");
             }
 
-            // ⏱️ Limit video length
+            // ⏱️ Inform if long video (but don’t block)
             if (isVideo) {
                 const duration = mediaMsg.videoMessage.seconds || 0;
+
                 if (duration > 10) {
-                    return reply("❌ Video too long (max 10 sec)");
+                    await reply("⏱️ Video too long, trimming to 10s...");
                 }
             }
 
@@ -40,7 +41,7 @@ module.exports = {
                 buffer = Buffer.concat([buffer, chunk]);
             }
 
-            // 🔥 Convert + add pack info
+            // 🔥 Convert + add EXIF (your system auto handles trimming)
             const sticker = await writeExif(
                 {
                     mimetype: isImage ? "image/jpeg" : "video/mp4",
