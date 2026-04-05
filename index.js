@@ -56,6 +56,9 @@ const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
 
+// ✅ LOAD MESSAGE HANDLER ONCE
+const messageHandler = require("./message");
+
 let isRestarting = false;
 
 // 📲 INPUT
@@ -140,7 +143,7 @@ const clientstart = async () => {
     }
   });
 
-  // 🔥🔥🔥 FINAL MESSAGE HANDLER (PRIVATE + FORCE FIX)
+  // 🔥 MESSAGE HANDLER
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
       const messages = chatUpdate.messages;
@@ -160,8 +163,8 @@ const clientstart = async () => {
         // 🔥 MARK AS READ
         await sock.readMessages([mek.key]);
 
-        // 🔥 EXECUTE YOUR SYSTEM
-        await require("./message")(sock, m);
+        // 🔥 EXECUTE COMMAND SYSTEM
+        await messageHandler(sock, m);
 
         // 🔥 ANTI-HOST DELAY
         await new Promise(r => setTimeout(r, 200));
@@ -169,6 +172,17 @@ const clientstart = async () => {
 
     } catch (err) {
       console.log("MESSAGE ERROR:", err);
+    }
+  });
+
+  // 🛡️ ANTIDELETE LISTENER
+  sock.ev.on('messages.delete', async (update) => {
+    try {
+      if (messageHandler.handleDelete) {
+        await messageHandler.handleDelete(sock, update);
+      }
+    } catch (err) {
+      console.log("Delete event error:", err);
     }
   });
 
