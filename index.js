@@ -1,6 +1,6 @@
 // © 2026 Alpha. All Rights Reserved.
 
-// 🔥 AUTO INSTALL MISSING MODULES
+// 🔥 AUTO INSTALL MODULES
 const { execSync } = require("child_process");
 
 const modules = [
@@ -125,13 +125,16 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔥 ADMIN DEBUG + FIX
+        // 🔥 ADMIN FIX (FINAL)
         if (m.isGroup) {
           const metadata = await sock.groupMetadata(m.chat);
           const participants = metadata.participants;
 
           const sender = sock.decodeJid(m.key.participant || m.key.remoteJid);
           const botId = sock.decodeJid(sock.user.id);
+
+          const cleanSender = sender.split("@")[0];
+          const cleanBot = botId.split("@")[0];
 
           console.log("\n====== DEBUG START ======");
           console.log("🤖 BOT:", botId);
@@ -141,13 +144,17 @@ const clientstart = async () => {
             console.log("👥", sock.decodeJid(p.id), "| ADMIN:", p.admin);
           });
 
-          m.isAdmin = participants.some(p =>
-            sock.decodeJid(p.id) === sender && p.admin
-          );
+          // ✅ USER ADMIN FIX
+          m.isAdmin = participants.some(p => {
+            const id = sock.decodeJid(p.id);
+            return id.includes(cleanSender) && p.admin;
+          });
 
-          m.isBotAdmin = participants.some(p =>
-            sock.decodeJid(p.id) === botId && p.admin
-          );
+          // ✅ BOT ADMIN FIX
+          m.isBotAdmin = participants.some(p => {
+            const id = sock.decodeJid(p.id);
+            return id.includes(cleanBot) && p.admin;
+          });
 
           console.log("✅ isAdmin:", m.isAdmin);
           console.log("✅ isBotAdmin:", m.isBotAdmin);
