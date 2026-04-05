@@ -175,11 +175,17 @@ const clientstart = async () => {
     }
   });
 
-  // 🛡️ ANTIDELETE LISTENER
-  sock.ev.on('messages.delete', async (update) => {
+  // 🛡️ ANTIDELETE (FINAL FIX - RELIABLE)
+  sock.ev.on('messages.update', async (updates) => {
     try {
-      if (messageHandler.handleDelete) {
-        await messageHandler.handleDelete(sock, update);
+      for (const update of updates) {
+        if (update.update?.message === null) {
+          if (messageHandler.handleDelete) {
+            await messageHandler.handleDelete(sock, {
+              keys: [update.key]
+            });
+          }
+        }
       }
     } catch (err) {
       console.log("Delete event error:", err);
