@@ -12,6 +12,16 @@ module.exports = {
             const feature = args[0]?.toLowerCase();
             const state = args[1]?.toLowerCase();
 
+            // 🔥 ANTIDELETE MODE (NEW FEATURE)
+            if (feature === "antidelete" && ["chat", "dm", "both"].includes(state)) {
+                settings.antidelete = true;
+                settings.antidelete_mode = state;
+
+                saveSettings(settings);
+
+                return reply(`🛡️ AntiDelete mode set to *${state.toUpperCase()}*`);
+            }
+
             // ❌ Missing input
             if (!feature || !state) {
                 return reply(
@@ -19,7 +29,8 @@ module.exports = {
 .toggle autoread on/off
 .toggle typing on/off
 .toggle react on/off
-.toggle antidelete on/off`
+.toggle antidelete on/off
+.toggle antidelete chat/dm/both`
                 );
             }
 
@@ -30,11 +41,11 @@ module.exports = {
                 return reply(`❌ Invalid feature\n\nAvailable: ${valid.join(", ")}`);
             }
 
-            if (!["on", "off"].includes(state)) {
-                return reply("❌ Use on or off only");
+            // 🔥 ALLOW MODES + ON/OFF
+            if (!["on", "off", "chat", "dm", "both"].includes(state)) {
+                return reply("❌ Use on/off or chat/dm/both");
             }
 
-            // 🔥 MAP FEATURE → SETTINGS KEY
             const map = {
                 autoread: "autoread",
                 typing: "typing",
@@ -44,18 +55,19 @@ module.exports = {
 
             const key = map[feature];
 
-            // 🔁 CHECK IF SAME STATE
-            if (settings[key] === (state === "on")) {
-                return reply(`⚠️ ${feature} is already ${state}`);
-            }
+            // 🔁 PREVENT SAME STATE
+            if (["on", "off"].includes(state)) {
+                if (settings[key] === (state === "on")) {
+                    return reply(`⚠️ ${feature} is already ${state}`);
+                }
 
-            // ✅ UPDATE
-            settings[key] = state === "on";
+                settings[key] = state === "on";
+            }
 
             // 💾 SAVE
             saveSettings(settings);
 
-            reply(`✅ ${feature.toUpperCase()} is now ${state.toUpperCase()}`);
+            reply(`✅ ${feature.toUpperCase()} updated`);
 
         } catch (err) {
             console.log("Toggle error:", err);
