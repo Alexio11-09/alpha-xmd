@@ -1,4 +1,4 @@
-// © 2026 Alpha - AUTO MENU (UPGRADED + SETTINGS VIEW)
+// © 2026 Alpha - CLEAN PREMIUM MENU
 
 const config = require("../settings/config");
 const path = require("path");
@@ -34,11 +34,9 @@ module.exports = {
             const pluginsDir = path.join(__dirname);
             let grouped = {};
 
-            // 🔥 LOAD ALL PLUGINS (SAFE + RECURSIVE)
+            // 🔁 LOAD COMMANDS
             const load = (dir) => {
-                const files = fs.readdirSync(dir);
-
-                for (let file of files) {
+                for (let file of fs.readdirSync(dir)) {
                     let full = path.join(dir, file);
 
                     if (fs.lstatSync(full).isDirectory()) {
@@ -46,7 +44,6 @@ module.exports = {
                     } else if (file.endsWith(".js") && file !== "menu.js") {
                         try {
                             delete require.cache[require.resolve(full)];
-
                             const plugin = require(full);
                             if (!plugin.command) continue;
 
@@ -64,52 +61,48 @@ module.exports = {
                                 }
                             });
 
-                        } catch (e) {
-                            console.log("Menu load error:", e.message);
-                        }
+                        } catch {}
                     }
                 }
             };
 
             load(pluginsDir);
 
-            const order = ["general", "downloader", "group", "settings", "owner"];
+            const order = ["general", "downloader", "group", "owner"];
 
             const format = (arr) =>
                 arr && arr.length
-                    ? arr.map(c => `║ • .${c}`).join("\n")
-                    : "║ • -";
+                    ? arr.map(c => `│ • ${c}`).join("\n")
+                    : "│ • -";
 
-            let text = `╔═══〔 ${config.settings.title} 〕═══⬣\n║\n`;
+            const ON = "ON ✅";
+            const OFF = "OFF ❌";
 
-            // 🔥 PRINT CATEGORIES
+            // 🧾 MENU TEXT
+            let text = `╭─〔 ${config.settings.title} 〕\n│\n`;
+
             for (let cat of order) {
                 if (grouped[cat]) {
-                    text += `║ ${getIcon(cat)} *${cat.toUpperCase()}*\n`;
-                    text += format(grouped[cat]) + "\n║\n";
+                    text += `│ ${getIcon(cat)} ${cat.toUpperCase()}\n`;
+                    text += format(grouped[cat]) + "\n│\n";
                     delete grouped[cat];
                 }
             }
 
-            // 🔥 PRINT EXTRA CATEGORIES
-            for (let cat in grouped) {
-                text += `║ 🔹 *${cat.toUpperCase()}*\n`;
-                text += format(grouped[cat]) + "\n║\n";
-            }
+            // ⚙️ SETTINGS (CLEAN STYLE)
+            text += `│ ⚙️ SETTINGS\n`;
+            text += `│ • Autoread: ${settings.autoread ? ON : OFF}\n`;
+            text += `│ • Typing: ${settings.typing ? ON : OFF}\n`;
+            text += `│ • React: ${settings.autoreact ? ON : OFF}\n`;
+            text += `│ • Antidelete: ${
+                settings.antidelete
+                    ? `ON ✅ (${settings.antidelete_mode.toUpperCase()})`
+                    : OFF
+            }\n`;
+            text += `│ • Ignore Admins: ${settings.ignore_admins ? ON : OFF}\n`;
+            text += `│\n`;
 
-            // 🔥 SETTINGS SECTION (NEW 🔥)
-            const ON = "ON ✅";
-            const OFF = "OFF ❌";
-
-            text += `║ ⚙️ *SETTINGS*\n`;
-            text += `║ • Autoread: ${settings.autoread ? ON : OFF}\n`;
-            text += `║ • Typing: ${settings.typing ? ON : OFF}\n`;
-            text += `║ • React: ${settings.autoreact ? ON : OFF}\n`;
-            text += `║ • Antidelete: ${settings.antidelete ? `ON (${settings.antidelete_mode})` : OFF}\n`;
-            text += `║ • Ignore Admins: ${settings.ignore_admins ? ON : OFF}\n`;
-            text += `║\n`;
-
-            text += `╚══════════════════⬣\n\n${config.settings.footer}`;
+            text += `╰─${config.settings.footer}`;
 
             await send({ text });
 
@@ -119,13 +112,12 @@ module.exports = {
     }
 };
 
-// 🔥 ICON SYSTEM
+// 🎯 ICONS
 function getIcon(cat) {
     switch (cat) {
         case "general": return "⚡";
         case "downloader": return "🎧";
         case "group": return "👥";
-        case "settings": return "⚙️";
         case "owner": return "👑";
         default: return "🔹";
     }
