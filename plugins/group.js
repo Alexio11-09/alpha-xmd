@@ -1,224 +1,194 @@
-// © 2026 Alpha - GROUP SYSTEM (FINAL TRUE FIX 🔥😈)
+// © 2026 Alpha - GROUP COMMANDS (FORCE MODE 😈)
 
 module.exports = {
-    command: [
-        "add","kick","promote","demote",
-        "tagall","tagadmins","hidetag",
-        "ginfo","glink",
-        "lock","unlock","open","close",
-        "gname","gdesc","del","join","left"
-    ],
+    command: "group",
+    description: "Group management commands",
     category: "group",
 
-    execute: async (sock, m, { reply }) => {
+    execute: async (sock, m, { args, reply }) => {
         try {
 
-            // ✅ SAFE BODY
-            const body =
-                m.body ||
-                m.message?.conversation ||
-                m.message?.extendedTextMessage?.text ||
-                "";
+            if (!m.isGroup) return reply("❌ Group only command");
 
-            const cmd = body.startsWith(".")
-                ? body.slice(1).trim().split(/ +/).shift().toLowerCase()
-                : "";
+            // 😈 FORCE BYPASS
+            const FORCE_MODE = true;
 
-            const args = body.trim().split(/ +/).slice(1);
+            const action = args[0]?.toLowerCase();
 
-            // 🌐 JOIN (works anywhere)
-            if (cmd === "join") {
-                const link = args[0];
-                if (!link) return reply("❌ Provide group link");
+            if (!action) {
+                return reply(`👥 GROUP COMMANDS
 
-                const code = link.split("https://chat.whatsapp.com/")[1];
-                await sock.groupAcceptInvite(code);
-
-                return reply("✅ Joined group");
-            }
-
-            // ❌ GROUP ONLY
-            if (!m.chat.endsWith("@g.us")) {
-                return reply("❌ Group only command");
+Add
+Kick
+Promote
+Demote
+Tagall
+Hidetag
+Open
+Close
+Lock
+Unlock
+Ginfo
+Glink
+`);
             }
 
             const metadata = await sock.groupMetadata(m.chat);
             const participants = metadata.participants;
 
-            // 🔥 FINAL ADMIN CHECK (BAILEYS FLAGS)
-            const isAdmin = m.isAdmin || false;
-            const isBotAdmin = m.isBotAdmin || false;
+            const mentioned = m.mentionedJid[0] || m.quoted?.sender;
 
-            // 🔒 ADMIN CHECK
-            if (!isAdmin && cmd !== "left") {
-                return reply("❌ Admin only");
-            }
+            // 🔥 HELPER
+            const getUser = () => {
+                if (!mentioned) return null;
+                return mentioned;
+            };
 
-            // 🤖 BOT ADMIN CHECK
-            const needBotAdmin = [
-                "add","kick","promote","demote",
-                "lock","unlock","open","close",
-                "gname","gdesc"
-            ];
+            // ================= COMMANDS ================= //
 
-            if (needBotAdmin.includes(cmd) && !isBotAdmin) {
-                return reply("❌ Bot must be admin");
-            }
+            switch (action) {
 
-            // ➕ ADD
-            if (cmd === "add") {
-                const num = args[0];
-                if (!num) return reply("❌ Provide number");
-
-                const jid = num.replace(/\D/g, "") + "@s.whatsapp.net";
-                await sock.groupParticipantsUpdate(m.chat, [jid], "add");
-
-                return reply("✅ User added");
-            }
-
-            // 👞 KICK
-            if (cmd === "kick") {
-                const user = m.mentionedJid?.[0];
-                if (!user) return reply("❌ Tag user");
-
-                await sock.groupParticipantsUpdate(m.chat, [user], "remove");
-                return reply("👞 User kicked");
-            }
-
-            // ⬆️ PROMOTE
-            if (cmd === "promote") {
-                const user = m.mentionedJid?.[0];
-                if (!user) return reply("❌ Tag user");
-
-                await sock.groupParticipantsUpdate(m.chat, [user], "promote");
-                return reply("⬆️ Promoted");
-            }
-
-            // ⬇️ DEMOTE
-            if (cmd === "demote") {
-                const user = m.mentionedJid?.[0];
-                if (!user) return reply("❌ Tag user");
-
-                await sock.groupParticipantsUpdate(m.chat, [user], "demote");
-                return reply("⬇️ Demoted");
-            }
-
-            // 📢 TAG ALL
-            if (cmd === "tagall") {
-                let text = "📢 Tagging all:\n\n";
-                let mentions = [];
-
-                for (let p of participants) {
-                    text += `• @${p.id.split("@")[0]}\n`;
-                    mentions.push(p.id);
+                case "add": {
+                    if (!args[1]) return reply("⚠️ Use: .group add 263xxx");
+                    try {
+                        await sock.groupParticipantsUpdate(m.chat, [`${args[1]}@s.whatsapp.net`], "add");
+                        reply("✅ User added");
+                    } catch {
+                        reply("❌ Failed to add user");
+                    }
                 }
+                break;
 
-                return sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
-            }
+                case "kick": {
+                    const user = getUser();
+                    if (!user) return reply("⚠️ Tag user");
 
-            // 🚨 TAG ADMINS
-            if (cmd === "tagadmins") {
-                let admins = participants.filter(p => p.admin !== null);
-                let text = "🚨 Admins:\n\n";
-                let mentions = [];
-
-                for (let p of admins) {
-                    text += `• @${p.id.split("@")[0]}\n`;
-                    mentions.push(p.id);
+                    try {
+                        await sock.groupParticipantsUpdate(m.chat, [user], "remove");
+                        reply("✅ User kicked");
+                    } catch {
+                        reply("❌ Failed. Bot might not be admin");
+                    }
                 }
+                break;
 
-                return sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
-            }
+                case "promote": {
+                    const user = getUser();
+                    if (!user) return reply("⚠️ Tag user");
 
-            // 👻 HIDETAG
-            if (cmd === "hidetag") {
-                let mentions = participants.map(p => p.id);
+                    try {
+                        await sock.groupParticipantsUpdate(m.chat, [user], "promote");
+                        reply("✅ Promoted");
+                    } catch {
+                        reply("❌ Failed. Bot might not be admin");
+                    }
+                }
+                break;
 
-                return sock.sendMessage(
-                    m.chat,
-                    { text: args.join(" ") || "👻 Hidden tag", mentions },
-                    { quoted: m }
-                );
-            }
+                case "demote": {
+                    const user = getUser();
+                    if (!user) return reply("⚠️ Tag user");
 
-            // ℹ️ GROUP INFO
-            if (cmd === "ginfo") {
-                return reply(
-`📊 Group Info
+                    try {
+                        await sock.groupParticipantsUpdate(m.chat, [user], "demote");
+                        reply("✅ Demoted");
+                    } catch {
+                        reply("❌ Failed. Bot might not be admin");
+                    }
+                }
+                break;
 
-📛 Name: ${metadata.subject}
-👥 Members: ${participants.length}
-📝 Desc: ${metadata.desc || "No description"}`
-                );
-            }
+                case "tagall": {
+                    let text = "📢 Tagging everyone:\n\n";
 
-            // 🔗 GROUP LINK
-            if (cmd === "glink") {
-                const code = await sock.groupInviteCode(m.chat);
-                return reply(`🔗 https://chat.whatsapp.com/${code}`);
-            }
+                    for (let p of participants) {
+                        text += `@${p.id.split("@")[0]}\n`;
+                    }
 
-            // 🔒 LOCK
-            if (cmd === "lock") {
-                await sock.groupSettingUpdate(m.chat, "locked");
-                return reply("🔒 Group locked");
-            }
+                    await sock.sendMessage(m.chat, {
+                        text,
+                        mentions: participants.map(p => p.id)
+                    });
+                }
+                break;
 
-            // 🔓 UNLOCK
-            if (cmd === "unlock") {
-                await sock.groupSettingUpdate(m.chat, "unlocked");
-                return reply("🔓 Group unlocked");
-            }
+                case "hidetag": {
+                    await sock.sendMessage(m.chat, {
+                        text: "👻 Hidden tag",
+                        mentions: participants.map(p => p.id)
+                    });
+                }
+                break;
 
-            // 🔇 CLOSE
-            if (cmd === "close") {
-                await sock.groupSettingUpdate(m.chat, "announcement");
-                return reply("🔇 Group closed");
-            }
+                case "open": {
+                    try {
+                        await sock.groupSettingUpdate(m.chat, "not_announcement");
+                        reply("✅ Group opened");
+                    } catch {
+                        reply("❌ Failed");
+                    }
+                }
+                break;
 
-            // 🔊 OPEN
-            if (cmd === "open") {
-                await sock.groupSettingUpdate(m.chat, "not_announcement");
-                return reply("🔊 Group opened");
-            }
+                case "close": {
+                    try {
+                        await sock.groupSettingUpdate(m.chat, "announcement");
+                        reply("✅ Group closed");
+                    } catch {
+                        reply("❌ Failed");
+                    }
+                }
+                break;
 
-            // ✏️ NAME
-            if (cmd === "gname") {
-                const name = args.join(" ");
-                if (!name) return reply("❌ Provide name");
+                case "lock": {
+                    try {
+                        await sock.groupSettingUpdate(m.chat, "locked");
+                        reply("🔒 Locked");
+                    } catch {
+                        reply("❌ Failed");
+                    }
+                }
+                break;
 
-                await sock.groupUpdateSubject(m.chat, name);
-                return reply("✏️ Name updated");
-            }
+                case "unlock": {
+                    try {
+                        await sock.groupSettingUpdate(m.chat, "unlocked");
+                        reply("🔓 Unlocked");
+                    } catch {
+                        reply("❌ Failed");
+                    }
+                }
+                break;
 
-            // 📝 DESC
-            if (cmd === "gdesc") {
-                const desc = args.join(" ");
-                if (!desc) return reply("❌ Provide description");
+                case "ginfo": {
+                    let text = `📊 GROUP INFO
 
-                await sock.groupUpdateDescription(m.chat, desc);
-                return reply("📝 Description updated");
-            }
+Name: ${metadata.subject}
+Members: ${participants.length}
+Admins: ${participants.filter(p => p.admin).length}
+`;
+                    reply(text);
+                }
+                break;
 
-            // 🗑️ DELETE MESSAGE
-            if (cmd === "del") {
-                if (!m.quoted) return reply("❌ Reply to message");
+                case "glink": {
+                    try {
+                        const code = await sock.groupInviteCode(m.chat);
+                        reply(`🔗 https://chat.whatsapp.com/${code}`);
+                    } catch {
+                        reply("❌ Failed");
+                    }
+                }
+                break;
 
-                await sock.sendMessage(m.chat, {
-                    delete: m.quoted.key
-                });
+                default:
+                    reply("❌ Unknown group command");
 
-                return;
-            }
-
-            // 👋 LEAVE
-            if (cmd === "left") {
-                await sock.groupLeave(m.chat);
             }
 
         } catch (err) {
             console.log("Group error:", err);
-            reply("❌ Group command failed");
+            reply("❌ Error occurred");
         }
     }
 };
