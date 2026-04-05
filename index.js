@@ -56,7 +56,7 @@ const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
 
-// ✅ LOAD MESSAGE HANDLER ONCE
+// ✅ LOAD MESSAGE HANDLER
 const messageHandler = require("./message");
 
 let isRestarting = false;
@@ -114,17 +114,11 @@ const clientstart = async () => {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
 
-    if (connection === 'connecting') {
-      console.log('🔄 Connecting...');
-    }
-
-    if (connection === 'open') {
-      console.log('✅ Connected!');
-    }
+    if (connection === 'connecting') console.log('🔄 Connecting...');
+    if (connection === 'open') console.log('✅ Connected!');
 
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-
       console.log('❌ Disconnected:', statusCode);
 
       if (statusCode === DisconnectReason.loggedOut) {
@@ -155,6 +149,21 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
+        // 🔥 ADMIN DETECTION (FINAL FIX)
+        if (m.isGroup) {
+          const groupMetadata = await sock.groupMetadata(m.chat);
+          const participants = groupMetadata.participants;
+
+          const sender = m.key.participant || m.key.remoteJid;
+          const botNumber = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+
+          m.isAdmin = participants.some(p => p.id === sender && p.admin !== null);
+          m.isBotAdmin = participants.some(p => p.id === botNumber && p.admin !== null);
+        } else {
+          m.isAdmin = false;
+          m.isBotAdmin = false;
+        }
+
         console.log("📩 MESSAGE FROM:", m.chat);
 
         // 🔥 FORCE WAKE
@@ -175,7 +184,7 @@ const clientstart = async () => {
     }
   });
 
-  // 🛡️ ANTIDELETE (FINAL FIX - RELIABLE)
+  // 🛡️ ANTIDELETE
   sock.ev.on('messages.update', async (updates) => {
     try {
       for (const update of updates) {
