@@ -1,13 +1,13 @@
 {
   "name": "alpha-xmd",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Advanced WhatsApp Bot by Alpha",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "postinstall": "npm install --legacy-peer-deps"
+    "postinstall": "npm install qrcode --legacy-peer-deps"
   },
   "keywords": [
     "whatsapp-bot",
