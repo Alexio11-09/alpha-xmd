@@ -1,14 +1,15 @@
-// © 2026 Alpha (Pterodactyl Restart System)
+// © 2026 Alpha (VISIBLE + WORKING)
 
 module.exports = {
     command: "restart",
+    description: "Restart the bot",
+    category: "owner", // 🔥 IMPORTANT
     owner: true,
 
     execute: async (sock, m, { reply }) => {
         try {
             await reply("♻️ Restarting bot...");
 
-            // 🔥 FORCE PANEL RESTART
             setTimeout(() => {
                 process.exit(1);
             }, 2000);
