@@ -4,23 +4,10 @@
 const { execSync } = require("child_process");
 
 const modules = [
-  "pino",
-  "@whiskeysockets/baileys",
-  "@hapi/boom",
-  "chalk",
-  "axios",
-  "node-fetch",
-  "yt-search",
-  "form-data",
-  "file-type",
-  "moment-timezone",
-  "human-readable",
-  "jimp",
-  "fluent-ffmpeg",
-  "@ffmpeg-installer/ffmpeg",
-  "node-webpmux",
-  "crypto-js",
-  "adm-zip"
+  "pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios",
+  "node-fetch","yt-search","form-data","file-type","moment-timezone",
+  "human-readable","jimp","fluent-ffmpeg","@ffmpeg-installer/ffmpeg",
+  "node-webpmux","crypto-js","adm-zip"
 ];
 
 modules.forEach(mod => {
@@ -55,18 +42,13 @@ const chalk = require("chalk");
 const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
-
-// ✅ LOAD MESSAGE HANDLER
 const messageHandler = require("./message");
 
 let isRestarting = false;
 
 // 📲 INPUT
 const question = (text) => {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(chalk.yellow(text), (answer) => {
       resolve(answer);
@@ -93,19 +75,17 @@ const clientstart = async () => {
   sock.decodeJid = (jid) => {
     if (!jid) return jid;
     if (/:\d+@/gi.test(jid)) {
-      let decode = jidDecode(jid) || {};
-      return decode.user && decode.server
-        ? decode.user + '@' + decode.server
-        : jid;
+      let d = jidDecode(jid) || {};
+      return d.user && d.server ? d.user + '@' + d.server : jid;
     }
     return jid;
   };
 
   // 🔥 PAIRING
   if (config().status.terminal && !sock.authState.creds.registered) {
-    const phoneNumber = await question('📱 Enter your WhatsApp number (263...):\n');
+    const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
     const code = await sock.requestPairingCode(phoneNumber);
-    console.log(chalk.green(`🔥 PAIRING CODE: ${code}`));
+    console.log(chalk.green(`🔥 CODE: ${code}`));
   }
 
   sock.ev.on('creds.update', saveCreds);
@@ -121,14 +101,10 @@ const clientstart = async () => {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       console.log('❌ Disconnected:', statusCode);
 
-      if (statusCode === DisconnectReason.loggedOut) {
-        console.log('🚫 Logged out. Delete session.');
-        process.exit(0);
-      }
+      if (statusCode === DisconnectReason.loggedOut) process.exit(0);
 
       if (!isRestarting) {
         isRestarting = true;
-        console.log('🔄 Reconnecting...');
         setTimeout(() => {
           clientstart();
           isRestarting = false;
@@ -141,7 +117,7 @@ const clientstart = async () => {
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
       const messages = chatUpdate.messages;
-      if (!messages || !messages.length) return;
+      if (!messages?.length) return;
 
       for (let mek of messages) {
         if (!mek.message) continue;
@@ -149,33 +125,44 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔥 ADMIN DETECTION (FINAL FIX)
+        // 🔥 ADMIN DEBUG + FIX
         if (m.isGroup) {
-          const groupMetadata = await sock.groupMetadata(m.chat);
-          const participants = groupMetadata.participants;
+          const metadata = await sock.groupMetadata(m.chat);
+          const participants = metadata.participants;
 
-          const sender = m.key.participant || m.key.remoteJid;
-          const botNumber = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+          const sender = sock.decodeJid(m.key.participant || m.key.remoteJid);
+          const botId = sock.decodeJid(sock.user.id);
 
-          m.isAdmin = participants.some(p => p.id === sender && p.admin !== null);
-          m.isBotAdmin = participants.some(p => p.id === botNumber && p.admin !== null);
+          console.log("\n====== DEBUG START ======");
+          console.log("🤖 BOT:", botId);
+          console.log("👤 SENDER:", sender);
+
+          participants.forEach(p => {
+            console.log("👥", sock.decodeJid(p.id), "| ADMIN:", p.admin);
+          });
+
+          m.isAdmin = participants.some(p =>
+            sock.decodeJid(p.id) === sender && p.admin
+          );
+
+          m.isBotAdmin = participants.some(p =>
+            sock.decodeJid(p.id) === botId && p.admin
+          );
+
+          console.log("✅ isAdmin:", m.isAdmin);
+          console.log("✅ isBotAdmin:", m.isBotAdmin);
+          console.log("====== DEBUG END ======\n");
+
         } else {
           m.isAdmin = false;
           m.isBotAdmin = false;
         }
 
-        console.log("📩 MESSAGE FROM:", m.chat);
-
-        // 🔥 FORCE WAKE
         await sock.sendPresenceUpdate('available', m.chat);
-
-        // 🔥 MARK AS READ
         await sock.readMessages([mek.key]);
 
-        // 🔥 EXECUTE COMMAND SYSTEM
         await messageHandler(sock, m);
 
-        // 🔥 ANTI-HOST DELAY
         await new Promise(r => setTimeout(r, 200));
       }
 
@@ -184,26 +171,7 @@ const clientstart = async () => {
     }
   });
 
-  // 🛡️ ANTIDELETE
-  sock.ev.on('messages.update', async (updates) => {
-    try {
-      for (const update of updates) {
-        if (update.update?.message === null) {
-          if (messageHandler.handleDelete) {
-            await messageHandler.handleDelete(sock, {
-              keys: [update.key]
-            });
-          }
-        }
-      }
-    } catch (err) {
-      console.log("Delete event error:", err);
-    }
-  });
-
   sock.public = true;
-
-  return sock;
 };
 
 clientstart();
