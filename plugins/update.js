@@ -1,7 +1,6 @@
-// © 2026 Alpha (FINAL AUTO-RESTART FIX)
+// © 2026 Alpha (AUTO UPDATE + RESTART)
 
 const { updateBot } = require("../library/updater");
-const { spawn } = require("child_process");
 
 module.exports = {
     command: "update",
@@ -13,18 +12,12 @@ module.exports = {
 
             await updateBot();
 
-            await reply("✅ Updated successfully!\n♻️ Restarting bot...");
+            await reply("✅ Updated!\n♻️ Restarting...");
 
-            // 🔥 START NEW BOT PROCESS
-            const child = spawn("node", ["index.js"], {
-                detached: true,
-                stdio: "inherit"
-            });
-
-            child.unref(); // let it run independently
-
-            // 🔥 STOP OLD PROCESS
-            process.exit(0);
+            // 🔥 TRIGGER PANEL AUTO-RESTART
+            setTimeout(() => {
+                process.exit(1);
+            }, 2000);
 
         } catch (err) {
             console.log("Update error:", err);
