@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "postinstall": "npm install --legacy-peer-deps"
   },
   "keywords": [
     "whatsapp-bot",
@@ -34,7 +35,8 @@
     "node-webpmux": "^3.1.0",
     "pino": "^8.17.0",
     "yt-search": "^2.10.4",
-    "adm-zip": "^0.5.10"
+    "adm-zip": "^0.5.10",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
