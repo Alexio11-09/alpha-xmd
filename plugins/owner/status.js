@@ -1,43 +1,24 @@
 // © 2026 Alpha
 
-const fs = require('fs');
-const settingsPath = './database/settings.json';
-
 module.exports = {
     command: "status",
-    category: "owner", // ✅ shows in menu under OWNER
+    description: "Show bot status",
+    category: "owner",
     owner: true,
 
-    execute: async (sock, m, context) => {
-        const { reply, isCreator } = context;
-
+    execute: async (sock, m, { reply, settings }) => {
         try {
-            // 🔐 OWNER CHECK (extra safety)
-            if (!isCreator) {
-                return reply("❌ Owner only command");
-            }
 
-            let s;
-
-            // 🔥 SAFE READ (no crash if file missing)
-            try {
-                s = JSON.parse(fs.readFileSync(settingsPath));
-            } catch {
-                s = {
-                    autoread: false,
-                    typing: false,
-                    autoreact: false,
-                    antidelete: false,
-                    mode: "public"
-                };
-            }
+            // 🔥 USE LIVE SETTINGS (no file read)
+            const s = settings;
 
             let text = `⚙️ *BOT STATUS*\n\n` +
-            `👁️ Auto Read: ${s.autoread ? "ON" : "OFF"}\n` +
-            `⌨️ Typing: ${s.typing ? "ON" : "OFF"}\n` +
-            `❤️ Auto React: ${s.autoreact ? "ON" : "OFF"}\n` +
-            `🛡️ Anti Delete: ${s.antidelete ? "ON" : "OFF"}\n` +
-            `🤖 Mode: ${s.mode.toUpperCase()}`;
+                `👁️ Auto Read: ${s.autoread ? "ON" : "OFF"}\n` +
+                `⌨️ Typing: ${s.typing ? "ON" : "OFF"}\n` +
+                `❤️ Auto React: ${s.autoreact ? "ON" : "OFF"}\n` +
+                `🛡️ Anti Delete: ${s.antidelete ? "ON" : "OFF"}\n` +
+                `🤖 Mode: ${(s.mode || "public").toUpperCase()}\n\n` +
+                `⚡ Bot: ACTIVE`;
 
             reply(text);
 
