@@ -14,6 +14,9 @@ const loadBaileysUtils = async () => {
 
 const settingsPath = './database/settings.json';
 
+// 🛡️ STORE FOR ANTIDELETE
+const store = new Map();
+
 const loadSettings = () => {
     try {
         return JSON.parse(fs.readFileSync(settingsPath));
@@ -23,6 +26,7 @@ const loadSettings = () => {
             typing: false,
             antidelete: false,
             autoreact: false,
+            antidelete_mode: "chat",
             mode: "public"
         };
     }
@@ -107,7 +111,6 @@ module.exports = async (sock, m) => {
         const settings = loadSettings();
         const prefix = '.';
 
-        // 🔥 IMPROVED MESSAGE PARSER
         const body =
             m.message?.conversation ||
             m.message?.extendedTextMessage?.text ||
@@ -122,13 +125,15 @@ module.exports = async (sock, m) => {
 
         const sender = m.sender || "";
 
-        // 🔥 OWNER SYSTEM (PERFECT)
         const senderJid = sender.split(":")[0];
         const botJid = (sock.user?.id || "").split(":")[0];
         const isCreator = senderJid === botJid;
 
-        // 🔒 MODE
         if (settings.mode === "self" && !isCreator) return;
+
+        // 💾 SAVE MESSAGE FOR ANTIDELETE
+        store.set(m.key.id, m);
+        setTimeout(() => store.delete(m.key.id), 10 * 60 * 1000);
 
         // 👁️ AUTO READ
         if (settings.autoread) {
@@ -147,7 +152,6 @@ module.exports = async (sock, m) => {
             });
         }
 
-        // 🔥 CHANNEL FORWARD (UNCHANGED ✅)
         const ctx = {
             contextInfo: {
                 forwardingScore: 999,
@@ -172,7 +176,6 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
-        // 🔥 EXECUTE COMMANDS ONLY (NO HARDCODED MENU)
         if (isCmd) {
             const done = await plugins.execute(command, sock, m, {
                 args,
@@ -192,5 +195,38 @@ module.exports = async (sock, m) => {
 
     } catch (err) {
         console.log(err);
+    }
+};
+
+// 🛡️ ANTIDELETE HANDLER
+module.exports.handleDelete = async (sock, update) => {
+    try {
+        const settings = loadSettings();
+        if (!settings.antidelete) return;
+
+        const msg = update.messages[0];
+        if (!msg?.key?.id) return;
+
+        const deleted = store.get(msg.key.id);
+        if (!deleted) return;
+
+        const from = deleted.key.remoteJid;
+        const sender = deleted.key.participant || deleted.key.remoteJid;
+
+        const caption = `🛡️ *ANTI DELETE*\n\n👤 @${sender.split("@")[0]}\n`;
+
+        const sendChat = settings.antidelete_mode === "chat" || settings.antidelete_mode === "both";
+        const sendDM = settings.antidelete_mode === "dm" || settings.antidelete_mode === "both";
+
+        const text =
+            deleted.message?.conversation ||
+            deleted.message?.extendedTextMessage?.text ||
+            "[Media message]";
+
+        if (sendChat) await sock.sendMessage(from, { text: caption + text, mentions: [sender] });
+        if (sendDM) await sock.sendMessage(sock.user.id, { text: caption + text });
+
+    } catch (err) {
+        console.log("Antidelete error:", err);
     }
 };
