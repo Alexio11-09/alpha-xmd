@@ -1,4 +1,4 @@
-// © 2026 Alpha - FULL GROUP SYSTEM (FINAL 🔥😈)
+// © 2026 Alpha - GROUP SYSTEM (FINAL CLEAN 😈🔥)
 
 module.exports = {
     command: [
@@ -10,9 +10,21 @@ module.exports = {
     ],
     category: "group",
 
-    execute: async (sock, m, { args, reply }) => {
+    execute: async (sock, m, { reply }) => {
         try {
-            const cmd = m.body.split(" ")[0].slice(1).toLowerCase();
+
+            // ✅ SAFE BODY
+            const body =
+                m.body ||
+                m.message?.conversation ||
+                m.message?.extendedTextMessage?.text ||
+                "";
+
+            const cmd = body.startsWith(".")
+                ? body.slice(1).trim().split(/ +/).shift().toLowerCase()
+                : "";
+
+            const args = body.trim().split(/ +/).slice(1);
 
             // 🌐 JOIN (works anywhere)
             if (cmd === "join") {
@@ -57,14 +69,18 @@ module.exports = {
 
             // ➕ ADD
             if (cmd === "add") {
-                const num = args[0]?.replace(/\D/g, "") + "@s.whatsapp.net";
-                await sock.groupParticipantsUpdate(m.chat, [num], "add");
+                const num = args[0];
+                if (!num) return reply("❌ Provide number");
+
+                const jid = num.replace(/\D/g, "") + "@s.whatsapp.net";
+                await sock.groupParticipantsUpdate(m.chat, [jid], "add");
+
                 return reply("✅ User added");
             }
 
             // 👞 KICK
             if (cmd === "kick") {
-                const user = m.mentionedJid[0];
+                const user = m.mentionedJid?.[0];
                 if (!user) return reply("❌ Tag user");
 
                 await sock.groupParticipantsUpdate(m.chat, [user], "remove");
@@ -73,7 +89,7 @@ module.exports = {
 
             // ⬆️ PROMOTE
             if (cmd === "promote") {
-                const user = m.mentionedJid[0];
+                const user = m.mentionedJid?.[0];
                 if (!user) return reply("❌ Tag user");
 
                 await sock.groupParticipantsUpdate(m.chat, [user], "promote");
@@ -82,14 +98,14 @@ module.exports = {
 
             // ⬇️ DEMOTE
             if (cmd === "demote") {
-                const user = m.mentionedJid[0];
+                const user = m.mentionedJid?.[0];
                 if (!user) return reply("❌ Tag user");
 
                 await sock.groupParticipantsUpdate(m.chat, [user], "demote");
                 return reply("⬇️ Demoted");
             }
 
-            // 📢 TAG ALL (VERTICAL 🔥)
+            // 📢 TAG ALL (VERTICAL CLEAN)
             if (cmd === "tagall") {
                 let text = "📢 Tagging all:\n\n";
                 let mentions = [];
@@ -102,7 +118,7 @@ module.exports = {
                 return sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
             }
 
-            // 🚨 TAG ADMINS (VERTICAL 🔥)
+            // 🚨 TAG ADMINS
             if (cmd === "tagadmins") {
                 let admins = participants.filter(p => p.admin);
                 let text = "🚨 Admins:\n\n";
@@ -191,13 +207,9 @@ module.exports = {
                 if (!m.quoted) return reply("❌ Reply to message");
 
                 await sock.sendMessage(m.chat, {
-                    delete: {
-                        remoteJid: m.chat,
-                        fromMe: false,
-                        id: m.quoted.id,
-                        participant: m.quoted.sender
-                    }
+                    delete: m.quoted.key
                 });
+
                 return;
             }
 
