@@ -1,7 +1,7 @@
-// © 2026 Alpha - CLEAN STICKER USING EXIF SYSTEM 🔥
+// © 2026 Alpha - FINAL STICKER (USING library/exif)
 
 const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
-const { writeExif } = require("../../lib/exif");
+const { writeExif } = require("../../library/exif");
 
 module.exports = {
     command: "sticker",
@@ -16,11 +16,12 @@ module.exports = {
             const isImage = mediaMsg?.imageMessage;
             const isVideo = mediaMsg?.videoMessage;
 
+            // ❌ No media
             if (!isImage && !isVideo) {
                 return reply("📩 Reply to image/video with .sticker");
             }
 
-            // ⏱️ LIMIT VIDEO
+            // ⏱️ Limit video length
             if (isVideo) {
                 const duration = mediaMsg.videoMessage.seconds || 0;
                 if (duration > 10) {
@@ -28,7 +29,7 @@ module.exports = {
                 }
             }
 
-            // 📥 DOWNLOAD
+            // 📥 Download media
             const stream = await downloadContentFromMessage(
                 isImage ? isImage : isVideo,
                 isImage ? "image" : "video"
@@ -39,7 +40,7 @@ module.exports = {
                 buffer = Buffer.concat([buffer, chunk]);
             }
 
-            // 🔥 USE YOUR EXIF SYSTEM
+            // 🔥 Convert + add pack info
             const sticker = await writeExif(
                 {
                     mimetype: isImage ? "image/jpeg" : "video/mp4",
@@ -52,10 +53,12 @@ module.exports = {
                 }
             );
 
-            // 📤 SEND
-            await sock.sendMessage(m.chat, {
-                sticker
-            }, { quoted: m });
+            // 📤 Send sticker
+            await sock.sendMessage(
+                m.chat,
+                { sticker },
+                { quoted: m }
+            );
 
         } catch (err) {
             console.log("STICKER ERROR:", err);
