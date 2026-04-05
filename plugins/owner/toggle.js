@@ -1,81 +1,83 @@
-// © 2026 Alpha
+// © 2026 Alpha - SMART TOGGLE FINAL
 
 module.exports = {
     command: "toggle",
-    description: "Enable or disable bot features",
+    description: "Control bot settings",
     category: "settings",
     owner: true,
 
     execute: async (sock, m, { args, settings, saveSettings, reply }) => {
         try {
-
             const feature = args[0]?.toLowerCase();
-            const state = args[1]?.toLowerCase();
+            let state = args[1]?.toLowerCase();
 
-            // ❌ Missing input
-            if (!feature || !state) {
-                return reply(
-`⚙️ Usage:
-.toggle autoread on/off
-.toggle typing on/off
-.toggle react on/off
-.toggle antidelete on/off
-.toggle antidelete chat/dm/both`
-                );
-            }
-
-            // 🔥 ANTIDELETE MODE (PRIORITY)
-            if (feature === "antidelete" && ["chat", "dm", "both"].includes(state)) {
-                settings.antidelete = true;
-                settings.antidelete_mode = state;
-
-                saveSettings(settings);
-
-                return reply(`🛡️ AntiDelete mode set to *${state.toUpperCase()}*`);
-            }
-
-            // 🔥 VALID FEATURES
-            const valid = ["autoread", "typing", "react", "antidelete"];
-
-            if (!valid.includes(feature)) {
-                return reply(`❌ Invalid feature\n\nAvailable: ${valid.join(", ")}`);
-            }
-
-            // 🔥 ONLY ON/OFF HERE
-            if (!["on", "off"].includes(state)) {
-                return reply("❌ Use on/off or antidelete chat/dm/both");
-            }
+            const valid = ["autoread", "typing", "react", "antidelete", "ignoreadmins"];
 
             const map = {
                 autoread: "autoread",
                 typing: "typing",
                 react: "autoreact",
-                antidelete: "antidelete"
+                antidelete: "antidelete",
+                ignoreadmins: "ignore_admins"
             };
+
+            // ❌ No feature
+            if (!feature) {
+                return reply(
+`⚙️ Usage:
+.toggle autoread
+.toggle typing
+.toggle react on/off
+.toggle antidelete
+.toggle antidelete chat/dm/both
+.toggle ignoreadmins`
+                );
+            }
+
+            // ❌ Invalid
+            if (!valid.includes(feature)) {
+                return reply(`❌ Invalid feature\n\nAvailable: ${valid.join(", ")}`);
+            }
 
             const key = map[feature];
 
-            // 🔁 PREVENT SAME STATE
-            if (settings[key] === (state === "on")) {
-                return reply(`⚠️ ${feature} is already ${state}`);
+            // 🔥 ANTIDELETE MODE
+            if (feature === "antidelete" && ["chat", "dm", "both"].includes(state)) {
+                settings.antidelete = true;
+                settings.antidelete_mode = state;
+                saveSettings(settings);
+                return reply(`🛡️ Antidelete → ${state.toUpperCase()}`);
             }
 
-            // ✅ UPDATE
-            settings[key] = state === "on";
+            // 🔁 SWITCH (no state)
+            if (!state) {
+                settings[key] = !settings[key];
 
-            // 🔥 DEFAULT MODE FIX
-            if (feature === "antidelete" && state === "on" && !settings.antidelete_mode) {
-                settings.antidelete_mode = "chat";
+                if (feature === "antidelete" && settings[key] && !settings.antidelete_mode) {
+                    settings.antidelete_mode = "chat";
+                }
+
+                saveSettings(settings);
+                return reply(`✅ ${feature.toUpperCase()} → ${settings[key] ? "ON ✅" : "OFF ❌"}`);
             }
 
-            // 💾 SAVE
-            saveSettings(settings);
+            // 🔥 FORCE ON/OFF
+            if (["on", "off"].includes(state)) {
+                settings[key] = state === "on";
 
-            reply(`✅ ${feature.toUpperCase()} is now ${state.toUpperCase()}`);
+                if (feature === "antidelete" && state === "on" && !settings.antidelete_mode) {
+                    settings.antidelete_mode = "chat";
+                }
+
+                saveSettings(settings);
+                return reply(`✅ ${feature.toUpperCase()} → ${state.toUpperCase()}`);
+            }
+
+            return reply("❌ Use on/off or antidelete chat/dm/both");
 
         } catch (err) {
             console.log("Toggle error:", err);
-            reply("❌ Failed to toggle setting");
+            reply("❌ Toggle failed");
         }
     }
 };
