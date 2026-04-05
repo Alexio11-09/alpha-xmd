@@ -14,7 +14,7 @@ const loadBaileysUtils = async () => {
 
 const settingsPath = './database/settings.json';
 
-// 🛡️ FIXED STORE (OBJECT NOT MAP)
+// 🛡️ STORE
 const store = {};
 
 const loadSettings = () => {
@@ -27,6 +27,7 @@ const loadSettings = () => {
             antidelete: false,
             autoreact: false,
             antidelete_mode: "chat",
+            log_jid: "",
             mode: "public"
         };
     }
@@ -131,29 +132,23 @@ module.exports = async (sock, m) => {
 
         if (settings.mode === "self" && !isCreator) return;
 
-        // 💾 SAVE MESSAGE (FIXED)
-        store[m.key.id] = {
-            message: m.message,
-            key: m.key,
-            sender: m.sender,
-            isGroup: m.isGroup
-        };
+        // 💾 SAVE MESSAGE
+        if (m.key?.id) {
+            store[m.key.id] = {
+                message: m.message,
+                key: m.key,
+                sender: m.sender,
+                isGroup: m.isGroup
+            };
 
-        setTimeout(() => {
-            delete store[m.key.id];
-        }, 10 * 60 * 1000);
-
-        // 👁️ AUTO READ
-        if (settings.autoread) {
-            await sock.readMessages([m.key]);
+            setTimeout(() => {
+                delete store[m.key.id];
+            }, 10 * 60 * 1000);
         }
 
-        // ⌨️ TYPING
-        if (settings.typing) {
-            await sock.sendPresenceUpdate('composing', m.chat);
-        }
-
-        // ❤️ AUTO REACT
+        // AUTO FEATURES
+        if (settings.autoread) await sock.readMessages([m.key]);
+        if (settings.typing) await sock.sendPresenceUpdate('composing', m.chat);
         if (settings.autoreact) {
             await sock.sendMessage(m.chat, {
                 react: { text: "🔥", key: m.key }
@@ -184,6 +179,7 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
+        // COMMANDS
         if (isCmd) {
             const done = await plugins.execute(command, sock, m, {
                 args,
@@ -206,48 +202,78 @@ module.exports = async (sock, m) => {
     }
 };
 
-// 🛡️ FINAL ANTIDELETE (FIXED)
+// 🛡️ ANTIDELETE V2
 module.exports.handleDelete = async (sock, update) => {
     try {
         const settings = loadSettings();
         if (!settings.antidelete) return;
 
-        const msg = update.messages[0];
-        if (!msg?.key?.id) return;
+        const key = update?.messages?.[0]?.key || update?.keys?.[0];
+        if (!key?.id) return;
 
-        const data = store[msg.key.id];
-        if (!data) {
-            console.log("❌ Not in store");
-            return;
-        }
+        const data = store[key.id];
+        if (!data) return;
 
         const from = data.key.remoteJid;
         const sender = data.sender || data.key.participant || data.key.remoteJid;
 
-        const caption = `🛡️ *ANTI DELETE*\n\n👤 @${sender.split("@")[0]}\n`;
+        const tag = `@${sender.split("@")[0]}`;
+        const mention = [sender];
+
+        const caption = `🛡️ *ANTI DELETE*\n\n👤 ${tag}`;
 
         const sendChat = settings.antidelete_mode === "chat" || settings.antidelete_mode === "both";
         const sendDM = settings.antidelete_mode === "dm" || settings.antidelete_mode === "both";
 
-        const text =
-            data.message?.conversation ||
-            data.message?.extendedTextMessage?.text ||
-            "[Deleted message]";
+        const logJid = settings.log_jid || null;
 
-        if (sendChat) {
-            await sock.sendMessage(from, {
-                text: caption + text,
-                mentions: [sender]
-            });
+        const msg = data.message;
+
+        const sendTo = async (jid, content) => {
+            await sock.sendMessage(jid, content);
+        };
+
+        const text = msg?.conversation || msg?.extendedTextMessage?.text;
+        const image = msg?.imageMessage;
+        const video = msg?.videoMessage;
+        const audio = msg?.audioMessage;
+
+        if (text) {
+            const content = { text: `${caption}\n\n${text}`, mentions: mention };
+            if (sendChat) await sendTo(from, content);
+            if (sendDM) await sendTo(sock.user.id, content);
+            if (logJid) await sendTo(logJid, content);
         }
 
-        if (sendDM) {
-            await sock.sendMessage(sock.user.id, {
-                text: caption + text
-            });
+        else if (image) {
+            const content = { image: image, caption, mentions: mention };
+            if (sendChat) await sendTo(from, content);
+            if (sendDM) await sendTo(sock.user.id, content);
+            if (logJid) await sendTo(logJid, content);
+        }
+
+        else if (video) {
+            const content = { video: video, caption, mentions: mention };
+            if (sendChat) await sendTo(from, content);
+            if (sendDM) await sendTo(sock.user.id, content);
+            if (logJid) await sendTo(logJid, content);
+        }
+
+        else if (audio) {
+            const content = { audio: audio, mimetype: "audio/mp4", ptt: true };
+            if (sendChat) await sendTo(from, content);
+            if (sendDM) await sendTo(sock.user.id, content);
+            if (logJid) await sendTo(logJid, content);
+        }
+
+        else {
+            const content = { text: `${caption}\n\n[Unsupported message]`, mentions: mention };
+            if (sendChat) await sendTo(from, content);
+            if (sendDM) await sendTo(sock.user.id, content);
+            if (logJid) await sendTo(logJid, content);
         }
 
     } catch (err) {
-        console.log("Antidelete error:", err);
+        console.log("Antidelete v2 error:", err);
     }
 };
