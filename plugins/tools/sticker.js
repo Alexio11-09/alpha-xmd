@@ -1,15 +1,11 @@
-// 🔥 SIMPLE WORKING STICKER (NO EXIF)
+// © 2026 Alpha - CLEAN STICKER USING EXIF SYSTEM 🔥
 
-const fs = require("fs");
-const path = require("path");
 const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
-
-ffmpeg.setFfmpegPath(ffmpegPath);
+const { writeExif } = require("../../lib/exif");
 
 module.exports = {
     command: "sticker",
+    description: "Convert image/video to sticker",
     category: "tools",
 
     execute: async (sock, m, { reply }) => {
@@ -21,7 +17,15 @@ module.exports = {
             const isVideo = mediaMsg?.videoMessage;
 
             if (!isImage && !isVideo) {
-                return reply("📩 Reply to image/video");
+                return reply("📩 Reply to image/video with .sticker");
+            }
+
+            // ⏱️ LIMIT VIDEO
+            if (isVideo) {
+                const duration = mediaMsg.videoMessage.seconds || 0;
+                if (duration > 10) {
+                    return reply("❌ Video too long (max 10 sec)");
+                }
             }
 
             // 📥 DOWNLOAD
@@ -35,37 +39,27 @@ module.exports = {
                 buffer = Buffer.concat([buffer, chunk]);
             }
 
-            const input = path.join(__dirname, isImage ? "in.jpg" : "in.mp4");
-            const output = path.join(__dirname, "out.webp");
+            // 🔥 USE YOUR EXIF SYSTEM
+            const sticker = await writeExif(
+                {
+                    mimetype: isImage ? "image/jpeg" : "video/mp4",
+                    data: buffer
+                },
+                {
+                    packname: "Alpha-XMD",
+                    author: "Alpha",
+                    categories: ["🔥"]
+                }
+            );
 
-            fs.writeFileSync(input, buffer);
-
-            // 🔥 CONVERT
-            await new Promise((resolve, reject) => {
-                ffmpeg(input)
-                    .outputOptions([
-                        "-vcodec", "libwebp",
-                        "-vf", "scale=512:512:force_original_aspect_ratio=decrease,fps=15",
-                        "-loop", "0",
-                        "-preset", "default",
-                        "-an"
-                    ])
-                    .toFormat("webp")
-                    .save(output)
-                    .on("end", resolve)
-                    .on("error", reject);
-            });
-
-            const sticker = fs.readFileSync(output);
-
-            await sock.sendMessage(m.chat, { sticker }, { quoted: m });
-
-            fs.unlinkSync(input);
-            fs.unlinkSync(output);
+            // 📤 SEND
+            await sock.sendMessage(m.chat, {
+                sticker
+            }, { quoted: m });
 
         } catch (err) {
             console.log("STICKER ERROR:", err);
-            reply("❌ Sticker failed");
+            reply("❌ Failed to create sticker");
         }
     }
 };
