@@ -6,14 +6,8 @@ module.exports = {
     category: "settings",
     owner: true,
 
-    execute: async (sock, m, context) => {
+    execute: async (sock, m, { args, settings, saveSettings, reply }) => {
         try {
-            const { args, settings, saveSettings, reply, isCreator } = context;
-
-            // 🔥 FIXED OWNER CHECK
-            if (!isCreator) {
-                return reply("❌ Owner only command");
-            }
 
             const feature = args[0]?.toLowerCase();
             const state = args[1]?.toLowerCase();
@@ -48,12 +42,20 @@ module.exports = {
                 antidelete: "antidelete"
             };
 
-            settings[map[feature]] = state === "on";
+            const key = map[feature];
+
+            // 🔁 CHECK IF SAME STATE
+            if (settings[key] === (state === "on")) {
+                return reply(`⚠️ ${feature} is already ${state}`);
+            }
+
+            // ✅ UPDATE
+            settings[key] = state === "on";
 
             // 💾 SAVE
             saveSettings(settings);
 
-            reply(`✅ ${feature} is now ${state}`);
+            reply(`✅ ${feature.toUpperCase()} is now ${state.toUpperCase()}`);
 
         } catch (err) {
             console.log("Toggle error:", err);
