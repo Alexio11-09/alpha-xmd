@@ -1,4 +1,4 @@
-// © 2026 Alpha - GROUP SYSTEM (FINAL ADMIN FIX 🔥😈)
+// © 2026 Alpha - GROUP SYSTEM (FINAL REAL FIX 😈🔥)
 
 module.exports = {
     command: [
@@ -47,16 +47,19 @@ module.exports = {
 
             const sender = m.key.participant || m.key.remoteJid;
 
-            // ✅ FIXED ADMIN DETECTION
-            const senderNumber = sender.split("@")[0];
-            const botNumber = sock.user.id.split(":")[0];
+            // 🔥 NORMALIZE JIDs (REAL FIX)
+            const normalize = (jid) => jid.split(":")[0];
 
+            const botJid = normalize(sock.user.id);
+            const senderJid = normalize(sender);
+
+            // ✅ FINAL ADMIN CHECKS
             const isAdmin = participants.some(p =>
-                p.id.includes(senderNumber) && p.admin
+                normalize(p.id) === senderJid && p.admin !== null
             );
 
             const isBotAdmin = participants.some(p =>
-                p.id.includes(botNumber) && p.admin
+                normalize(p.id) === botJid && p.admin !== null
             );
 
             // 🔒 ADMIN CHECK
@@ -128,7 +131,7 @@ module.exports = {
 
             // 🚨 TAG ADMINS
             if (cmd === "tagadmins") {
-                let admins = participants.filter(p => p.admin);
+                let admins = participants.filter(p => p.admin !== null);
                 let text = "🚨 Admins:\n\n";
                 let mentions = [];
 
