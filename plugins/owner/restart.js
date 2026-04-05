@@ -1,9 +1,9 @@
-// © 2026 Alpha (VISIBLE + WORKING)
+// © 2026 Alpha (FIXED + GUARANTEED LOAD)
 
 module.exports = {
     command: "restart",
     description: "Restart the bot",
-    category: "owner", // 🔥 IMPORTANT
+    category: "owner",
     owner: true,
 
     execute: async (sock, m, { reply }) => {
