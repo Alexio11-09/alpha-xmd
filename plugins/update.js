@@ -1,4 +1,4 @@
-// © 2026 Alpha
+// © 2026 Alpha (SAFE UPDATE FIX)
 
 const { updateBot } = require("../library/updater");
 
@@ -10,13 +10,21 @@ module.exports = {
         try {
             await reply("🔄 Updating bot...");
 
-            await updateBot();
+            const result = await updateBot();
 
-            await reply("✅ Updated! Restarting...");
+            if (result === false) {
+                return reply("❌ Update failed");
+            }
 
-            setTimeout(() => process.exit(0), 2000);
+            await reply("✅ Update complete!\n♻️ Restarting bot...");
+
+            // 🔥 SAFE RESTART DELAY
+            setTimeout(() => {
+                process.exit(0);
+            }, 4000);
 
         } catch (err) {
+            console.log("Update error:", err);
             reply("❌ Update failed:\n" + err.message);
         }
     }
