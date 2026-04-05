@@ -1,4 +1,4 @@
-// © 2026 Alpha - SETTINGS PANEL (BUTTON UI)
+// © 2026 Alpha - SETTINGS PANEL (NEW WORKING BUTTONS)
 
 const fs = require("fs");
 const settingsPath = "./database/settings.json";
@@ -23,7 +23,7 @@ module.exports = {
     category: "settings",
     owner: true,
 
-    execute: async (sock, m, { reply }) => {
+    execute: async (sock, m) => {
         try {
             const s = loadSettings();
 
@@ -38,24 +38,38 @@ module.exports = {
 ❤️ React: ${s.autoreact ? ON : OFF}
 🛡️ Antidelete: ${s.antidelete ? ON : OFF}
 
-Tap a button to toggle 👇`;
-
-            const buttons = [
-                { buttonId: ".toggle autoread", buttonText: { displayText: "👁️ Autoread" }, type: 1 },
-                { buttonId: ".toggle typing", buttonText: { displayText: "⌨️ Typing" }, type: 1 },
-                { buttonId: ".toggle react", buttonText: { displayText: "❤️ React" }, type: 1 },
-                { buttonId: ".toggle antidelete", buttonText: { displayText: "🛡️ AntiDelete" }, type: 1 }
-            ];
+Tap below 👇`;
 
             await sock.sendMessage(m.chat, {
                 text,
-                buttons,
+                footer: "Alpha-XMD",
+                buttons: [
+                    {
+                        buttonId: ".toggle autoread",
+                        buttonText: { displayText: "👁️ Toggle Autoread" },
+                        type: 1
+                    },
+                    {
+                        buttonId: ".toggle typing",
+                        buttonText: { displayText: "⌨️ Toggle Typing" },
+                        type: 1
+                    },
+                    {
+                        buttonId: ".toggle react",
+                        buttonText: { displayText: "❤️ Toggle React" },
+                        type: 1
+                    },
+                    {
+                        buttonId: ".toggle antidelete",
+                        buttonText: { displayText: "🛡️ Toggle AntiDelete" },
+                        type: 1
+                    }
+                ],
                 headerType: 1
             });
 
         } catch (err) {
             console.log("Settings panel error:", err);
-            reply("❌ Failed to open settings panel");
         }
     }
 };
