@@ -1,6 +1,7 @@
-// © 2026 Alpha - FINAL CLEAN MENU (UPDATED)
+// © 2026 Alpha - PREMIUM MENU 😈
 
 const config = require("../settings/config");
+const moment = require("moment-timezone");
 
 module.exports = {
     command: "menu",
@@ -10,7 +11,24 @@ module.exports = {
     execute: async (sock, m, { send }) => {
         try {
 
-            let text = `╭─〔 ${config.settings.title} 〕\n│\n`;
+            // 👤 USER INFO
+            const name = m.pushName || "User";
+
+            // ⏱️ UPTIME
+            const uptime = process.uptime();
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
+
+            // 📅 TIME
+            const time = moment().tz("Africa/Harare").format("HH:mm:ss");
+            const date = moment().tz("Africa/Harare").format("DD/MM/YYYY");
+
+            let text = `╭─〔 ${config.settings.title} 〕\n`;
+            text += `│ 👤 User: ${name}\n`;
+            text += `│ ⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s\n`;
+            text += `│ 🕒 Time: ${time}\n`;
+            text += `│ 📅 Date: ${date}\n│\n`;
 
             // ⚡ GENERAL
             text += `│ ⚡ GENERAL\n`;
@@ -26,14 +44,14 @@ module.exports = {
             text += `│ 👥 GROUP\n`;
             text += `│ • .tagall\n│\n`;
 
-            // 👑 OWNER (FIXED 🔥)
+            // 👑 OWNER
             text += `│ 👑 OWNER\n`;
             text += `│ • .mode\n`;
             text += `│ • .status\n`;
             text += `│ • .update\n`;
             text += `│ • .restart\n│\n`;
 
-            // ⚙️ SETTINGS (REAL COMMAND GUIDE)
+            // ⚙️ SETTINGS
             text += `│ ⚙️ SETTINGS\n`;
             text += `│ • .toggle autoread\n`;
             text += `│ • .toggle typing\n`;
