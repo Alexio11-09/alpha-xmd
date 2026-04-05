@@ -1,6 +1,6 @@
-// © 2026 Alpha - QR GENERATOR 📷
+// © 2026 Alpha - QR (NO PACKAGE VERSION)
 
-const QRCode = require("qrcode");
+const axios = require("axios");
 
 module.exports = {
     command: "qr",
@@ -10,19 +10,18 @@ module.exports = {
     execute: async (sock, m, { args, reply }) => {
         try {
             if (!args.length) {
-                return reply("📷 Usage: .qr hello world");
+                return reply("📷 Usage: .qr Hello World");
             }
 
             const text = args.join(" ");
 
-            // 🔥 GENERATE QR
-            const qrBuffer = await QRCode.toBuffer(text);
+            // 🌐 API QR Generator
+            const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;
 
-            // ✅ SEND IMAGE
             await sock.sendMessage(m.chat, {
-                image: qrBuffer,
-                caption: `📷 QR for:\n${text}`
-            }, { quoted: m });
+                image: { url },
+                caption: `📷 QR Code for:\n${text}`
+            });
 
         } catch (err) {
             console.log("QR error:", err);
