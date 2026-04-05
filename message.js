@@ -14,8 +14,8 @@ const loadBaileysUtils = async () => {
 
 const settingsPath = './database/settings.json';
 
-// 🛡️ STORE FOR ANTIDELETE
-const store = new Map();
+// 🛡️ FIXED STORE (OBJECT NOT MAP)
+const store = {};
 
 const loadSettings = () => {
     try {
@@ -131,9 +131,17 @@ module.exports = async (sock, m) => {
 
         if (settings.mode === "self" && !isCreator) return;
 
-        // 💾 SAVE MESSAGE FOR ANTIDELETE
-        store.set(m.key.id, m);
-        setTimeout(() => store.delete(m.key.id), 10 * 60 * 1000);
+        // 💾 SAVE MESSAGE (FIXED)
+        store[m.key.id] = {
+            message: m.message,
+            key: m.key,
+            sender: m.sender,
+            isGroup: m.isGroup
+        };
+
+        setTimeout(() => {
+            delete store[m.key.id];
+        }, 10 * 60 * 1000);
 
         // 👁️ AUTO READ
         if (settings.autoread) {
@@ -198,7 +206,7 @@ module.exports = async (sock, m) => {
     }
 };
 
-// 🛡️ ANTIDELETE HANDLER
+// 🛡️ FINAL ANTIDELETE (FIXED)
 module.exports.handleDelete = async (sock, update) => {
     try {
         const settings = loadSettings();
@@ -207,11 +215,14 @@ module.exports.handleDelete = async (sock, update) => {
         const msg = update.messages[0];
         if (!msg?.key?.id) return;
 
-        const deleted = store.get(msg.key.id);
-        if (!deleted) return;
+        const data = store[msg.key.id];
+        if (!data) {
+            console.log("❌ Not in store");
+            return;
+        }
 
-        const from = deleted.key.remoteJid;
-        const sender = deleted.key.participant || deleted.key.remoteJid;
+        const from = data.key.remoteJid;
+        const sender = data.sender || data.key.participant || data.key.remoteJid;
 
         const caption = `🛡️ *ANTI DELETE*\n\n👤 @${sender.split("@")[0]}\n`;
 
@@ -219,12 +230,22 @@ module.exports.handleDelete = async (sock, update) => {
         const sendDM = settings.antidelete_mode === "dm" || settings.antidelete_mode === "both";
 
         const text =
-            deleted.message?.conversation ||
-            deleted.message?.extendedTextMessage?.text ||
-            "[Media message]";
+            data.message?.conversation ||
+            data.message?.extendedTextMessage?.text ||
+            "[Deleted message]";
 
-        if (sendChat) await sock.sendMessage(from, { text: caption + text, mentions: [sender] });
-        if (sendDM) await sock.sendMessage(sock.user.id, { text: caption + text });
+        if (sendChat) {
+            await sock.sendMessage(from, {
+                text: caption + text,
+                mentions: [sender]
+            });
+        }
+
+        if (sendDM) {
+            await sock.sendMessage(sock.user.id, {
+                text: caption + text
+            });
+        }
 
     } catch (err) {
         console.log("Antidelete error:", err);
