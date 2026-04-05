@@ -1,4 +1,4 @@
-// © 2026 Alpha - INSANE MENU 😈🔥
+// © 2026 Alpha - PREMIUM MENU (WITH TOOLS 😈)
 
 const config = require("../settings/config");
 const moment = require("moment-timezone");
@@ -38,7 +38,7 @@ module.exports = {
             const time = moment().tz("Africa/Harare").format("HH:mm:ss");
             const date = moment().tz("Africa/Harare").format("DD/MM/YYYY");
 
-            // 🔥 STATUS FORMATTER
+            // 🔥 STATUS FORMAT
             const ON = "ON ✅";
             const OFF = "OFF ❌";
 
@@ -58,6 +58,15 @@ module.exports = {
             text += `│ • .play\n`;
             text += `│ • .video\n│\n`;
 
+            // 🛠️ TOOLS (NEW 🔥)
+            text += `│ 🛠️ TOOLS\n`;
+            text += `│ • .calc\n`;
+            text += `│ • .short\n`;
+            text += `│ • .translate\n`;
+            text += `│ • .sticker\n`;
+            text += `│ • .qr\n`;
+            text += `│ • .google\n│\n`;
+
             // 👥 GROUP
             text += `│ 👥 GROUP\n`;
             text += `│ • .tagall\n│\n`;
@@ -69,7 +78,7 @@ module.exports = {
             text += `│ • .update\n`;
             text += `│ • .restart\n│\n`;
 
-            // ⚙️ SETTINGS (LIVE 🔥)
+            // ⚙️ SETTINGS (LIVE)
             text += `│ ⚙️ SETTINGS\n`;
             text += `│ • Autoread: ${settings.autoread ? ON : OFF}\n`;
             text += `│ • Typing: ${settings.typing ? ON : OFF}\n`;
@@ -82,7 +91,7 @@ module.exports = {
             text += `│ • Ignore Admins: ${settings.ignore_admins ? ON : OFF}\n`;
             text += `│\n`;
 
-            // 📘 COMMAND GUIDE (REAL USAGE)
+            // 📘 HOW TO USE
             text += `│ 📘 HOW TO USE\n`;
             text += `│ • .toggle autoread\n`;
             text += `│ • .toggle typing\n`;
