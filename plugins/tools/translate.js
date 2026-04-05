@@ -1,4 +1,4 @@
-// © 2026 Alpha - TRANSLATE 🌍
+// © 2026 Alpha - SMART TRANSLATE 🔥
 
 const axios = require("axios");
 
@@ -9,36 +9,55 @@ module.exports = {
 
     execute: async (sock, m, { args, reply }) => {
         try {
-            if (!args.length) {
-                return reply("🌍 Usage: .translate hello | fr");
-            }
-
-            // 🔥 JOIN INPUT
             const input = args.join(" ");
 
-            // 🔥 SPLIT TEXT | LANG
-            let [text, lang] = input.split("|").map(v => v.trim());
+            if (!input) {
+                return reply("❌ Usage:\n.translate hello | fr\n.translate es|en hola");
+            }
 
-            if (!text) return reply("❌ Enter text to translate");
-            if (!lang) lang = "en"; // default to English
+            let from = "en";
+            let to, text;
 
-            // 🌐 API
-            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${lang}`;
+            // 🔥 MODE 1: hello | fr
+            if (input.includes("|") && !input.includes(" ")) {
+                return reply("❌ Invalid format");
+            }
+
+            if (input.includes("|") && input.split("|").length === 2) {
+                const [query, lang] = input.split("|").map(v => v.trim());
+                text = query;
+                to = lang;
+            }
+
+            // 🔥 MODE 2: es|en hello
+            if (input.includes(" ")) {
+                const first = input.split(" ")[0];
+
+                if (first.includes("|")) {
+                    const [f, t] = first.split("|");
+                    from = f;
+                    to = t;
+                    text = input.split(" ").slice(1).join(" ");
+                }
+            }
+
+            if (!text || !to) {
+                return reply("❌ Invalid format\nExample:\n.translate hello | fr\n.translate es|en hola");
+            }
+
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
 
             const res = await axios.get(url);
 
             const translated = res.data?.responseData?.translatedText;
 
-            if (!translated) {
-                return reply("❌ Failed to translate");
-            }
+            if (!translated) return reply("❌ Translation failed");
 
-            // ✅ RESULT
             reply(`🌍 *Translation*\n\n📝 ${text}\n➡️ ${translated}`);
 
         } catch (err) {
-            console.log("Translate error:", err);
-            reply("❌ Error translating text");
+            console.log("Translate error:", err.message);
+            reply("❌ Failed to translate");
         }
     }
 };
