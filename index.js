@@ -81,6 +81,12 @@ const clientstart = async () => {
     return jid;
   };
 
+  // 🔥 NORMALIZE (KEY FIX)
+  const normalize = (jid) => {
+    if (!jid) return jid;
+    return jid.split(":")[0].split("@")[0];
+  };
+
   // 🔥 PAIRING
   if (config().status.terminal && !sock.authState.creds.registered) {
     const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
@@ -125,40 +131,40 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔥 ADMIN FIX (FINAL)
+        // 🔥 FINAL ADMIN FIX
         if (m.isGroup) {
           const metadata = await sock.groupMetadata(m.chat);
           const participants = metadata.participants;
 
-          const sender = sock.decodeJid(m.key.participant || m.key.remoteJid);
-          const botId = sock.decodeJid(sock.user.id);
+          const senderJid = sock.decodeJid(m.key.participant || m.key.remoteJid);
+          const botJid = sock.decodeJid(sock.user.id);
 
-          const cleanSender = sender.split("@")[0];
-          const cleanBot = botId.split("@")[0];
+          const senderId = normalize(senderJid);
+          const botId = normalize(botJid);
 
-          console.log("\n====== DEBUG START ======");
+          console.log("\n====== FINAL DEBUG ======");
           console.log("🤖 BOT:", botId);
-          console.log("👤 SENDER:", sender);
+          console.log("👤 SENDER:", senderId);
 
           participants.forEach(p => {
-            console.log("👥", sock.decodeJid(p.id), "| ADMIN:", p.admin);
+            console.log("👥", normalize(sock.decodeJid(p.id)), "|", p.admin);
           });
 
-          // ✅ USER ADMIN FIX
+          // ✅ USER ADMIN
           m.isAdmin = participants.some(p => {
-            const id = sock.decodeJid(p.id);
-            return id.includes(cleanSender) && p.admin;
+            const pid = normalize(sock.decodeJid(p.id));
+            return pid === senderId && p.admin;
           });
 
-          // ✅ BOT ADMIN FIX
+          // ✅ BOT ADMIN
           m.isBotAdmin = participants.some(p => {
-            const id = sock.decodeJid(p.id);
-            return id.includes(cleanBot) && p.admin;
+            const pid = normalize(sock.decodeJid(p.id));
+            return pid === botId && p.admin;
           });
 
           console.log("✅ isAdmin:", m.isAdmin);
           console.log("✅ isBotAdmin:", m.isBotAdmin);
-          console.log("====== DEBUG END ======\n");
+          console.log("====== END ======\n");
 
         } else {
           m.isAdmin = false;
