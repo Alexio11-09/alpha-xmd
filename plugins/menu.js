@@ -1,8 +1,26 @@
-// © 2026 Alpha - AUTO MENU (UPGRADED)
+// © 2026 Alpha - AUTO MENU (UPGRADED + SETTINGS VIEW)
 
 const config = require("../settings/config");
 const path = require("path");
 const fs = require("fs");
+
+const settingsPath = './database/settings.json';
+
+// 🔧 LOAD SETTINGS
+const loadSettings = () => {
+    try {
+        return JSON.parse(fs.readFileSync(settingsPath));
+    } catch {
+        return {
+            autoread: false,
+            typing: false,
+            autoreact: false,
+            antidelete: false,
+            antidelete_mode: "chat",
+            ignore_admins: false
+        };
+    }
+};
 
 module.exports = {
     command: "menu",
@@ -11,6 +29,8 @@ module.exports = {
 
     execute: async (sock, m, { send }) => {
         try {
+            const settings = loadSettings();
+
             const pluginsDir = path.join(__dirname);
             let grouped = {};
 
@@ -22,7 +42,7 @@ module.exports = {
                     let full = path.join(dir, file);
 
                     if (fs.lstatSync(full).isDirectory()) {
-                        load(full); // 🔁 support subfolders
+                        load(full);
                     } else if (file.endsWith(".js") && file !== "menu.js") {
                         try {
                             delete require.cache[require.resolve(full)];
@@ -53,7 +73,6 @@ module.exports = {
 
             load(pluginsDir);
 
-            // 🔥 CATEGORY ORDER (your style)
             const order = ["general", "downloader", "group", "settings", "owner"];
 
             const format = (arr) =>
@@ -63,7 +82,7 @@ module.exports = {
 
             let text = `╔═══〔 ${config.settings.title} 〕═══⬣\n║\n`;
 
-            // 🔥 PRINT ORDERED CATEGORIES FIRST
+            // 🔥 PRINT CATEGORIES
             for (let cat of order) {
                 if (grouped[cat]) {
                     text += `║ ${getIcon(cat)} *${cat.toUpperCase()}*\n`;
@@ -72,11 +91,23 @@ module.exports = {
                 }
             }
 
-            // 🔥 PRINT ANY NEW CATEGORIES AUTO
+            // 🔥 PRINT EXTRA CATEGORIES
             for (let cat in grouped) {
                 text += `║ 🔹 *${cat.toUpperCase()}*\n`;
                 text += format(grouped[cat]) + "\n║\n";
             }
+
+            // 🔥 SETTINGS SECTION (NEW 🔥)
+            const ON = "ON ✅";
+            const OFF = "OFF ❌";
+
+            text += `║ ⚙️ *SETTINGS*\n`;
+            text += `║ • Autoread: ${settings.autoread ? ON : OFF}\n`;
+            text += `║ • Typing: ${settings.typing ? ON : OFF}\n`;
+            text += `║ • React: ${settings.autoreact ? ON : OFF}\n`;
+            text += `║ • Antidelete: ${settings.antidelete ? `ON (${settings.antidelete_mode})` : OFF}\n`;
+            text += `║ • Ignore Admins: ${settings.ignore_admins ? ON : OFF}\n`;
+            text += `║\n`;
 
             text += `╚══════════════════⬣\n\n${config.settings.footer}`;
 
