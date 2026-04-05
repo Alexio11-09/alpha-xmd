@@ -1,4 +1,4 @@
-// © 2026 Alpha - GROUP COMMANDS (FORCE MODE 😈)
+// © 2026 Alpha - GROUP COMMANDS (STABLE 😈)
 
 module.exports = {
     command: "group",
@@ -9,9 +9,6 @@ module.exports = {
         try {
 
             if (!m.isGroup) return reply("❌ Group only command");
-
-            // 😈 FORCE BYPASS
-            const FORCE_MODE = true;
 
             const action = args[0]?.toLowerCase();
 
@@ -36,64 +33,57 @@ Glink
             const metadata = await sock.groupMetadata(m.chat);
             const participants = metadata.participants;
 
-            const mentioned = m.mentionedJid[0] || m.quoted?.sender;
+            // ✅ SAFE MENTION FIX
+            const mentioned =
+                (m.mentionedJid && m.mentionedJid[0]) ||
+                (m.quoted && m.quoted.sender) ||
+                null;
 
-            // 🔥 HELPER
             const getUser = () => {
                 if (!mentioned) return null;
                 return mentioned;
             };
 
-            // ================= COMMANDS ================= //
-
             switch (action) {
-
-                case "add": {
-                    if (!args[1]) return reply("⚠️ Use: .group add 263xxx");
-                    try {
-                        await sock.groupParticipantsUpdate(m.chat, [`${args[1]}@s.whatsapp.net`], "add");
-                        reply("✅ User added");
-                    } catch {
-                        reply("❌ Failed to add user");
-                    }
-                }
-                break;
 
                 case "kick": {
                     const user = getUser();
-                    if (!user) return reply("⚠️ Tag user");
+                    if (!user) return reply("⚠️ Tag or reply to user");
 
                     try {
                         await sock.groupParticipantsUpdate(m.chat, [user], "remove");
                         reply("✅ User kicked");
-                    } catch {
-                        reply("❌ Failed. Bot might not be admin");
+                    } catch (e) {
+                        console.log("Kick error:", e);
+                        reply("❌ Failed. Bot may not be admin");
                     }
                 }
                 break;
 
                 case "promote": {
                     const user = getUser();
-                    if (!user) return reply("⚠️ Tag user");
+                    if (!user) return reply("⚠️ Tag or reply to user");
 
                     try {
                         await sock.groupParticipantsUpdate(m.chat, [user], "promote");
                         reply("✅ Promoted");
-                    } catch {
-                        reply("❌ Failed. Bot might not be admin");
+                    } catch (e) {
+                        console.log("Promote error:", e);
+                        reply("❌ Failed");
                     }
                 }
                 break;
 
                 case "demote": {
                     const user = getUser();
-                    if (!user) return reply("⚠️ Tag user");
+                    if (!user) return reply("⚠️ Tag or reply to user");
 
                     try {
                         await sock.groupParticipantsUpdate(m.chat, [user], "demote");
                         reply("✅ Demoted");
-                    } catch {
-                        reply("❌ Failed. Bot might not be admin");
+                    } catch (e) {
+                        console.log("Demote error:", e);
+                        reply("❌ Failed");
                     }
                 }
                 break;
@@ -124,7 +114,8 @@ Glink
                     try {
                         await sock.groupSettingUpdate(m.chat, "not_announcement");
                         reply("✅ Group opened");
-                    } catch {
+                    } catch (e) {
+                        console.log("Open error:", e);
                         reply("❌ Failed");
                     }
                 }
@@ -134,7 +125,8 @@ Glink
                     try {
                         await sock.groupSettingUpdate(m.chat, "announcement");
                         reply("✅ Group closed");
-                    } catch {
+                    } catch (e) {
+                        console.log("Close error:", e);
                         reply("❌ Failed");
                     }
                 }
@@ -144,7 +136,8 @@ Glink
                     try {
                         await sock.groupSettingUpdate(m.chat, "locked");
                         reply("🔒 Locked");
-                    } catch {
+                    } catch (e) {
+                        console.log("Lock error:", e);
                         reply("❌ Failed");
                     }
                 }
@@ -154,7 +147,8 @@ Glink
                     try {
                         await sock.groupSettingUpdate(m.chat, "unlocked");
                         reply("🔓 Unlocked");
-                    } catch {
+                    } catch (e) {
+                        console.log("Unlock error:", e);
                         reply("❌ Failed");
                     }
                 }
@@ -175,19 +169,19 @@ Admins: ${participants.filter(p => p.admin).length}
                     try {
                         const code = await sock.groupInviteCode(m.chat);
                         reply(`🔗 https://chat.whatsapp.com/${code}`);
-                    } catch {
+                    } catch (e) {
+                        console.log("Link error:", e);
                         reply("❌ Failed");
                     }
                 }
                 break;
 
                 default:
-                    reply("❌ Unknown group command");
-
+                    reply("❌ Unknown command");
             }
 
         } catch (err) {
-            console.log("Group error:", err);
+            console.log("🔥 GROUP CRASH:", err);
             reply("❌ Error occurred");
         }
     }
