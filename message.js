@@ -28,7 +28,6 @@ const loadSettings = () => {
             antidelete: false,
             autoreact: false,
             antidelete_mode: "chat",
-            log_jid: "",
             whitelist: [],
             ignore_admins: false,
             delete_tracker: {},
@@ -111,7 +110,7 @@ class PluginLoader {
 
 const plugins = new PluginLoader();
 
-// 📩 MAIN MESSAGE HANDLER
+// 📩 MAIN HANDLER
 module.exports = async (sock, m) => {
     try {
         if (!jidNormalizedUser) await loadBaileysUtils();
@@ -142,7 +141,7 @@ module.exports = async (sock, m) => {
 
         if (settings.mode === "self" && !isCreator) return;
 
-        // 💾 SAVE MESSAGE
+        // 💾 STORE MESSAGE
         if (m.key?.id) {
             store[m.key.id] = {
                 message: m.message,
@@ -151,9 +150,7 @@ module.exports = async (sock, m) => {
                 isGroup: m.isGroup
             };
 
-            setTimeout(() => {
-                delete store[m.key.id];
-            }, 10 * 60 * 1000);
+            setTimeout(() => delete store[m.key.id], 10 * 60 * 1000);
         }
 
         // ⚙️ AUTO FEATURES
@@ -189,7 +186,7 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
-        // 🔥 COMMAND SYSTEM
+        // 🔥 COMMANDS
         if (isCmd) {
             const done = await plugins.execute(command, sock, m, {
                 args,
@@ -212,7 +209,7 @@ module.exports = async (sock, m) => {
     }
 };
 
-// 🛡️ ANTIDELETE V4 (FINAL)
+// 🛡️ ANTIDELETE V5 (CLEAN + FILTERED)
 module.exports.handleDelete = async (sock, update) => {
     try {
         const settings = loadSettings();
@@ -229,14 +226,17 @@ module.exports.handleDelete = async (sock, update) => {
 
         const senderJid = sender.split(":")[0];
         const botJid = sock.user.id.split(":")[0];
-        const ownerNumbers = config.owner || [];
-        const whitelist = settings.whitelist || [];
 
-        // 🚫 FILTER SYSTEM
+        // 🚫 IGNORE OWNER / BOT
         if (senderJid === botJid) return;
+
+        const ownerNumbers = config.owner || [];
         if (ownerNumbers.includes(senderJid.replace("@s.whatsapp.net", ""))) return;
+
+        const whitelist = settings.whitelist || [];
         if (whitelist.includes(senderJid.replace("@s.whatsapp.net", ""))) return;
 
+        // 👥 IGNORE ADMINS
         if (settings.ignore_admins && data.isGroup) {
             const meta = await sock.groupMetadata(from);
             const admins = meta.participants
@@ -246,51 +246,26 @@ module.exports.handleDelete = async (sock, update) => {
             if (admins.includes(senderJid.split("@")[0])) return;
         }
 
-        // 📊 TRACKING
-        if (!settings.delete_tracker) settings.delete_tracker = {};
-
         const user = senderJid.split("@")[0];
-        settings.delete_tracker[user] = (settings.delete_tracker[user] || 0) + 1;
-
-        saveSettings(settings);
-
-        const count = settings.delete_tracker[user];
-
-        // ⚠️ WARNING
-        if (settings.warn_delete && count === settings.warn_limit) {
-            await sock.sendMessage(from, {
-                text: `⚠️ @${user} stop deleting messages (${count} times)`,
-                mentions: [sender]
-            });
-        }
-
-        // 🚫 AUTO KICK
-        if (settings.kick_limit && count >= settings.kick_limit && data.isGroup) {
-            try {
-                await sock.groupParticipantsUpdate(from, [sender], "remove");
-            } catch {}
-        }
-
-        // 🔥 OUTPUT
         const tag = `@${user}`;
         const mention = [sender];
 
-        const caption = `🛡️ *ANTI DELETE*\n👤 ${tag} (x${count})`;
+        const caption = `🛡️ *ANTI DELETE*\n👤 ${tag}`;
 
         const sendChat = settings.antidelete_mode === "chat" || settings.antidelete_mode === "both";
         const sendDM = settings.antidelete_mode === "dm" || settings.antidelete_mode === "both";
 
         const msg = data.message;
-
         const text = msg?.conversation || msg?.extendedTextMessage?.text;
 
         if (text) {
             const content = { text: `${caption}\n\n${text}`, mentions: mention };
+
             if (sendChat) await sock.sendMessage(from, content);
             if (sendDM) await sock.sendMessage(sock.user.id, content);
         }
 
     } catch (err) {
-        console.log("Antidelete v4 error:", err);
+        console.log("Antidelete error:", err);
     }
 };
