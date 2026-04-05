@@ -1,4 +1,4 @@
-// © 2026 Alpha - FULL GROUP SYSTEM 😈🔥
+// © 2026 Alpha - FULL GROUP SYSTEM (FINAL 🔥😈)
 
 module.exports = {
     command: [
@@ -12,11 +12,9 @@ module.exports = {
 
     execute: async (sock, m, { args, reply }) => {
         try {
-            const isGroup = m.chat.endsWith("@g.us");
-
             const cmd = m.body.split(" ")[0].slice(1).toLowerCase();
 
-            // 🌐 JOIN (works outside group)
+            // 🌐 JOIN (works anywhere)
             if (cmd === "join") {
                 const link = args[0];
                 if (!link) return reply("❌ Provide group link");
@@ -27,13 +25,16 @@ module.exports = {
                 return reply("✅ Joined group");
             }
 
-            if (!isGroup) return reply("❌ Group only command");
+            // ❌ GROUP ONLY
+            if (!m.chat.endsWith("@g.us")) {
+                return reply("❌ Group only command");
+            }
 
             const metadata = await sock.groupMetadata(m.chat);
             const participants = metadata.participants;
 
             const sender = m.key.participant || m.key.remoteJid;
-            const botId = sock.user.id;
+            const botId = sock.user.id.split(":")[0] + "@s.whatsapp.net";
 
             const isAdmin = participants.find(p => p.id === sender)?.admin;
             const isBotAdmin = participants.find(p => p.id === botId)?.admin;
@@ -41,6 +42,17 @@ module.exports = {
             // 🔒 ADMIN CHECK
             if (!isAdmin && cmd !== "left") {
                 return reply("❌ Admin only");
+            }
+
+            // 🤖 BOT ADMIN CHECK
+            const needBotAdmin = [
+                "add","kick","promote","demote",
+                "lock","unlock","open","close",
+                "gname","gdesc"
+            ];
+
+            if (needBotAdmin.includes(cmd) && !isBotAdmin) {
+                return reply("❌ Bot must be admin");
             }
 
             // ➕ ADD
@@ -53,6 +65,8 @@ module.exports = {
             // 👞 KICK
             if (cmd === "kick") {
                 const user = m.mentionedJid[0];
+                if (!user) return reply("❌ Tag user");
+
                 await sock.groupParticipantsUpdate(m.chat, [user], "remove");
                 return reply("👞 User kicked");
             }
@@ -60,6 +74,8 @@ module.exports = {
             // ⬆️ PROMOTE
             if (cmd === "promote") {
                 const user = m.mentionedJid[0];
+                if (!user) return reply("❌ Tag user");
+
                 await sock.groupParticipantsUpdate(m.chat, [user], "promote");
                 return reply("⬆️ Promoted");
             }
@@ -67,32 +83,35 @@ module.exports = {
             // ⬇️ DEMOTE
             if (cmd === "demote") {
                 const user = m.mentionedJid[0];
+                if (!user) return reply("❌ Tag user");
+
                 await sock.groupParticipantsUpdate(m.chat, [user], "demote");
                 return reply("⬇️ Demoted");
             }
 
-            // 📢 TAG ALL
+            // 📢 TAG ALL (VERTICAL 🔥)
             if (cmd === "tagall") {
                 let text = "📢 Tagging all:\n\n";
-                let mentions = participants.map(p => p.id);
+                let mentions = [];
 
-                participants.forEach(p => {
-                    text += `@${p.id.split("@")[0]}\n`;
-                });
+                for (let p of participants) {
+                    text += `• @${p.id.split("@")[0]}\n`;
+                    mentions.push(p.id);
+                }
 
                 return sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
             }
 
-            // 🚨 TAG ADMINS
+            // 🚨 TAG ADMINS (VERTICAL 🔥)
             if (cmd === "tagadmins") {
                 let admins = participants.filter(p => p.admin);
                 let text = "🚨 Admins:\n\n";
                 let mentions = [];
 
-                admins.forEach(p => {
-                    text += `@${p.id.split("@")[0]}\n`;
+                for (let p of admins) {
+                    text += `• @${p.id.split("@")[0]}\n`;
                     mentions.push(p.id);
-                });
+                }
 
                 return sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
             }
@@ -125,7 +144,7 @@ module.exports = {
                 return reply(`🔗 https://chat.whatsapp.com/${code}`);
             }
 
-            // 🔒 LOCK (admins only edit)
+            // 🔒 LOCK
             if (cmd === "lock") {
                 await sock.groupSettingUpdate(m.chat, "locked");
                 return reply("🔒 Group locked");
@@ -137,7 +156,7 @@ module.exports = {
                 return reply("🔓 Group unlocked");
             }
 
-            // 🔇 CLOSE (admins only chat)
+            // 🔇 CLOSE
             if (cmd === "close") {
                 await sock.groupSettingUpdate(m.chat, "announcement");
                 return reply("🔇 Group closed");
@@ -149,16 +168,16 @@ module.exports = {
                 return reply("🔊 Group opened");
             }
 
-            // ✏️ CHANGE NAME
+            // ✏️ GROUP NAME
             if (cmd === "gname") {
                 const name = args.join(" ");
                 if (!name) return reply("❌ Provide name");
 
                 await sock.groupUpdateSubject(m.chat, name);
-                return reply("✏️ Group name updated");
+                return reply("✏️ Name updated");
             }
 
-            // 📝 CHANGE DESC
+            // 📝 GROUP DESC
             if (cmd === "gdesc") {
                 const desc = args.join(" ");
                 if (!desc) return reply("❌ Provide description");
@@ -179,17 +198,16 @@ module.exports = {
                         participant: m.quoted.sender
                     }
                 });
-
                 return;
             }
 
-            // 👋 LEAVE GROUP
+            // 👋 LEAVE
             if (cmd === "left") {
                 await sock.groupLeave(m.chat);
             }
 
         } catch (err) {
-            console.log("Group error:", err.message);
+            console.log("Group error:", err);
             reply("❌ Group command failed");
         }
     }
