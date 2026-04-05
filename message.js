@@ -59,7 +59,7 @@ class PluginLoader {
                             ? plugin.command
                             : [plugin.command];
 
-                        cmds.forEach(cmd => this.plugins.set(cmd, plugin));
+                        cmds.forEach(cmd => this.plugins.set(cmd.toLowerCase(), plugin));
 
                     } catch (e) {
                         console.log("Plugin load error:", e.message);
@@ -76,7 +76,6 @@ class PluginLoader {
         if (!plugin) return false;
 
         try {
-            // 🔐 OWNER CHECK (WORKING)
             if (plugin.owner && !context.isCreator) {
                 return context.reply(config.message.owner);
             }
@@ -106,21 +105,26 @@ module.exports = async (sock, m) => {
         if (m.key?.remoteJid === 'status@broadcast') return;
 
         const settings = loadSettings();
-
-        const body = m.text || '';
         const prefix = '.';
 
+        // 🔥 IMPROVED MESSAGE PARSER
+        const body =
+            m.message?.conversation ||
+            m.message?.extendedTextMessage?.text ||
+            m.message?.imageMessage?.caption ||
+            m.message?.videoMessage?.caption ||
+            '';
+
         const isCmd = body.startsWith(prefix);
-        const command = isCmd ? body.slice(1).split(" ")[0].toLowerCase() : '';
+        const command = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const text = args.join(" ");
 
         const sender = m.sender || "";
 
-        // 🔥 FINAL OWNER FIX (BULLETPROOF)
+        // 🔥 OWNER SYSTEM (PERFECT)
         const senderJid = sender.split(":")[0];
         const botJid = (sock.user?.id || "").split(":")[0];
-
         const isCreator = senderJid === botJid;
 
         // 🔒 MODE
@@ -168,7 +172,7 @@ module.exports = async (sock, m) => {
 
         const reply = (text) => send({ text });
 
-        // 🔥 EXECUTE COMMAND
+        // 🔥 EXECUTE COMMANDS ONLY (NO HARDCODED MENU)
         if (isCmd) {
             const done = await plugins.execute(command, sock, m, {
                 args,
@@ -184,21 +188,6 @@ module.exports = async (sock, m) => {
             });
 
             if (done) return;
-        }
-
-        // 🔥 DEFAULT MENU
-        if (command === "menu") {
-            return reply(`
-╔═══〔 ${config.settings.title} MENU 〕═══⬣
-║
-║ ⚡ .ping
-║ 🎵 .play
-║ 🎥 .video
-║ ⚙️ .toggle autoread on/off
-║ 🔄 .update
-║
-╚══════════════════⬣
-`);
         }
 
     } catch (err) {
