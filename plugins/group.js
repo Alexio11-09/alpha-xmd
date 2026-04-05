@@ -1,4 +1,4 @@
-// © 2026 Alpha - GROUP SYSTEM (FINAL CLEAN 😈🔥)
+// © 2026 Alpha - GROUP SYSTEM (FINAL ADMIN FIX 🔥😈)
 
 module.exports = {
     command: [
@@ -46,10 +46,18 @@ module.exports = {
             const participants = metadata.participants;
 
             const sender = m.key.participant || m.key.remoteJid;
-            const botId = sock.user.id.split(":")[0] + "@s.whatsapp.net";
 
-            const isAdmin = participants.find(p => p.id === sender)?.admin;
-            const isBotAdmin = participants.find(p => p.id === botId)?.admin;
+            // ✅ FIXED ADMIN DETECTION
+            const senderNumber = sender.split("@")[0];
+            const botNumber = sock.user.id.split(":")[0];
+
+            const isAdmin = participants.some(p =>
+                p.id.includes(senderNumber) && p.admin
+            );
+
+            const isBotAdmin = participants.some(p =>
+                p.id.includes(botNumber) && p.admin
+            );
 
             // 🔒 ADMIN CHECK
             if (!isAdmin && cmd !== "left") {
@@ -105,7 +113,7 @@ module.exports = {
                 return reply("⬇️ Demoted");
             }
 
-            // 📢 TAG ALL (VERTICAL CLEAN)
+            // 📢 TAG ALL
             if (cmd === "tagall") {
                 let text = "📢 Tagging all:\n\n";
                 let mentions = [];
@@ -184,7 +192,7 @@ module.exports = {
                 return reply("🔊 Group opened");
             }
 
-            // ✏️ GROUP NAME
+            // ✏️ NAME
             if (cmd === "gname") {
                 const name = args.join(" ");
                 if (!name) return reply("❌ Provide name");
@@ -193,7 +201,7 @@ module.exports = {
                 return reply("✏️ Name updated");
             }
 
-            // 📝 GROUP DESC
+            // 📝 DESC
             if (cmd === "gdesc") {
                 const desc = args.join(" ");
                 if (!desc) return reply("❌ Provide description");
