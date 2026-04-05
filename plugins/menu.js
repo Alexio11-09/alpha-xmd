@@ -1,8 +1,9 @@
-// © 2026 Alpha - PREMIUM MENU (WITH TOOLS 😈)
+// © 2026 Alpha - PREMIUM AUTO MENU 😈
 
 const config = require("../settings/config");
 const moment = require("moment-timezone");
 const fs = require("fs");
+const path = require("path");
 
 const settingsPath = "./database/settings.json";
 
@@ -25,20 +26,16 @@ module.exports = {
 
             const settings = loadSettings();
 
-            // 👤 USER
             const name = m.pushName || "User";
 
-            // ⏱️ UPTIME
             const uptime = process.uptime();
             const h = Math.floor(uptime / 3600);
             const mnt = Math.floor((uptime % 3600) / 60);
             const s = Math.floor(uptime % 60);
 
-            // 📅 TIME
             const time = moment().tz("Africa/Harare").format("HH:mm:ss");
             const date = moment().tz("Africa/Harare").format("DD/MM/YYYY");
 
-            // 🔥 STATUS FORMAT
             const ON = "ON ✅";
             const OFF = "OFF ❌";
 
@@ -48,37 +45,62 @@ module.exports = {
             text += `│ 🕒 Time: ${time}\n`;
             text += `│ 📅 Date: ${date}\n│\n`;
 
-            // ⚡ GENERAL
-            text += `│ ⚡ GENERAL\n`;
-            text += `│ • .alive\n`;
-            text += `│ • .ping\n│\n`;
+            // 🔥 AUTO LOAD COMMANDS
+            const pluginsPath = path.join(__dirname, "../plugins");
+            let categories = {};
 
-            // 🎧 DOWNLOADER
-            text += `│ 🎧 DOWNLOADER\n`;
-            text += `│ • .play\n`;
-            text += `│ • .video\n│\n`;
+            const loadCommands = (dir) => {
+                const files = fs.readdirSync(dir);
 
-            // 🛠️ TOOLS (NEW 🔥)
-            text += `│ 🛠️ TOOLS\n`;
-            text += `│ • .calc\n`;
-            text += `│ • .short\n`;
-            text += `│ • .translate\n`;
-            text += `│ • .sticker\n`;
-            text += `│ • .qr\n`;
-            text += `│ • .google\n│\n`;
+                for (let file of files) {
+                    const fullPath = path.join(dir, file);
 
-            // 👥 GROUP
-            text += `│ 👥 GROUP\n`;
-            text += `│ • .tagall\n│\n`;
+                    if (fs.lstatSync(fullPath).isDirectory()) {
+                        loadCommands(fullPath);
+                    } else if (file.endsWith(".js")) {
+                        try {
+                            const cmd = require(fullPath);
 
-            // 👑 OWNER
-            text += `│ 👑 OWNER\n`;
-            text += `│ • .mode\n`;
-            text += `│ • .status\n`;
-            text += `│ • .update\n`;
-            text += `│ • .restart\n│\n`;
+                            if (!cmd.command) continue;
 
-            // ⚙️ SETTINGS (LIVE)
+                            const category = cmd.category || "other";
+
+                            if (!categories[category]) {
+                                categories[category] = [];
+                            }
+
+                            categories[category].push(cmd.command);
+
+                        } catch (e) {
+                            console.log("Menu load error:", file);
+                        }
+                    }
+                }
+            };
+
+            loadCommands(pluginsPath);
+
+            // 🔥 DISPLAY CATEGORIES
+            const emojis = {
+                general: "⚡",
+                downloader: "🎧",
+                tools: "🛠️",
+                group: "👥",
+                owner: "👑",
+                other: "📦"
+            };
+
+            for (let cat in categories) {
+                text += `│ ${emojis[cat] || "📂"} ${cat.toUpperCase()}\n`;
+
+                categories[cat].forEach(cmd => {
+                    text += `│ • .${cmd}\n`;
+                });
+
+                text += `│\n`;
+            }
+
+            // ⚙️ SETTINGS
             text += `│ ⚙️ SETTINGS\n`;
             text += `│ • Autoread: ${settings.autoread ? ON : OFF}\n`;
             text += `│ • Typing: ${settings.typing ? ON : OFF}\n`;
@@ -93,10 +115,10 @@ module.exports = {
 
             // 📘 HOW TO USE
             text += `│ 📘 HOW TO USE\n`;
-            text += `│ • .toggle autoread\n`;
-            text += `│ • .toggle typing\n`;
-            text += `│ • .toggle react\n`;
-            text += `│ • .toggle antidelete\n`;
+            text += `│ • .toggle autoread on/off\n`;
+            text += `│ • .toggle typing on/off\n`;
+            text += `│ • .toggle react on/off\n`;
+            text += `│ • .toggle antidelete on/off\n`;
             text += `│ • .toggle antidelete chat/dm/both\n`;
             text += `│\n`;
 
