@@ -1,4 +1,4 @@
-// © 2026 Alpha - GROUP SYSTEM (FINAL REAL FIX 😈🔥)
+// © 2026 Alpha - GROUP SYSTEM (FINAL TRUE FIX 🔥😈)
 
 module.exports = {
     command: [
@@ -45,22 +45,9 @@ module.exports = {
             const metadata = await sock.groupMetadata(m.chat);
             const participants = metadata.participants;
 
-            const sender = m.key.participant || m.key.remoteJid;
-
-            // 🔥 NORMALIZE JIDs (REAL FIX)
-            const normalize = (jid) => jid.split(":")[0];
-
-            const botJid = normalize(sock.user.id);
-            const senderJid = normalize(sender);
-
-            // ✅ FINAL ADMIN CHECKS
-            const isAdmin = participants.some(p =>
-                normalize(p.id) === senderJid && p.admin !== null
-            );
-
-            const isBotAdmin = participants.some(p =>
-                normalize(p.id) === botJid && p.admin !== null
-            );
+            // 🔥 FINAL ADMIN CHECK (BAILEYS FLAGS)
+            const isAdmin = m.isAdmin || false;
+            const isBotAdmin = m.isBotAdmin || false;
 
             // 🔒 ADMIN CHECK
             if (!isAdmin && cmd !== "left") {
