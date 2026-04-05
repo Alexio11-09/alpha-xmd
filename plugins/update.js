@@ -1,6 +1,7 @@
-// © 2026 Alpha (SAFE UPDATE FIX)
+// © 2026 Alpha (FINAL AUTO-RESTART FIX)
 
 const { updateBot } = require("../library/updater");
+const { spawn } = require("child_process");
 
 module.exports = {
     command: "update",
@@ -10,18 +11,20 @@ module.exports = {
         try {
             await reply("🔄 Updating bot...");
 
-            const result = await updateBot();
+            await updateBot();
 
-            if (result === false) {
-                return reply("❌ Update failed");
-            }
+            await reply("✅ Updated successfully!\n♻️ Restarting bot...");
 
-            await reply("✅ Update complete!\n♻️ Restarting bot...");
+            // 🔥 START NEW BOT PROCESS
+            const child = spawn("node", ["index.js"], {
+                detached: true,
+                stdio: "inherit"
+            });
 
-            // 🔥 SAFE RESTART DELAY
-            setTimeout(() => {
-                process.exit(0);
-            }, 4000);
+            child.unref(); // let it run independently
+
+            // 🔥 STOP OLD PROCESS
+            process.exit(0);
 
         } catch (err) {
             console.log("Update error:", err);
