@@ -1,4 +1,4 @@
-// © 2026 Alpha - CLEAN MESSAGE HANDLER
+// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯)
 
 const fs = require("fs");
 const path = require("path");
@@ -20,7 +20,10 @@ const loadCommands = (dir) => {
                 delete require.cache[require.resolve(fullPath)];
                 const cmd = require(fullPath);
 
-                if (cmd.command) {
+                // ✅ SUPPORT MULTIPLE EXPORTS
+                if (Array.isArray(cmd)) {
+                    commands.push(...cmd);
+                } else if (cmd.command) {
                     commands.push(cmd);
                 }
 
@@ -33,10 +36,9 @@ const loadCommands = (dir) => {
 
 loadCommands(path.join(__dirname, "plugins"));
 
-// 🔥 CLEAN NUMBER FUNCTION (VERY IMPORTANT)
+// 🔥 CLEAN NUMBER FUNCTION
 const clean = (jid) => {
     if (!jid) return "";
-
     try {
         return jid.toString().split("@")[0];
     } catch {
@@ -57,8 +59,8 @@ module.exports = async (sock, m) => {
         const command = commands.find(cmd => cmd.command === commandName);
         if (!command) return;
 
-        // ✅ OWNER FIX (SAFE)
-        const isOwner = clean(m.sender) === clean(config.owner);
+        // ✅ OWNER FIX (ARRAY SUPPORT)
+        const isOwner = config.owner.includes(clean(m.sender));
 
         // 🔥 HELPERS
         const reply = (text) =>
@@ -67,20 +69,38 @@ module.exports = async (sock, m) => {
         const send = (data) =>
             sock.sendMessage(m.chat, data, { quoted: m });
 
-        // 🔥 CONTEXT (WE WILL EXPAND LATER)
+        // 🔥 CONTEXT
         const context = {
             args,
             reply,
             send,
-            isOwner
+            isOwner,
+            isGroup: m.isGroup,
+            isAdmin: m.isAdmin,
+            isBotAdmin: m.isBotAdmin
         };
 
         // 🔒 OWNER PROTECTION
         if (command.owner && !isOwner) {
-            return reply("❌ Owner only command");
+            return reply(config.message.owner);
         }
 
-        // 🚀 EXECUTE COMMAND
+        // 🔒 GROUP ONLY
+        if (command.group && !m.isGroup) {
+            return reply(config.message.group);
+        }
+
+        // 🔒 ADMIN ONLY
+        if (command.admin && !m.isAdmin) {
+            return reply(config.message.admin);
+        }
+
+        // 🔒 BOT ADMIN REQUIRED
+        if (command.botAdmin && !m.isBotAdmin) {
+            return reply("❌ Bot needs admin rights.");
+        }
+
+        // 🚀 EXECUTE
         await command.execute(sock, m, context);
 
     } catch (err) {
