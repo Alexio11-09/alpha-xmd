@@ -78,7 +78,11 @@ const clientstart = async () => {
     printQRInTerminal: !config().status.terminal,
     auth: state,
     version,
-    browser: Browsers.macOS('Chrome')
+    browser: Browsers.macOS('Chrome'),
+
+    // 🔥 FIX: ENABLE STATUS FLOW
+    syncFullHistory: true,
+    markOnlineOnConnect: false
   });
 
   // 🔄 JID FIX
@@ -106,8 +110,8 @@ const clientstart = async () => {
   };
 
   // 💾 STORES
-  const store = new Map();       // messages
-  const statusStore = new Map(); // statuses
+  const store = new Map();
+  const statusStore = new Map();
 
   // 🔥 PAIRING
   if (config().status.terminal && !sock.authState.creds.registered) {
@@ -140,6 +144,9 @@ const clientstart = async () => {
     }
   });
 
+  // 🔥 KEEP ALIVE FOR STATUS EVENTS
+  sock.ev.on("presence.update", () => {});
+
   // 🔥 ANTIDELETE + ANTIEDIT
   sock.ev.on('messages.update', async (updates) => {
     const settings = getSettings();
@@ -149,7 +156,7 @@ const clientstart = async () => {
 
       // 🛡️ ANTIDELETE
       if (settings.antidelete && update.update.message === null) {
-        if (!oldMsg) return;
+        if (!oldMsg) continue;
 
         await sock.sendMessage(update.key.remoteJid, {
           text: `🛡️ *Deleted Message*\n\n${oldMsg.text || "Media message"}`
@@ -166,7 +173,7 @@ const clientstart = async () => {
           newText = msg[type]?.text || msg[type]?.caption || "";
         } catch {}
 
-        if (oldMsg && newText && oldMsg.text !== newText) {
+        if (oldMsg && oldMsg.text && newText && oldMsg.text !== newText) {
           await sock.sendMessage(update.key.remoteJid, {
             text: `✏️ *Edited Message*\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}`
           });
@@ -186,18 +193,19 @@ const clientstart = async () => {
 
         const settings = getSettings();
 
-        // 👁️ STATUS SYSTEM (PRO)
-        if (mek.key?.remoteJid === 'status@broadcast') {
+        // 🔥 STRONG STATUS DETECTION
+        const isStatus =
+          mek.key?.remoteJid === "status@broadcast" ||
+          mek.key?.participant?.includes("status");
 
-          // 💾 SAVE STATUS
+        if (isStatus) {
+
           statusStore.set(mek.key.id, mek);
 
-          // 👁️ AUTO VIEW
           if (settings.autoviewstatus) {
             await sock.readMessages([mek.key]);
           }
 
-          // ❤️ AUTO REACT
           if (settings.autoreactstatus) {
             const emojis = ["🔥","😍","😂","💯","⚡","😎","🥶"];
             const random = emojis[Math.floor(Math.random() * emojis.length)];
@@ -209,13 +217,29 @@ const clientstart = async () => {
             } catch {}
           }
 
-          return;
+          continue;
         }
 
         const m = await smsg(sock, mek);
 
+        // ✏️ FALLBACK ANTIEDIT
+        if (store.has(mek.key.id)) {
+          const old = store.get(mek.key.id);
+
+          if (old.text && m.text && old.text !== m.text) {
+            if (settings.antiedit) {
+              await sock.sendMessage(m.chat, {
+                text: `✏️ *Edited Message*\n\n📌 Old: ${old.text}\n🆕 New: ${m.text}`
+              });
+            }
+          }
+        }
+
         // 💾 SAVE MESSAGE
-        store.set(mek.key.id, m);
+        store.set(mek.key.id, {
+          text: m.text || "",
+          message: mek.message
+        });
 
         // 🔥 ADMIN DETECTION
         if (m.isGroup) {
