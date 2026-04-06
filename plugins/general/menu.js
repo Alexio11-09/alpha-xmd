@@ -13,6 +13,18 @@ const runtime = (seconds) => {
     return `${d}d ${h}h ${m}m ${s}s`;
 };
 
+// 🌍 SIMPLE COUNTRY DETECTOR
+const getCountry = (jid) => {
+    if (!jid) return "Unknown";
+
+    if (jid.startsWith("263")) return "Zimbabwe 🇿🇼";
+    if (jid.startsWith("234")) return "Nigeria 🇳🇬";
+    if (jid.startsWith("27")) return "South Africa 🇿🇦";
+    if (jid.startsWith("254")) return "Kenya 🇰🇪";
+
+    return "Unknown 🌍";
+};
+
 module.exports = {
     command: "menu",
     description: "Show bot menu",
@@ -28,11 +40,13 @@ module.exports = {
             const pushname = m.pushName || "User";
             const uptime = runtime(process.uptime());
 
+            const country = getCountry((m.sender || "").replace(/[^0-9]/g, ""));
+
             const menu = `
 ╭───〔 ${config.settings.title} 〕───⬣
 
 👤 User: ${pushname}
-🌍 Country: Unknown 🌍
+🌍 Country: ${country}
 
 🕒 Time: ${time}
 📅 Date: ${date}
@@ -48,8 +62,13 @@ module.exports = {
 ⚙️ *SETTINGS*
 • .autoread on/off
 • .autotyping on/off
-• .autorecord on/off
+• .autorecording on/off
 • .autoreact on/off
+• .antidelete on/off
+• .autoviewstatus on/off
+• .autoreactstatus on/off
+• .antideletestatus on/off
+• .antiedit on/off
 
 📥 *DOWNLOADER*
 • .play
