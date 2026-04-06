@@ -11,7 +11,13 @@ const load = () => {
             autotyping: false,
             autoreact: false,
             autorecording: false,
-            antidelete: false
+            antidelete: false,
+
+            // 🆕 NEW PRO FEATURES
+            autoviewstatus: false,
+            autoreactstatus: false,
+            antideletestatus: false,
+            antiedit: false
         };
         fs.writeFileSync(path, JSON.stringify(def, null, 2));
         return def;
@@ -57,12 +63,21 @@ execute: async (sock, m, { reply }) => {
 🎙️ Autorecording: ${s.autorecording ? "ON ✅" : "OFF ❌"}
 🛡️ Antidelete: ${s.antidelete ? "ON ✅" : "OFF ❌"}
 
+👁️‍🗨️ AutoView Status: ${s.autoviewstatus ? "ON ✅" : "OFF ❌"}
+❤️‍🔥 AutoReact Status: ${s.autoreactstatus ? "ON ✅" : "OFF ❌"}
+🛡️ AntiDelete Status: ${s.antideletestatus ? "ON ✅" : "OFF ❌"}
+✏️ AntiEdit: ${s.antiedit ? "ON ✅" : "OFF ❌"}
+
 Use:
 .autoread on/off
 .autotyping on/off
 .autoreact on/off
 .autorecording on/off
-.antidelete on/off`
+.antidelete on/off
+.autoviewstatus on/off
+.autoreactstatus on/off
+.antideletestatus on/off
+.antiedit on/off`
     );
 }
 },
@@ -109,6 +124,42 @@ command: "antidelete",
 category: "settings",
 execute: async (sock, m, { args, reply }) => {
     toggle("antidelete", args[0], reply);
+}
+},
+
+/* ================= AUTOVIEW STATUS ================= */
+{
+command: "autoviewstatus",
+category: "settings",
+execute: async (sock, m, { args, reply }) => {
+    toggle("autoviewstatus", args[0], reply);
+}
+},
+
+/* ================= AUTOREACT STATUS ================= */
+{
+command: "autoreactstatus",
+category: "settings",
+execute: async (sock, m, { args, reply }) => {
+    toggle("autoreactstatus", args[0], reply);
+}
+},
+
+/* ================= ANTIDELETE STATUS ================= */
+{
+command: "antideletestatus",
+category: "settings",
+execute: async (sock, m, { args, reply }) => {
+    toggle("antideletestatus", args[0], reply);
+}
+},
+
+/* ================= ANTIEDIT ================= */
+{
+command: "antiedit",
+category: "settings",
+execute: async (sock, m, { args, reply }) => {
+    toggle("antiedit", args[0], reply);
 }
 }
 
