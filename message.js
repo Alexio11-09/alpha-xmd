@@ -1,4 +1,4 @@
-// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯 + AUTOREACT UPGRADE)
+// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯)
 
 const fs = require("fs");
 const path = require("path");
@@ -8,121 +8,100 @@ const config = require("./settings/config");
 const commands = [];
 
 const loadCommands = (dir) => {
-    const files = fs.readdirSync(dir);
+const files = fs.readdirSync(dir);
 
-    for (let file of files) {
-        const fullPath = path.join(dir, file);
+for (let file of files) {  
+    const fullPath = path.join(dir, file);  
 
-        if (fs.lstatSync(fullPath).isDirectory()) {
-            loadCommands(fullPath);
-        } else if (file.endsWith(".js")) {
-            try {
-                delete require.cache[require.resolve(fullPath)];
-                const cmd = require(fullPath);
+    if (fs.lstatSync(fullPath).isDirectory()) {  
+        loadCommands(fullPath);  
+    } else if (file.endsWith(".js")) {  
+        try {  
+            delete require.cache[require.resolve(fullPath)];  
+            const cmd = require(fullPath);  
 
-                if (cmd.command) {
-                    commands.push(cmd);
-                }
+            if (cmd.command) {  
+                commands.push(cmd);  
+            }  
 
-            } catch (e) {
-                console.log("❌ Command load error:", file);
-            }
-        }
-    }
+        } catch (e) {  
+            console.log("❌ Command load error:", file);  
+        }  
+    }  
+}
+
 };
 
 loadCommands(path.join(__dirname, "plugins"));
 
 // 🔥 FINAL CLEAN FUNCTION (NO ERRORS EVER)
 const clean = (jid) => {
-    try {
-        if (!jid) return "";
+try {
+if (!jid) return "";
 
-        jid = jid.toString();
+// force string  
+    jid = jid.toString();  
 
-        if (jid.includes("@")) {
-            return jid.split("@")[0];
-        }
+    // normal jid  
+    if (jid.includes("@")) {  
+        return jid.split("@")[0];  
+    }  
 
-        return jid;
+    // fallback (numbers etc)  
+    return jid;  
 
-    } catch {
-        return "";
-    }
+} catch {  
+    return "";  
+}
+
 };
 
 module.exports = async (sock, m) => {
-    try {
+try {
+if (!m.text) return;
 
-        // 🔥 LOAD SETTINGS ON EVERY MESSAGE
-        const settings = JSON.parse(fs.readFileSync("./database/settings.json"));
+const prefix = ".";  
+    if (!m.text.startsWith(prefix)) return;  
 
-        // 😈 MULTI EMOJI AUTOREACT (SAFE ADDITION)
-        if (settings.autoreact && m.key && m.message) {
-            try {
-                const emojis = [
-                    "😂","🔥","❤️","😎","💀","🥶","😈","✨","🤖","⚡",
-                    "😍","😹","🙌","💯","🎉","😏","🤍","😜","🧠","🥵"
-                ];
+    const args = m.text.slice(prefix.length).trim().split(/ +/);  
+    const commandName = args.shift().toLowerCase();  
 
-                const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const command = commands.find(cmd => cmd.command === commandName);  
+    if (!command) return;  
 
-                await sock.sendMessage(m.chat, {
-                    react: {
-                        text: emoji,
-                        key: m.key
-                    }
-                });
+    // 🔥 OWNER FIX (NO MORE LOCK)  
+    const isOwner = clean(m.sender) === clean(config.owner);  
 
-            } catch (e) {
-                console.log("Autoreact error:", e);
-            }
-        }
+    // 🔥 HELPERS  
+    const reply = (text) =>  
+        sock.sendMessage(m.chat, { text }, { quoted: m });  
 
-        // 🔒 DON'T BREAK NON-COMMAND MESSAGES
-        if (!m.text) return;
+    const send = (data) =>  
+        sock.sendMessage(m.chat, data, { quoted: m });  
 
-        const prefix = ".";
-        if (!m.text.startsWith(prefix)) return;
+    // 🔥 CONTEXT  
+    const context = {  
+        args,  
+        reply,  
+        send,  
+        isOwner  
+    };  
 
-        const args = m.text.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
+    // 🔥 OWNER PROTECTION  
+    if (command.category === "owner" && !isOwner) {  
+        return reply("❌ Owner only command");  
+    }  
 
-        const command = commands.find(cmd => cmd.command === commandName);
-        if (!command) return;
+    // 🚀 EXECUTE  
+    await command.execute(sock, m, context);  
 
-        // 🔥 OWNER FIX
-        const isOwner = clean(m.sender) === clean(config.owner);
+} catch (err) {  
+    console.log("🔥 MESSAGE ERROR:", err);  
+    await sock.sendMessage(  
+        m.chat,  
+        { text: "❌ Error occurred" },  
+        { quoted: m }  
+    );  
+}
 
-        // 🔥 HELPERS
-        const reply = (text) =>
-            sock.sendMessage(m.chat, { text }, { quoted: m });
-
-        const send = (data) =>
-            sock.sendMessage(m.chat, data, { quoted: m });
-
-        // 🔥 CONTEXT
-        const context = {
-            args,
-            reply,
-            send,
-            isOwner
-        };
-
-        // 🔥 OWNER PROTECTION
-        if (command.category === "owner" && !isOwner) {
-            return reply("❌ Owner only command");
-        }
-
-        // 🚀 EXECUTE
-        await command.execute(sock, m, context);
-
-    } catch (err) {
-        console.log("🔥 MESSAGE ERROR:", err);
-        await sock.sendMessage(
-            m.chat,
-            { text: "❌ Error occurred" },
-            { quoted: m }
-        );
-    }
 };
