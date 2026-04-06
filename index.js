@@ -1,5 +1,5 @@
 // © 2026 Alpha. All Rights Reserved.
-
+const fs = require("fs");
 // 🔥 AUTO INSTALL MODULES
 const { execSync } = require("child_process");
 
