@@ -35,7 +35,7 @@ const loadCommands = (dir) => {
 
 loadCommands(path.join(__dirname, "plugins"));
 
-// 🔥 CLEAN NUMBER (BULLETPROOF)
+// 🔥 CLEAN NUMBER
 const clean = (jid) => {
     if (!jid) return "";
     try {
@@ -58,7 +58,7 @@ module.exports = async (sock, m) => {
         const command = commands.find(cmd => cmd.command === commandName);
         if (!command) return;
 
-        // 🔥 OWNER SYSTEM (PUBLIC READY)
+        // 🔥 OWNER SYSTEM
         const botNumber = clean(sock.user.id);
         const senderNumber = clean(m.sender);
 
@@ -91,7 +91,7 @@ module.exports = async (sock, m) => {
                 { quoted: m }
             );
 
-        // 🔥 CONTEXT
+        // ✅ UPDATED CONTEXT (THIS FIXES YOUR ERROR)
         const context = {
             args,
             reply,
@@ -99,7 +99,9 @@ module.exports = async (sock, m) => {
             isOwner,
             isGroup: m.isGroup,
             isAdmin: m.isAdmin,
-            isBotAdmin: m.isBotAdmin
+            isBotAdmin: m.isBotAdmin,
+            config,     // 🔥 FIX
+            prefix      // 🔥 FIX
         };
 
         // 🔒 OWNER ONLY
