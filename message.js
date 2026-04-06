@@ -1,4 +1,4 @@
-// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯)
+// © 2026 Alpha - FINAL MESSAGE HANDLER (PUBLIC + BRANDING 💯)
 
 const fs = require("fs");
 const path = require("path");
@@ -20,7 +20,6 @@ const loadCommands = (dir) => {
                 delete require.cache[require.resolve(fullPath)];
                 const cmd = require(fullPath);
 
-                // ✅ SUPPORT MULTIPLE EXPORTS
                 if (Array.isArray(cmd)) {
                     commands.push(...cmd);
                 } else if (cmd.command) {
@@ -36,11 +35,11 @@ const loadCommands = (dir) => {
 
 loadCommands(path.join(__dirname, "plugins"));
 
-// 🔥 CLEAN NUMBER FUNCTION
+// 🔥 CLEAN NUMBER (BULLETPROOF)
 const clean = (jid) => {
     if (!jid) return "";
     try {
-        return jid.toString().split("@")[0];
+        return jid.toString().replace(/[^0-9]/g, "");
     } catch {
         return "";
     }
@@ -59,15 +58,38 @@ module.exports = async (sock, m) => {
         const command = commands.find(cmd => cmd.command === commandName);
         if (!command) return;
 
-        // ✅ OWNER FIX (ARRAY SUPPORT)
-        const isOwner = config.owner.includes(clean(m.sender));
+        // 🔥 OWNER SYSTEM (PUBLIC READY)
+        const botNumber = clean(sock.user.id);
+        const senderNumber = clean(m.sender);
+
+        const isOwner =
+            config.owner.includes(senderNumber) ||
+            senderNumber === botNumber;
+
+        // 🔥 CHANNEL BRANDING
+        const contextInfo = {
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: config.newsletter.id + "@newsletter",
+                newsletterName: config.newsletter.name
+            }
+        };
 
         // 🔥 HELPERS
         const reply = (text) =>
-            sock.sendMessage(m.chat, { text }, { quoted: m });
+            sock.sendMessage(
+                m.chat,
+                { text, contextInfo },
+                { quoted: m }
+            );
 
         const send = (data) =>
-            sock.sendMessage(m.chat, data, { quoted: m });
+            sock.sendMessage(
+                m.chat,
+                { ...data, contextInfo },
+                { quoted: m }
+            );
 
         // 🔥 CONTEXT
         const context = {
@@ -80,7 +102,7 @@ module.exports = async (sock, m) => {
             isBotAdmin: m.isBotAdmin
         };
 
-        // 🔒 OWNER PROTECTION
+        // 🔒 OWNER ONLY
         if (command.owner && !isOwner) {
             return reply(config.message.owner);
         }
