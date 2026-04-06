@@ -1,4 +1,4 @@
-// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯)
+// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯 + AUTOREACT UPGRADE)
 
 const fs = require("fs");
 const path = require("path");
@@ -38,15 +38,12 @@ const clean = (jid) => {
     try {
         if (!jid) return "";
 
-        // force string
         jid = jid.toString();
 
-        // normal jid
         if (jid.includes("@")) {
             return jid.split("@")[0];
         }
 
-        // fallback (numbers etc)
         return jid;
 
     } catch {
@@ -56,6 +53,33 @@ const clean = (jid) => {
 
 module.exports = async (sock, m) => {
     try {
+
+        // 🔥 LOAD SETTINGS ON EVERY MESSAGE
+        const settings = JSON.parse(fs.readFileSync("./database/settings.json"));
+
+        // 😈 MULTI EMOJI AUTOREACT (SAFE ADDITION)
+        if (settings.autoreact && m.key && m.message) {
+            try {
+                const emojis = [
+                    "😂","🔥","❤️","😎","💀","🥶","😈","✨","🤖","⚡",
+                    "😍","😹","🙌","💯","🎉","😏","🤍","😜","🧠","🥵"
+                ];
+
+                const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+                await sock.sendMessage(m.chat, {
+                    react: {
+                        text: emoji,
+                        key: m.key
+                    }
+                });
+
+            } catch (e) {
+                console.log("Autoreact error:", e);
+            }
+        }
+
+        // 🔒 DON'T BREAK NON-COMMAND MESSAGES
         if (!m.text) return;
 
         const prefix = ".";
@@ -67,7 +91,7 @@ module.exports = async (sock, m) => {
         const command = commands.find(cmd => cmd.command === commandName);
         if (!command) return;
 
-        // 🔥 OWNER FIX (NO MORE LOCK)
+        // 🔥 OWNER FIX
         const isOwner = clean(m.sender) === clean(config.owner);
 
         // 🔥 HELPERS
