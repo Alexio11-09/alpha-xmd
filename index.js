@@ -150,13 +150,11 @@ const clientstart = async () => {
             console.log("👥", normalize(sock.decodeJid(p.id)), "|", p.admin);
           });
 
-          // ✅ USER ADMIN
           m.isAdmin = participants.some(p => {
             const pid = normalize(sock.decodeJid(p.id));
             return pid === senderId && p.admin;
           });
 
-          // ✅ BOT ADMIN
           m.isBotAdmin = participants.some(p => {
             const pid = normalize(sock.decodeJid(p.id));
             return pid === botId && p.admin;
@@ -171,7 +169,21 @@ const clientstart = async () => {
           m.isBotAdmin = false;
         }
 
-        await sock.sendPresenceUpdate('available', m.chat);
+        // 🔥 PRESENCE SYSTEM (NEW)
+        const fs = require("fs");
+        const settings = JSON.parse(fs.readFileSync("./database/settings.json"));
+
+        if (settings.autorecord) {
+          await sock.sendPresenceUpdate("recording", m.chat);
+
+        } else if (settings.autotyping) {
+          await sock.sendPresenceUpdate("composing", m.chat);
+
+        } else {
+          await sock.sendPresenceUpdate("available", m.chat);
+        }
+
+        // ✅ KEEP READ
         await sock.readMessages([mek.key]);
 
         await messageHandler(sock, m);
