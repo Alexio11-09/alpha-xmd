@@ -1,4 +1,4 @@
-// © 2026 Alpha - SETTINGS PANEL (NEW WORKING BUTTONS)
+// © 2026 Alpha - SETTINGS PANEL (UPDATED 💯)
 
 const fs = require("fs");
 const settingsPath = "./database/settings.json";
@@ -9,7 +9,8 @@ const loadSettings = () => {
     } catch {
         return {
             autoread: false,
-            typing: false,
+            autotyping: false,
+            autorecord: false,
             autoreact: false,
             antidelete: false,
             antidelete_mode: "chat"
@@ -34,8 +35,9 @@ module.exports = {
 `⚙️ *SETTINGS PANEL*
 
 👁️ Autoread: ${s.autoread ? ON : OFF}
-⌨️ Typing: ${s.typing ? ON : OFF}
-❤️ React: ${s.autoreact ? ON : OFF}
+⌨️ AutoTyping: ${s.autotyping ? ON : OFF}
+🎤 AutoRecord: ${s.autorecord ? ON : OFF}
+❤️ AutoReact: ${s.autoreact ? ON : OFF}
 🛡️ Antidelete: ${s.antidelete ? ON : OFF}
 
 Tap below 👇`;
@@ -50,13 +52,18 @@ Tap below 👇`;
                         type: 1
                     },
                     {
-                        buttonId: ".toggle typing",
-                        buttonText: { displayText: "⌨️ Toggle Typing" },
+                        buttonId: ".toggle autotyping",
+                        buttonText: { displayText: "⌨️ Toggle AutoTyping" },
                         type: 1
                     },
                     {
-                        buttonId: ".toggle react",
-                        buttonText: { displayText: "❤️ Toggle React" },
+                        buttonId: ".toggle autorecord",
+                        buttonText: { displayText: "🎤 Toggle AutoRecord" },
+                        type: 1
+                    },
+                    {
+                        buttonId: ".toggle autoreact",
+                        buttonText: { displayText: "❤️ Toggle AutoReact" },
                         type: 1
                     },
                     {
