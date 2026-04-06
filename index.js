@@ -45,7 +45,7 @@ const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
 
-// ✅ SAFE MESSAGE HANDLER (even if file missing)
+// ✅ SAFE MESSAGE HANDLER
 let messageHandler;
 try {
   messageHandler = require("./message");
@@ -91,24 +91,28 @@ const clientstart = async () => {
     return jid;
   };
 
-  // 🔥 NORMALIZE
   const normalize = (jid) => {
     if (!jid) return jid;
     return jid.split(":")[0].split("@")[0];
   };
 
-  // 🔥 SAFE SETTINGS LOAD
-  let settings = {};
-  try {
-    settings = JSON.parse(fs.readFileSync('./database/settings.json'));
-  } catch {
-    settings = {
-      autoread: false,
-      autotyping: false,
-      autorecording: false,
-      autoreact: false
-    };
-  }
+  // 🔥 SETTINGS LOADER (DYNAMIC)
+  const getSettings = () => {
+    try {
+      return JSON.parse(fs.readFileSync('./database/settings.json'));
+    } catch {
+      return {
+        autoread: false,
+        autotyping: false,
+        autorecording: false,
+        autoreact: false,
+        antidelete: false
+      };
+    }
+  };
+
+  // 🔥 MESSAGE STORE (for antidelete)
+  const store = new Map();
 
   // 🔥 PAIRING
   if (config().status.terminal && !sock.authState.creds.registered) {
@@ -128,7 +132,6 @@ const clientstart = async () => {
 
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      console.log('❌ Disconnected:', statusCode);
 
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
 
@@ -138,6 +141,23 @@ const clientstart = async () => {
           clientstart();
           isRestarting = false;
         }, 5000);
+      }
+    }
+  });
+
+  // 🔥 ANTIDELETE LISTENER
+  sock.ev.on('messages.update', async (updates) => {
+    const settings = getSettings();
+    if (!settings.antidelete) return;
+
+    for (let update of updates) {
+      if (update.update.message === null) {
+        const msg = store.get(update.key.id);
+        if (!msg) return;
+
+        await sock.sendMessage(update.key.remoteJid, {
+          text: `🛡️ *Deleted Message Detected*\n\n${msg.text || "Media message"}`
+        });
       }
     }
   });
@@ -153,32 +173,24 @@ const clientstart = async () => {
         if (mek.key?.remoteJid === 'status@broadcast') continue;
 
         const m = await smsg(sock, mek);
+        const settings = getSettings();
+
+        // 💾 SAVE MESSAGE (for antidelete)
+        store.set(mek.key.id, m);
 
         // 🔥 ADMIN DETECTION
         if (m.isGroup) {
           const metadata = await sock.groupMetadata(m.chat);
           const participants = metadata.participants;
 
-          const senderJid = sock.decodeJid(m.key.participant || m.key.remoteJid);
-          const botJid = sock.decodeJid(sock.user.id);
+          const senderId = normalize(sock.decodeJid(m.sender));
+          const botId = normalize(sock.decodeJid(sock.user.id));
 
-          const senderId = normalize(senderJid);
-          const botId = normalize(botJid);
-
-          m.isAdmin = participants.some(p => {
-            return normalize(sock.decodeJid(p.id)) === senderId && p.admin;
-          });
-
-          m.isBotAdmin = participants.some(p => {
-            return normalize(sock.decodeJid(p.id)) === botId && p.admin;
-          });
-
-        } else {
-          m.isAdmin = false;
-          m.isBotAdmin = false;
+          m.isAdmin = participants.some(p => normalize(sock.decodeJid(p.id)) === senderId && p.admin);
+          m.isBotAdmin = participants.some(p => normalize(sock.decodeJid(p.id)) === botId && p.admin);
         }
 
-        // 🔥 AUTO FEATURES (SAFE)
+        // 🔥 AUTO FEATURES
         if (settings.autoread) {
           await sock.readMessages([mek.key]);
         }
@@ -189,6 +201,16 @@ const clientstart = async () => {
 
         if (settings.autorecording) {
           await sock.sendPresenceUpdate('recording', m.chat);
+        }
+
+        // ❤️ AUTOREACT (RANDOM EMOJIS)
+        if (settings.autoreact) {
+          const emojis = ["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
+          const random = emojis[Math.floor(Math.random() * emojis.length)];
+
+          await sock.sendMessage(m.chat, {
+            react: { text: random, key: mek.key }
+          });
         }
 
         await messageHandler(sock, m);
