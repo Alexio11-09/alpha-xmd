@@ -1,8 +1,10 @@
 // © 2026 Alpha. All Rights Reserved.
+
+// 🔥 REQUIRE FIXES
 const fs = require("fs");
-// 🔥 AUTO INSTALL MODULES
 const { execSync } = require("child_process");
 
+// 🔥 AUTO INSTALL MODULES
 const modules = [
   "pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios",
   "node-fetch","yt-search","form-data","file-type","moment-timezone",
@@ -14,7 +16,7 @@ modules.forEach(mod => {
   try {
     require.resolve(mod);
   } catch {
-    console.log(`Installing ${mod}`);
+    console.log(`📦 Installing ${mod}`);
     execSync(`npm install ${mod} --force`, { stdio: "inherit" });
   }
 });
@@ -42,7 +44,14 @@ const chalk = require("chalk");
 const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
-const messageHandler = require("./message");
+
+// ✅ SAFE MESSAGE HANDLER (even if file missing)
+let messageHandler;
+try {
+  messageHandler = require("./message");
+} catch {
+  messageHandler = async () => {};
+}
 
 let isRestarting = false;
 
@@ -60,7 +69,8 @@ const question = (text) => {
 const clientstart = async () => {
   await loadBaileys();
 
-  const { state, saveCreds } = await useMultiFileAuthState(`./${config().session}`);
+  const sessionPath = `./${config().session}`;
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
@@ -87,11 +97,24 @@ const clientstart = async () => {
     return jid.split(":")[0].split("@")[0];
   };
 
+  // 🔥 SAFE SETTINGS LOAD
+  let settings = {};
+  try {
+    settings = JSON.parse(fs.readFileSync('./database/settings.json'));
+  } catch {
+    settings = {
+      autoread: false,
+      autotyping: false,
+      autorecording: false,
+      autoreact: false
+    };
+  }
+
   // 🔥 PAIRING
   if (config().status.terminal && !sock.authState.creds.registered) {
-    const phoneNumber = await question('Enter your WhatsApp number:\n');
+    const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
     const code = await sock.requestPairingCode(phoneNumber);
-    console.log(`CODE: ${code}`);
+    console.log(chalk.green(`🔥 CODE: ${code}`));
   }
 
   sock.ev.on('creds.update', saveCreds);
@@ -100,12 +123,12 @@ const clientstart = async () => {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
 
-    if (connection === 'connecting') console.log('Connecting...');
-    if (connection === 'open') console.log('Connected!');
+    if (connection === 'connecting') console.log('🔄 Connecting...');
+    if (connection === 'open') console.log('✅ Connected!');
 
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      console.log('Disconnected:', statusCode);
+      console.log('❌ Disconnected:', statusCode);
 
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
 
@@ -131,7 +154,7 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔥 ADMIN FIX
+        // 🔥 ADMIN DETECTION
         if (m.isGroup) {
           const metadata = await sock.groupMetadata(m.chat);
           const participants = metadata.participants;
@@ -142,31 +165,31 @@ const clientstart = async () => {
           const senderId = normalize(senderJid);
           const botId = normalize(botJid);
 
-          m.isAdmin = participants.some(p =>
-            normalize(sock.decodeJid(p.id)) === senderId && p.admin
-          );
+          m.isAdmin = participants.some(p => {
+            return normalize(sock.decodeJid(p.id)) === senderId && p.admin;
+          });
 
-          m.isBotAdmin = participants.some(p =>
-            normalize(sock.decodeJid(p.id)) === botId && p.admin
-          );
+          m.isBotAdmin = participants.some(p => {
+            return normalize(sock.decodeJid(p.id)) === botId && p.admin;
+          });
 
         } else {
           m.isAdmin = false;
           m.isBotAdmin = false;
         }
 
-        // 🔥 PRESENCE SYSTEM
-        const settings = JSON.parse(fs.readFileSync("./database/settings.json"));
-
-        if (settings.autorecord) {
-          await sock.sendPresenceUpdate("recording", m.chat);
-        } else if (settings.autotyping) {
-          await sock.sendPresenceUpdate("composing", m.chat);
-        } else {
-          await sock.sendPresenceUpdate("available", m.chat);
+        // 🔥 AUTO FEATURES (SAFE)
+        if (settings.autoread) {
+          await sock.readMessages([mek.key]);
         }
 
-        await sock.readMessages([mek.key]);
+        if (settings.autotyping) {
+          await sock.sendPresenceUpdate('composing', m.chat);
+        }
+
+        if (settings.autorecording) {
+          await sock.sendPresenceUpdate('recording', m.chat);
+        }
 
         await messageHandler(sock, m);
 
