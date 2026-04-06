@@ -1,271 +1,81 @@
-// © 2026 Alpha
+// © 2026 Alpha - CLEAN MESSAGE HANDLER (FIXED 💯)
 
-const config = require('./settings/config');
-const fs = require('fs');
+const fs = require("fs");
 const path = require("path");
+const config = require("./settings/config");
 
-let jidNormalizedUser, getContentType;
+// 🔥 LOAD ALL COMMANDS
+const commands = [];
 
-const loadBaileysUtils = async () => {
-    const baileys = await import('@whiskeysockets/baileys');
-    jidNormalizedUser = baileys.jidNormalizedUser;
-    getContentType = baileys.getContentType;
-};
+const loadCommands = (dir) => {
+    const files = fs.readdirSync(dir);
 
-const settingsPath = './database/settings.json';
+    for (let file of files) {
+        const fullPath = path.join(dir, file);
 
-// 🛡️ STORE
-const store = {};
+        if (fs.lstatSync(fullPath).isDirectory()) {
+            loadCommands(fullPath);
+        } else if (file.endsWith(".js")) {
+            try {
+                delete require.cache[require.resolve(fullPath)];
+                const cmd = require(fullPath);
 
-// 🔧 LOAD SETTINGS
-const loadSettings = () => {
-    try {
-        return JSON.parse(fs.readFileSync(settingsPath));
-    } catch {
-        return {
-            autoread: false,
-            typing: false,
-            antidelete: false,
-            autoreact: false,
-            antidelete_mode: "chat",
-            whitelist: [],
-            ignore_admins: false,
-            delete_tracker: {},
-            warn_delete: false,
-            warn_limit: 3,
-            kick_limit: 6,
-            mode: "public"
-        };
-    }
-};
-
-// 💾 SAVE SETTINGS
-const saveSettings = (data) => {
-    fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
-};
-
-// 🔌 PLUGIN LOADER
-class PluginLoader {
-    constructor() {
-        this.plugins = new Map();
-        this.pluginsDir = path.join(__dirname, 'plugins');
-        this.loadPlugins();
-    }
-
-    loadPlugins() {
-        if (!fs.existsSync(this.pluginsDir)) return;
-
-        const load = (dir) => {
-            for (let file of fs.readdirSync(dir)) {
-                let full = path.join(dir, file);
-
-                if (fs.lstatSync(full).isDirectory()) {
-                    load(full);
-                } else if (file.endsWith('.js')) {
-                    try {
-                        delete require.cache[require.resolve(full)];
-                        const plugin = require(full);
-
-                        if (!plugin.command || !plugin.execute) continue;
-
-                        const cmds = Array.isArray(plugin.command)
-                            ? plugin.command
-                            : [plugin.command];
-
-                        cmds.forEach(cmd => this.plugins.set(cmd.toLowerCase(), plugin));
-
-                    } catch (e) {
-                        console.log("Plugin load error:", e.message);
-                    }
+                if (cmd.command) {
+                    commands.push(cmd);
                 }
+
+            } catch (e) {
+                console.log("❌ Command load error:", file);
             }
-        };
-
-        load(this.pluginsDir);
-    }
-
-    async execute(command, sock, m, context) {
-        const plugin = this.plugins.get(command);
-        if (!plugin) return false;
-
-        try {
-            if (plugin.owner && !context.isCreator) {
-                return context.reply(config.message.owner);
-            }
-
-            if (plugin.group && !m.isGroup) {
-                return context.reply(config.message.group);
-            }
-
-            await plugin.execute(sock, m, context);
-            return true;
-
-        } catch (err) {
-            console.log("Plugin exec error:", err);
-            context.reply("❌ Command error");
-            return true;
         }
     }
-}
+};
 
-const plugins = new PluginLoader();
+loadCommands(path.join(__dirname, "plugins"));
 
-// 📩 MAIN HANDLER
+// 🔥 CLEAN FUNCTION
+const clean = (jid) => jid?.split("@")[0];
+
 module.exports = async (sock, m) => {
     try {
-        if (!jidNormalizedUser) await loadBaileysUtils();
+        if (!m.text) return;
 
-        if (!m.message) return;
-        if (m.key?.remoteJid === 'status@broadcast') return;
+        const prefix = ".";
 
-        const settings = loadSettings();
-        const prefix = '.';
+        if (!m.text.startsWith(prefix)) return;
 
-        const body =
-            m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            m.message?.imageMessage?.caption ||
-            m.message?.videoMessage?.caption ||
-            '';
+        const args = m.text.slice(prefix.length).trim().split(/ +/);
+        const commandName = args.shift().toLowerCase();
 
-        const isCmd = body.startsWith(prefix);
-        const command = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : '';
-        const args = body.trim().split(/ +/).slice(1);
-        const text = args.join(" ");
+        const command = commands.find(cmd => cmd.command === commandName);
+        if (!command) return;
 
-        const sender = m.sender || "";
+        // 🔥 FIX OWNER CHECK
+        const isOwner = clean(m.sender) === clean(config.owner);
 
-        const senderJid = sender.split(":")[0];
-        const botJid = (sock.user?.id || "").split(":")[0];
-        const isCreator = senderJid === botJid;
+        // 🔥 HELPER FUNCTIONS
+        const reply = (text) => sock.sendMessage(m.chat, { text }, { quoted: m });
 
-        if (settings.mode === "self" && !isCreator) return;
+        const send = (data) => sock.sendMessage(m.chat, data, { quoted: m });
 
-        // 💾 STORE MESSAGE
-        if (m.key?.id) {
-            store[m.key.id] = {
-                message: m.message,
-                key: m.key,
-                sender: m.sender,
-                isGroup: m.isGroup
-            };
-
-            setTimeout(() => delete store[m.key.id], 10 * 60 * 1000);
-        }
-
-        // ⚙️ AUTO FEATURES
-        if (settings.autoread) await sock.readMessages([m.key]);
-        if (settings.typing) await sock.sendPresenceUpdate('composing', m.chat);
-        if (settings.autoreact) {
-            await sock.sendMessage(m.chat, {
-                react: { text: "🔥", key: m.key }
-            });
-        }
-
-        const ctx = {
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: config.newsletter.id + "@newsletter",
-                    newsletterName: config.newsletter.name
-                },
-                externalAdReply: {
-                    title: config.settings.title,
-                    body: config.settings.description,
-                    thumbnailUrl: config.thumbUrl,
-                    sourceUrl: "https://whatsapp.com",
-                    mediaType: 1,
-                    renderLargerThumbnail: true
-                }
-            }
+        // 🔥 CONTEXT OBJECT
+        const context = {
+            args,
+            reply,
+            send,
+            isOwner
         };
 
-        const send = (msg) =>
-            sock.sendMessage(m.chat, { ...msg, ...ctx }, { quoted: m });
-
-        const reply = (text) => send({ text });
-
-        // 🔥 COMMANDS
-        if (isCmd) {
-            const done = await plugins.execute(command, sock, m, {
-                args,
-                text,
-                reply,
-                send,
-                command,
-                isCreator,
-                settings,
-                saveSettings,
-                config,
-                prefix
-            });
-
-            if (done) return;
+        // 🔥 OWNER PROTECTION (OPTIONAL)
+        if (command.category === "owner" && !isOwner) {
+            return reply("❌ Owner only command");
         }
+
+        // 🚀 EXECUTE COMMAND
+        await command.execute(sock, m, context);
 
     } catch (err) {
-        console.log(err);
-    }
-};
-
-// 🛡️ ANTIDELETE V5 (CLEAN + FILTERED)
-module.exports.handleDelete = async (sock, update) => {
-    try {
-        const settings = loadSettings();
-        if (!settings.antidelete) return;
-
-        const key = update?.messages?.[0]?.key || update?.keys?.[0];
-        if (!key?.id) return;
-
-        const data = store[key.id];
-        if (!data) return;
-
-        const from = data.key.remoteJid;
-        const sender = data.sender || data.key.participant || data.key.remoteJid;
-
-        const senderJid = sender.split(":")[0];
-        const botJid = sock.user.id.split(":")[0];
-
-        // 🚫 IGNORE OWNER / BOT
-        if (senderJid === botJid) return;
-
-        const ownerNumbers = config.owner || [];
-        if (ownerNumbers.includes(senderJid.replace("@s.whatsapp.net", ""))) return;
-
-        const whitelist = settings.whitelist || [];
-        if (whitelist.includes(senderJid.replace("@s.whatsapp.net", ""))) return;
-
-        // 👥 IGNORE ADMINS
-        if (settings.ignore_admins && data.isGroup) {
-            const meta = await sock.groupMetadata(from);
-            const admins = meta.participants
-                .filter(p => p.admin)
-                .map(p => p.id.split("@")[0]);
-
-            if (admins.includes(senderJid.split("@")[0])) return;
-        }
-
-        const user = senderJid.split("@")[0];
-        const tag = `@${user}`;
-        const mention = [sender];
-
-        const caption = `🛡️ *ANTI DELETE*\n👤 ${tag}`;
-
-        const sendChat = settings.antidelete_mode === "chat" || settings.antidelete_mode === "both";
-        const sendDM = settings.antidelete_mode === "dm" || settings.antidelete_mode === "both";
-
-        const msg = data.message;
-        const text = msg?.conversation || msg?.extendedTextMessage?.text;
-
-        if (text) {
-            const content = { text: `${caption}\n\n${text}`, mentions: mention };
-
-            if (sendChat) await sock.sendMessage(from, content);
-            if (sendDM) await sock.sendMessage(sock.user.id, content);
-        }
-
-    } catch (err) {
-        console.log("Antidelete error:", err);
+        console.log("🔥 MESSAGE ERROR:", err);
+        await sock.sendMessage(m.chat, { text: "❌ Error occurred" }, { quoted: m });
     }
 };
