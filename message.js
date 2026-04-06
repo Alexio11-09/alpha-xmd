@@ -1,10 +1,10 @@
-// © 2026 Alpha - CLEAN MESSAGE HANDLER (FIXED 💯)
+// © 2026 Alpha - FINAL MESSAGE HANDLER (STABLE 💯)
 
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
 
-// 🔥 LOAD ALL COMMANDS
+// 🔥 LOAD COMMANDS
 const commands = [];
 
 const loadCommands = (dir) => {
@@ -33,15 +33,32 @@ const loadCommands = (dir) => {
 
 loadCommands(path.join(__dirname, "plugins"));
 
-// 🔥 CLEAN FUNCTION
-const clean = (jid) => jid?.split("@")[0];
+// 🔥 FINAL CLEAN FUNCTION (NO ERRORS EVER)
+const clean = (jid) => {
+    try {
+        if (!jid) return "";
+
+        // force string
+        jid = jid.toString();
+
+        // normal jid
+        if (jid.includes("@")) {
+            return jid.split("@")[0];
+        }
+
+        // fallback (numbers etc)
+        return jid;
+
+    } catch {
+        return "";
+    }
+};
 
 module.exports = async (sock, m) => {
     try {
         if (!m.text) return;
 
         const prefix = ".";
-
         if (!m.text.startsWith(prefix)) return;
 
         const args = m.text.slice(prefix.length).trim().split(/ +/);
@@ -50,15 +67,17 @@ module.exports = async (sock, m) => {
         const command = commands.find(cmd => cmd.command === commandName);
         if (!command) return;
 
-        // 🔥 FIX OWNER CHECK
+        // 🔥 OWNER FIX (NO MORE LOCK)
         const isOwner = clean(m.sender) === clean(config.owner);
 
-        // 🔥 HELPER FUNCTIONS
-        const reply = (text) => sock.sendMessage(m.chat, { text }, { quoted: m });
+        // 🔥 HELPERS
+        const reply = (text) =>
+            sock.sendMessage(m.chat, { text }, { quoted: m });
 
-        const send = (data) => sock.sendMessage(m.chat, data, { quoted: m });
+        const send = (data) =>
+            sock.sendMessage(m.chat, data, { quoted: m });
 
-        // 🔥 CONTEXT OBJECT
+        // 🔥 CONTEXT
         const context = {
             args,
             reply,
@@ -66,16 +85,20 @@ module.exports = async (sock, m) => {
             isOwner
         };
 
-        // 🔥 OWNER PROTECTION (OPTIONAL)
+        // 🔥 OWNER PROTECTION
         if (command.category === "owner" && !isOwner) {
             return reply("❌ Owner only command");
         }
 
-        // 🚀 EXECUTE COMMAND
+        // 🚀 EXECUTE
         await command.execute(sock, m, context);
 
     } catch (err) {
         console.log("🔥 MESSAGE ERROR:", err);
-        await sock.sendMessage(m.chat, { text: "❌ Error occurred" }, { quoted: m });
+        await sock.sendMessage(
+            m.chat,
+            { text: "❌ Error occurred" },
+            { quoted: m }
+        );
     }
 };
