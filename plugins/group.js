@@ -1,4 +1,4 @@
-// 🧪 FORCE TEST VERSION
+// © 2026 Alpha - GROUP FIX (NO SERIALIZER DEPENDENCE 💯)
 
 module.exports = {
     command: "group",
@@ -8,25 +8,48 @@ module.exports = {
         try {
             if (!m.isGroup) return reply("❌ Group only");
 
-            console.log("CHAT:", m.chat);
-            console.log("SENDER:", m.sender);
-            console.log("BOT:", sock.user.id);
+            const metadata = await sock.groupMetadata(m.chat);
+            const participants = metadata.participants;
+
+            // 🔥 CLEAN FUNCTION
+            const clean = (jid) => jid?.split("@")[0];
+
+            // 🔥 FIND REAL SENDER FROM PARTICIPANTS
+            const senderObj = participants.find(p =>
+                clean(p.id) === clean(m.sender)
+            );
+
+            const botObj = participants.find(p =>
+                clean(p.id) === clean(sock.user.id)
+            );
+
+            // 🔥 ADMIN CHECK
+            const isAdmin =
+                senderObj?.admin === "admin" ||
+                senderObj?.admin === "superadmin";
+
+            const isBotAdmin =
+                botObj?.admin === "admin" ||
+                botObj?.admin === "superadmin";
+
+            console.log("isAdmin:", isAdmin);
+            console.log("isBotAdmin:", isBotAdmin);
 
             const action = args[0]?.toLowerCase();
 
             if (!action) {
-                return reply(`GROUP COMMANDS
+                return reply(`👥 GROUP COMMANDS
 
-kick
-promote
-demote
-tagall
-lock
-unlock`);
+Add
+Kick
+Promote
+Demote
+Tagall
+Hidetag
+Open
+Close
+`);
             }
-
-            const metadata = await sock.groupMetadata(m.chat);
-            const participants = metadata.participants;
 
             const mentioned =
                 (m.mentionedJid && m.mentionedJid[0]) ||
@@ -35,49 +58,40 @@ unlock`);
             switch (action) {
 
                 case "kick": {
-                    if (!mentioned) return reply("Tag user");
+                    if (!isAdmin) return reply("❌ You must be admin");
+                    if (!isBotAdmin) return reply("❌ Bot must be admin");
+                    if (!mentioned) return reply("⚠️ Tag user");
 
-                    try {
-                        await sock.groupParticipantsUpdate(m.chat, [mentioned], "remove");
-                        reply("✅ Kick tried");
-                    } catch (e) {
-                        console.log("KICK ERROR:", e);
-                        reply("❌ Kick failed");
-                    }
+                    await sock.groupParticipantsUpdate(m.chat, [mentioned], "remove");
+                    reply("✅ User kicked");
                 }
                 break;
 
                 case "promote": {
-                    if (!mentioned) return reply("Tag user");
+                    if (!isAdmin) return reply("❌ You must be admin");
+                    if (!isBotAdmin) return reply("❌ Bot must be admin");
+                    if (!mentioned) return reply("⚠️ Tag user");
 
-                    try {
-                        await sock.groupParticipantsUpdate(m.chat, [mentioned], "promote");
-                        reply("✅ Promote tried");
-                    } catch (e) {
-                        console.log("PROMOTE ERROR:", e);
-                        reply("❌ Promote failed");
-                    }
+                    await sock.groupParticipantsUpdate(m.chat, [mentioned], "promote");
+                    reply("✅ Promoted");
                 }
                 break;
 
                 case "demote": {
-                    if (!mentioned) return reply("Tag user");
+                    if (!isAdmin) return reply("❌ You must be admin");
+                    if (!isBotAdmin) return reply("❌ Bot must be admin");
+                    if (!mentioned) return reply("⚠️ Tag user");
 
-                    try {
-                        await sock.groupParticipantsUpdate(m.chat, [mentioned], "demote");
-                        reply("✅ Demote tried");
-                    } catch (e) {
-                        console.log("DEMOTE ERROR:", e);
-                        reply("❌ Demote failed");
-                    }
+                    await sock.groupParticipantsUpdate(m.chat, [mentioned], "demote");
+                    reply("✅ Demoted");
                 }
                 break;
 
                 case "tagall": {
-                    let text = "📢 Tagging:\n\n";
+                    let text = "📢 Tagging everyone:\n\n";
 
                     for (let p of participants) {
-                        text += `@${p.id.split("@")[0]}\n`;
+                        text += `@${clean(p.id)}\n`;
                     }
 
                     await sock.sendMessage(m.chat, {
@@ -87,34 +101,38 @@ unlock`);
                 }
                 break;
 
-                case "lock": {
-                    try {
-                        await sock.groupSettingUpdate(m.chat, "announcement");
-                        reply("🔒 Tried lock");
-                    } catch (e) {
-                        console.log("LOCK ERROR:", e);
-                        reply("❌ Lock failed");
-                    }
+                case "hidetag": {
+                    await sock.sendMessage(m.chat, {
+                        text: "👻 Hidden tag",
+                        mentions: participants.map(p => p.id)
+                    });
                 }
                 break;
 
-                case "unlock": {
-                    try {
-                        await sock.groupSettingUpdate(m.chat, "not_announcement");
-                        reply("🔓 Tried unlock");
-                    } catch (e) {
-                        console.log("UNLOCK ERROR:", e);
-                        reply("❌ Unlock failed");
-                    }
+                case "open": {
+                    if (!isAdmin) return reply("❌ You must be admin");
+                    if (!isBotAdmin) return reply("❌ Bot must be admin");
+
+                    await sock.groupSettingUpdate(m.chat, "not_announcement");
+                    reply("✅ Group opened");
+                }
+                break;
+
+                case "close": {
+                    if (!isAdmin) return reply("❌ You must be admin");
+                    if (!isBotAdmin) return reply("❌ Bot must be admin");
+
+                    await sock.groupSettingUpdate(m.chat, "announcement");
+                    reply("✅ Group closed");
                 }
                 break;
 
                 default:
-                    reply("❌ Unknown");
+                    reply("❌ Unknown command");
             }
 
         } catch (err) {
-            console.log("🔥 ERROR:", err);
+            console.log("GROUP ERROR:", err);
             reply("❌ Error occurred");
         }
     }
