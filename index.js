@@ -96,23 +96,18 @@ const clientstart = async () => {
     return jid.split(":")[0].split("@")[0];
   };
 
-  // 🔥 SETTINGS LOADER (DYNAMIC)
+  // 🔥 SETTINGS LOADER
   const getSettings = () => {
     try {
       return JSON.parse(fs.readFileSync('./database/settings.json'));
     } catch {
-      return {
-        autoread: false,
-        autotyping: false,
-        autorecording: false,
-        autoreact: false,
-        antidelete: false
-      };
+      return {};
     }
   };
 
-  // 🔥 MESSAGE STORE (for antidelete)
-  const store = new Map();
+  // 💾 STORES
+  const store = new Map();       // messages
+  const statusStore = new Map(); // statuses
 
   // 🔥 PAIRING
   if (config().status.terminal && !sock.authState.creds.registered) {
@@ -145,19 +140,37 @@ const clientstart = async () => {
     }
   });
 
-  // 🔥 ANTIDELETE LISTENER
+  // 🔥 ANTIDELETE + ANTIEDIT
   sock.ev.on('messages.update', async (updates) => {
     const settings = getSettings();
-    if (!settings.antidelete) return;
 
     for (let update of updates) {
-      if (update.update.message === null) {
-        const msg = store.get(update.key.id);
-        if (!msg) return;
+      const oldMsg = store.get(update.key.id);
+
+      // 🛡️ ANTIDELETE
+      if (settings.antidelete && update.update.message === null) {
+        if (!oldMsg) return;
 
         await sock.sendMessage(update.key.remoteJid, {
-          text: `🛡️ *Deleted Message Detected*\n\n${msg.text || "Media message"}`
+          text: `🛡️ *Deleted Message*\n\n${oldMsg.text || "Media message"}`
         });
+      }
+
+      // ✏️ ANTIEDIT
+      if (settings.antiedit && update.update?.message) {
+        let newText = "";
+
+        try {
+          const msg = update.update.message;
+          const type = Object.keys(msg)[0];
+          newText = msg[type]?.text || msg[type]?.caption || "";
+        } catch {}
+
+        if (oldMsg && newText && oldMsg.text !== newText) {
+          await sock.sendMessage(update.key.remoteJid, {
+            text: `✏️ *Edited Message*\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}`
+          });
+        }
       }
     }
   });
@@ -170,12 +183,38 @@ const clientstart = async () => {
 
       for (let mek of messages) {
         if (!mek.message) continue;
-        if (mek.key?.remoteJid === 'status@broadcast') continue;
 
-        const m = await smsg(sock, mek);
         const settings = getSettings();
 
-        // 💾 SAVE MESSAGE (for antidelete)
+        // 👁️ STATUS SYSTEM (PRO)
+        if (mek.key?.remoteJid === 'status@broadcast') {
+
+          // 💾 SAVE STATUS
+          statusStore.set(mek.key.id, mek);
+
+          // 👁️ AUTO VIEW
+          if (settings.autoviewstatus) {
+            await sock.readMessages([mek.key]);
+          }
+
+          // ❤️ AUTO REACT
+          if (settings.autoreactstatus) {
+            const emojis = ["🔥","😍","😂","💯","⚡","😎","🥶"];
+            const random = emojis[Math.floor(Math.random() * emojis.length)];
+
+            try {
+              await sock.sendMessage(mek.key.remoteJid, {
+                react: { text: random, key: mek.key }
+              });
+            } catch {}
+          }
+
+          return;
+        }
+
+        const m = await smsg(sock, mek);
+
+        // 💾 SAVE MESSAGE
         store.set(mek.key.id, m);
 
         // 🔥 ADMIN DETECTION
@@ -191,19 +230,10 @@ const clientstart = async () => {
         }
 
         // 🔥 AUTO FEATURES
-        if (settings.autoread) {
-          await sock.readMessages([mek.key]);
-        }
+        if (settings.autoread) await sock.readMessages([mek.key]);
+        if (settings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
+        if (settings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
 
-        if (settings.autotyping) {
-          await sock.sendPresenceUpdate('composing', m.chat);
-        }
-
-        if (settings.autorecording) {
-          await sock.sendPresenceUpdate('recording', m.chat);
-        }
-
-        // ❤️ AUTOREACT (RANDOM EMOJIS)
         if (settings.autoreact) {
           const emojis = ["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
           const random = emojis[Math.floor(Math.random() * emojis.length)];
