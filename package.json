@@ -5,9 +5,8 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "postinstall": "npm install qrcode --legacy-peer-deps"
+    "start": "npm install --legacy-peer-deps && node index.js",
+    "dev": "nodemon index.js"
   },
   "keywords": [
     "whatsapp-bot",
