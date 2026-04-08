@@ -45,6 +45,16 @@ const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
 
+// Clean number helper
+const clean = (jid) => {
+    if (!jid) return "";
+    try {
+        return jid.toString().replace(/[^0-9]/g, "");
+    } catch {
+        return "";
+    }
+};
+
 // Try multiple database paths
 let dbPath = './database/groupSettings.json';
 try {
@@ -228,10 +238,10 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // ========== ANTILINK DETECTION ==========
+        // ========== ANTILINK DETECTION (WITH MODE) ==========
         if (m.isGroup && m.text) {
           try {
-            let groupSettings = { antilink: false, antilinkAction: "delete" };
+            let groupSettings = { antilink: false, antilinkAction: "delete", antilinkMode: "admins" };
             try {
               const allSettings = JSON.parse(fs.readFileSync(dbPath));
               groupSettings = allSettings[m.chat] || groupSettings;
@@ -249,7 +259,23 @@ const clientstart = async () => {
                   return pNumber === senderNumber && p.admin;
                 });
                 
-                if (!isSenderAdmin) {
+                // Get bot owner number (the number bot is deployed on)
+                const botOwnerNumber = clean(sock.user.id);
+                const senderNum = clean(m.sender);
+                const isBotOwner = (senderNum === botOwnerNumber);
+                
+                // Check mode: "owner" = only owner exempt, "admins" = admins + owner exempt
+                const mode = groupSettings.antilinkMode || "admins";
+                
+                let exempt = false;
+                if (mode === "owner") {
+                    exempt = isBotOwner;
+                } else {
+                    exempt = isSenderAdmin || isBotOwner;
+                }
+                
+                // Skip if exempt
+                if (!exempt) {
                   const action = groupSettings.antilinkAction;
                   
                   if (action === "delete") {
