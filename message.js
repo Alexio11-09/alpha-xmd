@@ -8,6 +8,13 @@ const config = require("./settings/config");
 const commands = [];
 
 const loadCommands = (dir) => {
+    console.log(`📁 Loading commands from ${dir}...`);
+    
+    if (!fs.existsSync(dir)) {
+        console.log(`❌ Directory not found: ${dir}`);
+        return;
+    }
+    
     const files = fs.readdirSync(dir);
 
     for (let file of files) {
@@ -22,22 +29,23 @@ const loadCommands = (dir) => {
 
                 if (Array.isArray(cmd)) {
                     commands.push(...cmd);
+                    console.log(`   ✅ Loaded ${cmd.length} commands from ${file}`);
                 } else if (cmd.command) {
                     commands.push(cmd);
+                    console.log(`   ✅ Loaded command: ${cmd.command}`);
                 }
 
             } catch (err) {
-                console.log("❌ Failed to load:", file);
-                console.log("   Error:", err.message);
-                console.log("   Stack:", err.stack);
+                console.log(`   ❌ Failed to load ${file}:`, err.message);
+                console.log(`   Stack:`, err.stack);
             }
         }
     }
 };
 
 loadCommands(path.join(__dirname, "plugins"));
-console.log("📦 Total commands loaded:", commands.length);
-console.log("📋 Commands:", commands.map(c => c.command).join(", "));
+console.log(`📦 Total commands loaded: ${commands.length}`);
+console.log(`📋 Commands: ${commands.map(c => c.command).join(", ")}`);
 
 // 🔥 CLEAN NUMBER
 const clean = (jid) => {
@@ -53,14 +61,21 @@ module.exports = async (sock, m) => {
     try {
         if (!m.text) return;
 
-        const prefix = ".";
+        const prefix = config.prefix || ".";
         if (!m.text.startsWith(prefix)) return;
 
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
 
-        const command = commands.find(cmd => cmd.command === commandName);
+        // Check for aliases too
+        const command = commands.find(cmd => 
+            cmd.command === commandName || 
+            (cmd.aliases && cmd.aliases.includes(commandName))
+        );
+        
         if (!command) return;
+
+        console.log(`🎯 Command executed: ${commandName} by ${m.pushName || "User"}`);
 
         // 🔥 OWNER SYSTEM
         const botNumber = clean(sock.user.id);
@@ -81,21 +96,39 @@ module.exports = async (sock, m) => {
         };
 
         // 🔥 HELPERS
-        const reply = (text) =>
-            sock.sendMessage(
-                m.chat,
-                { text, contextInfo },
-                { quoted: m }
-            );
+        const reply = (text) => {
+            try {
+                return sock.sendMessage(
+                    m.chat,
+                    { text, contextInfo },
+                    { quoted: m }
+                );
+            } catch {
+                return sock.sendMessage(
+                    m.chat,
+                    { text },
+                    { quoted: m }
+                );
+            }
+        };
 
-        const send = (data) =>
-            sock.sendMessage(
-                m.chat,
-                { ...data, contextInfo },
-                { quoted: m }
-            );
+        const send = (data) => {
+            try {
+                return sock.sendMessage(
+                    m.chat,
+                    { ...data, contextInfo },
+                    { quoted: m }
+                );
+            } catch {
+                return sock.sendMessage(
+                    m.chat,
+                    data,
+                    { quoted: m }
+                );
+            }
+        };
 
-        // ✅ UPDATED CONTEXT (THIS FIXES YOUR ERROR)
+        // ✅ UPDATED CONTEXT
         const context = {
             args,
             reply,
@@ -104,23 +137,23 @@ module.exports = async (sock, m) => {
             isGroup: m.isGroup,
             isAdmin: m.isAdmin,
             isBotAdmin: m.isBotAdmin,
-            config,     // 🔥 FIX
-            prefix      // 🔥 FIX
+            config,
+            prefix
         };
 
         // 🔒 OWNER ONLY
         if (command.owner && !isOwner) {
-            return reply(config.message.owner);
+            return reply(config.message.owner || "❌ Owner only!");
         }
 
         // 🔒 GROUP ONLY
         if (command.group && !m.isGroup) {
-            return reply(config.message.group);
+            return reply(config.message.group || "❌ Group only!");
         }
 
         // 🔒 ADMIN ONLY
         if (command.admin && !m.isAdmin) {
-            return reply(config.message.admin);
+            return reply(config.message.admin || "❌ Admin only!");
         }
 
         // 🔒 BOT ADMIN REQUIRED
@@ -132,11 +165,14 @@ module.exports = async (sock, m) => {
         await command.execute(sock, m, context);
 
     } catch (err) {
-        console.log("🔥 MESSAGE ERROR:", err);
-        await sock.sendMessage(
-            m.chat,
-            { text: "❌ Error occurred" },
-            { quoted: m }
-        );
+        console.log("🔥 MESSAGE ERROR:", err.message);
+        console.log("Stack:", err.stack);
+        try {
+            await sock.sendMessage(
+                m.chat,
+                { text: "❌ Error occurred while executing command" },
+                { quoted: m }
+            );
+        } catch {}
     }
 };
