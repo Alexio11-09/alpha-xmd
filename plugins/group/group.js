@@ -248,8 +248,6 @@ module.exports = [
             } catch { reply("❌ Failed"); }
         }
     },
-    
-    // ==================== WORKING WELCOME ====================
     {
         command: "welcome",
         execute: async (sock, m, { args, reply }) => {
@@ -275,8 +273,6 @@ module.exports = [
             }
         }
     },
-    
-    // ==================== WORKING GOODBYE ====================
     {
         command: "goodbye",
         execute: async (sock, m, { args, reply }) => {
@@ -302,8 +298,6 @@ module.exports = [
             }
         }
     },
-    
-    // ==================== WORKING ANTILINK ====================
     {
         command: "antilink",
         execute: async (sock, m, { args, reply }) => {
@@ -334,8 +328,6 @@ module.exports = [
             }
         }
     },
-    
-    // ==================== LISTONLINE (FIXED) ====================
     {
         command: "listonline",
         execute: async (sock, m, { reply }) => {
