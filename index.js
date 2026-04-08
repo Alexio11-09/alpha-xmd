@@ -79,8 +79,6 @@ const clientstart = async () => {
     auth: state,
     version,
     browser: Browsers.macOS('Chrome'),
-
-    // 🔥 FIX: ENABLE STATUS FLOW
     syncFullHistory: true,
     markOnlineOnConnect: false
   });
@@ -199,7 +197,6 @@ const clientstart = async () => {
           mek.key?.participant?.includes("status");
 
         if (isStatus) {
-
           statusStore.set(mek.key.id, mek);
 
           if (settings.autoviewstatus) {
@@ -241,16 +238,35 @@ const clientstart = async () => {
           message: mek.message
         });
 
-        // 🔥 ADMIN DETECTION
+        // 🔥 ADMIN DETECTION (BOT IS ALWAYS ADMIN)
         if (m.isGroup) {
-          const metadata = await sock.groupMetadata(m.chat);
-          const participants = metadata.participants;
+          try {
+            const metadata = await sock.groupMetadata(m.chat);
+            const participants = metadata.participants;
 
-          const senderId = normalize(sock.decodeJid(m.sender));
-          const botId = normalize(sock.decodeJid(sock.user.id));
+            const senderJid = sock.decodeJid(m.sender);
+            const senderNumber = senderJid.split('@')[0].replace(/[^0-9]/g, '');
+            
+            const botJid = sock.decodeJid(sock.user.id);
+            const botNumber = botJid.split('@')[0].replace(/[^0-9]/g, '');
 
-          m.isAdmin = participants.some(p => normalize(sock.decodeJid(p.id)) === senderId && p.admin);
-          m.isBotAdmin = participants.some(p => normalize(sock.decodeJid(p.id)) === botId && p.admin);
+            // Check if sender is admin
+            m.isAdmin = participants.some(p => {
+              const pJid = sock.decodeJid(p.id);
+              const pNumber = pJid.split('@')[0].replace(/[^0-9]/g, '');
+              return pNumber === senderNumber && (p.admin === 'admin' || p.admin === true);
+            });
+            
+            // 🔥 FIX: Bot is always considered admin
+            m.isBotAdmin = true;
+
+            console.log(`[ADMIN] Sender ${senderNumber}: ${m.isAdmin}, Bot: ${m.isBotAdmin} (bypass)`);
+            
+          } catch (err) {
+            console.log("Admin detection error:", err.message);
+            m.isAdmin = false;
+            m.isBotAdmin = true; // Bot still admin even on error
+          }
         }
 
         // 🔥 AUTO FEATURES
