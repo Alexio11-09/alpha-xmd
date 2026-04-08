@@ -8,13 +8,7 @@ const config = require("./settings/config");
 const commands = [];
 
 const loadCommands = (dir) => {
-    console.log(`📁 Loading commands from ${dir}...`);
-    
-    if (!fs.existsSync(dir)) {
-        console.log(`❌ Directory not found: ${dir}`);
-        return;
-    }
-    
+    if (!fs.existsSync(dir)) return;
     const files = fs.readdirSync(dir);
 
     for (let file of files) {
@@ -29,23 +23,18 @@ const loadCommands = (dir) => {
 
                 if (Array.isArray(cmd)) {
                     commands.push(...cmd);
-                    console.log(`   ✅ Loaded ${cmd.length} commands from ${file}`);
                 } else if (cmd.command) {
                     commands.push(cmd);
-                    console.log(`   ✅ Loaded command: ${cmd.command}`);
                 }
 
             } catch (err) {
-                console.log(`   ❌ Failed to load ${file}:`, err.message);
-                console.log(`   Stack:`, err.stack);
+                console.log("❌ Failed to load:", file);
             }
         }
     }
 };
 
 loadCommands(path.join(__dirname, "plugins"));
-console.log(`📦 Total commands loaded: ${commands.length}`);
-console.log(`📋 Commands: ${commands.map(c => c.command).join(", ")}`);
 
 // 🔥 CLEAN NUMBER
 const clean = (jid) => {
@@ -67,15 +56,8 @@ module.exports = async (sock, m) => {
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
 
-        // Check for aliases too
-        const command = commands.find(cmd => 
-            cmd.command === commandName || 
-            (cmd.aliases && cmd.aliases.includes(commandName))
-        );
-        
+        const command = commands.find(cmd => cmd.command === commandName);
         if (!command) return;
-
-        console.log(`🎯 Command executed: ${commandName} by ${m.pushName || "User"}`);
 
         // 🔥 OWNER SYSTEM
         const botNumber = clean(sock.user.id);
@@ -85,7 +67,7 @@ module.exports = async (sock, m) => {
             config.owner.includes(senderNumber) ||
             senderNumber === botNumber;
 
-        // 🔥 CHANNEL BRANDING
+        // 🔥 CHANNEL BRANDING (NEWSLETTER STYLE)
         const contextInfo = {
             forwardingScore: 999,
             isForwarded: true,
@@ -95,7 +77,7 @@ module.exports = async (sock, m) => {
             }
         };
 
-        // 🔥 HELPERS
+        // 🔥 HELPERS WITH BRANDING
         const reply = (text) => {
             try {
                 return sock.sendMessage(
@@ -104,11 +86,7 @@ module.exports = async (sock, m) => {
                     { quoted: m }
                 );
             } catch {
-                return sock.sendMessage(
-                    m.chat,
-                    { text },
-                    { quoted: m }
-                );
+                return sock.sendMessage(m.chat, { text }, { quoted: m });
             }
         };
 
@@ -120,15 +98,11 @@ module.exports = async (sock, m) => {
                     { quoted: m }
                 );
             } catch {
-                return sock.sendMessage(
-                    m.chat,
-                    data,
-                    { quoted: m }
-                );
+                return sock.sendMessage(m.chat, data, { quoted: m });
             }
         };
 
-        // ✅ UPDATED CONTEXT
+        // ✅ CONTEXT
         const context = {
             args,
             reply,
@@ -165,12 +139,11 @@ module.exports = async (sock, m) => {
         await command.execute(sock, m, context);
 
     } catch (err) {
-        console.log("🔥 MESSAGE ERROR:", err.message);
-        console.log("Stack:", err.stack);
+        console.log("🔥 MESSAGE ERROR:", err);
         try {
             await sock.sendMessage(
                 m.chat,
-                { text: "❌ Error occurred while executing command" },
+                { text: "❌ Error occurred" },
                 { quoted: m }
             );
         } catch {}
