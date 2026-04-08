@@ -45,6 +45,10 @@ const { Boom } = require('@hapi/boom');
 
 const { smsg } = require('./library/serialize');
 
+// Create database folder if not exists
+if (!fs.existsSync('./database')) fs.mkdirSync('./database');
+if (!fs.existsSync('./database/groupSettings.json')) fs.writeFileSync('./database/groupSettings.json', '{}');
+
 // ✅ SAFE MESSAGE HANDLER
 let messageHandler;
 try {
@@ -219,6 +223,48 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
+        // ========== ANTILINK DETECTION ==========
+        if (m.isGroup && m.text) {
+          try {
+            const allSettings = JSON.parse(fs.readFileSync('./database/groupSettings.json'));
+            const groupSettings = allSettings[m.chat] || { antilink: false, antilinkAction: "delete" };
+            
+            if (groupSettings.antilink) {
+              const linkRegex = /(https?:\/\/|whatsapp\.com|chat\.whatsapp\.com|wa\.me|t\.me|discord\.gg|instagram\.com|facebook\.com|youtube\.com|twitter\.com)/i;
+              
+              if (linkRegex.test(m.text)) {
+                // Check if sender is admin
+                const metadata = await sock.groupMetadata(m.chat);
+                const senderJid = sock.decodeJid(m.sender);
+                const senderNumber = senderJid.split('@')[0].replace(/[^0-9]/g, '');
+                const isSenderAdmin = metadata.participants.some(p => {
+                  const pNumber = sock.decodeJid(p.id).split('@')[0].replace(/[^0-9]/g, '');
+                  return pNumber === senderNumber && p.admin;
+                });
+                
+                // Skip if sender is admin
+                if (!isSenderAdmin) {
+                  const action = groupSettings.antilinkAction;
+                  
+                  if (action === "delete") {
+                    await sock.sendMessage(m.chat, { delete: mek.key });
+                    await sock.sendMessage(m.chat, { text: "🛡️ Links are not allowed in this group!" }, { quoted: mek });
+                  } else if (action === "warn") {
+                    await sock.sendMessage(m.chat, { text: "⚠️ Warning: Links are not allowed!" }, { quoted: mek });
+                  } else if (action === "kick") {
+                    await sock.groupParticipantsUpdate(m.chat, [m.sender], "remove");
+                    await sock.sendMessage(m.chat, { text: "🚫 User kicked for sending links!" });
+                  }
+                  
+                  return; // Stop processing this message
+                }
+              }
+            }
+          } catch (err) {
+            console.log("Antilink error:", err.message);
+          }
+        }
+
         // ✏️ FALLBACK ANTIEDIT
         if (store.has(mek.key.id)) {
           const old = store.get(mek.key.id);
@@ -246,7 +292,7 @@ const clientstart = async () => {
 
             const senderJid = sock.decodeJid(m.sender);
             const senderNumber = senderJid.split('@')[0].replace(/[^0-9]/g, '');
-            
+
             const botJid = sock.decodeJid(sock.user.id);
             const botNumber = botJid.split('@')[0].replace(/[^0-9]/g, '');
 
@@ -256,12 +302,12 @@ const clientstart = async () => {
               const pNumber = pJid.split('@')[0].replace(/[^0-9]/g, '');
               return pNumber === senderNumber && (p.admin === 'admin' || p.admin === true);
             });
-            
+
             // 🔥 FIX: Bot is always considered admin
             m.isBotAdmin = true;
 
             console.log(`[ADMIN] Sender ${senderNumber}: ${m.isAdmin}, Bot: ${m.isBotAdmin} (bypass)`);
-            
+
           } catch (err) {
             console.log("Admin detection error:", err.message);
             m.isAdmin = false;
@@ -290,6 +336,43 @@ const clientstart = async () => {
 
     } catch (err) {
       console.log("MESSAGE ERROR:", err);
+    }
+  });
+
+  // ========== WELCOME & GOODBYE (AUTO) ==========
+  sock.ev.on('group-participants.update', async (update) => {
+    try {
+      const { id, participants, action } = update;
+      
+      // Load group settings
+      let groupSettings = {};
+      try {
+        const allSettings = JSON.parse(fs.readFileSync('./database/groupSettings.json'));
+        groupSettings = allSettings[id] || { 
+          welcome: false, 
+          welcomeMsg: "Welcome @user! 🎉", 
+          goodbye: false, 
+          goodbyeMsg: "Goodbye @user! 👋" 
+        };
+      } catch {}
+      
+      // WELCOME
+      if (action === 'add' && groupSettings.welcome) {
+        for (let user of participants) {
+          const msg = groupSettings.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
+          await sock.sendMessage(id, { text: msg, mentions: [user] });
+        }
+      }
+      
+      // GOODBYE
+      if (action === 'remove' && groupSettings.goodbye) {
+        for (let user of participants) {
+          const msg = groupSettings.goodbyeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
+          await sock.sendMessage(id, { text: msg, mentions: [user] });
+        }
+      }
+    } catch (err) {
+      console.log("Welcome/Goodbye error:", err.message);
     }
   });
 
