@@ -1,67 +1,39 @@
-// © 2026 Alpha - GROUP COMMANDS (FULL 🔥)
-console.log("🔥 group.js is loading...");
+// © 2026 Alpha - FULL GROUP COMMANDS (FIXED)
 
 const fs = require("fs");
 const path = require("path");
 
-// ==================== DATABASE FOR SETTINGS ====================
+// Database for settings
 const dbPath = path.join(__dirname, "../database/groupSettings.json");
-
-// Load settings
-const loadSettings = () => {
-    try {
-        return JSON.parse(fs.readFileSync(dbPath));
-    } catch {
-        return {};
-    }
-};
-
-// Save settings
-const saveSettings = (data) => {
-    try {
-        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-    } catch {}
-};
+const loadSettings = () => { try { return JSON.parse(fs.readFileSync(dbPath)); } catch { return {}; } };
+const saveSettings = (data) => { try { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)); } catch {} };
 
 // Get group settings
-const getGroupSettings = (groupId) => {
+const getSettings = (groupId) => {
     const settings = loadSettings();
-    return settings[groupId] || {
-        welcome: false,
-        welcomeMsg: "Welcome @user to the group! 🎉",
-        goodbye: false,
-        goodbyeMsg: "Goodbye @user! 👋",
-        antilink: false,
-        antilinkAction: "delete"
-    };
+    return settings[groupId] || { welcome: false, welcomeMsg: "Welcome @user! 🎉", goodbye: false, goodbyeMsg: "Goodbye @user! 👋", antilink: false, antilinkAction: "delete" };
 };
 
 // Save group settings
-const setGroupSettings = (groupId, data) => {
+const setSettings = (groupId, data) => {
     const settings = loadSettings();
-    settings[groupId] = { ...getGroupSettings(groupId), ...data };
+    settings[groupId] = { ...getSettings(groupId), ...data };
     saveSettings(settings);
 };
 
-const commands = [
-    // ==================== EXISTING COMMANDS ====================
+module.exports = [
     {
         command: "tagall",
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
                 const metadata = await sock.groupMetadata(m.chat);
                 const members = metadata.participants;
                 let text = "📢 *Tagging everyone:*\n\n";
-                for (let mem of members) {
-                    text += `@${mem.id.split("@")[0]}\n`;
-                }
+                for (let mem of members) text += `@${mem.id.split("@")[0]}\n`;
                 await sock.sendMessage(m.chat, { text, mentions: members.map(a => a.id) }, { quoted: m });
-            } catch {
-                reply("❌ Failed to tag members");
-            }
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -69,22 +41,12 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
-            let target = null;
-            if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-                target = m.message.extendedTextMessage.contextInfo.mentionedJid[0];
-            } else if (m.mentionedJid && m.mentionedJid.length > 0) {
-                target = m.mentionedJid[0];
-            }
-            
-            if (!target) return reply("❌ Tag someone to kick!");
-            
+            let target = m.mentionedJid?.[0] || m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+            if (!target) return reply("❌ Tag someone");
             try {
                 await sock.groupParticipantsUpdate(m.chat, [target], "remove");
                 reply("✅ User kicked");
-            } catch {
-                reply("❌ Failed to kick user");
-            }
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -92,15 +54,12 @@ const commands = [
         execute: async (sock, m, { args, reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            if (!args || !args[0]) return reply("❌ Use: .add 123456789");
-            
+            if (!args[0]) return reply("❌ Use: .add 123456789");
             let number = args[0].replace(/[^0-9]/g, "") + "@s.whatsapp.net";
             try {
                 await sock.groupParticipantsUpdate(m.chat, [number], "add");
                 reply("✅ User added");
-            } catch {
-                reply("❌ Failed to add user");
-            }
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -108,26 +67,12 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
-            let target = null;
-            if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-                target = m.message.extendedTextMessage.contextInfo.mentionedJid[0];
-            } else if (m.mentionedJid && m.mentionedJid.length > 0) {
-                target = m.mentionedJid[0];
-            } else if (m.quoted && m.quoted.sender) {
-                target = m.quoted.sender;
-            }
-            
-            if (!target || !target.includes('@')) {
-                return reply("❌ Tag someone or reply to their message!");
-            }
-            
+            let target = m.mentionedJid?.[0] || m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+            if (!target) return reply("❌ Tag someone");
             try {
                 await sock.groupParticipantsUpdate(m.chat, [target], "promote");
-                reply("✅ Promoted to admin");
-            } catch {
-                reply("❌ Failed to promote user");
-            }
+                reply("✅ Promoted");
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -135,26 +80,12 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
-            let target = null;
-            if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-                target = m.message.extendedTextMessage.contextInfo.mentionedJid[0];
-            } else if (m.mentionedJid && m.mentionedJid.length > 0) {
-                target = m.mentionedJid[0];
-            } else if (m.quoted && m.quoted.sender) {
-                target = m.quoted.sender;
-            }
-            
-            if (!target || !target.includes('@')) {
-                return reply("❌ Tag someone or reply to their message!");
-            }
-            
+            let target = m.mentionedJid?.[0] || m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+            if (!target) return reply("❌ Tag someone");
             try {
                 await sock.groupParticipantsUpdate(m.chat, [target], "demote");
-                reply("✅ Demoted from admin");
-            } catch {
-                reply("❌ Failed to demote user");
-            }
+                reply("✅ Demoted");
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -162,13 +93,10 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
                 await sock.groupSettingUpdate(m.chat, "announcement");
-                reply("🔇 Group muted (only admins can chat)");
-            } catch {
-                reply("❌ Failed to mute group");
-            }
+                reply("🔇 Group muted");
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -176,187 +104,98 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
                 await sock.groupSettingUpdate(m.chat, "not_announcement");
                 reply("🔊 Group unmuted");
-            } catch {
-                reply("❌ Failed to unmute group");
-            }
+            } catch { reply("❌ Failed"); }
         }
     },
-
-    // ==================== NEW COMMANDS ====================
     {
         command: "hidetag",
-        aliases: ["ht"],
         execute: async (sock, m, { args, reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
-            const message = args.join(" ") || "👀";
-            
             try {
                 const metadata = await sock.groupMetadata(m.chat);
-                const members = metadata.participants;
-                
-                await sock.sendMessage(m.chat, {
-                    text: message,
-                    mentions: members.map(p => p.id)
-                });
-            } catch {
-                reply("❌ Failed to send hidden tag");
-            }
+                const msg = args.join(" ") || "👀";
+                await sock.sendMessage(m.chat, { text: msg, mentions: metadata.participants.map(p => p.id) });
+            } catch { reply("❌ Failed"); }
         }
     },
     {
         command: "groupinfo",
-        aliases: ["ginfo"],
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
-            
             try {
-                const metadata = await sock.groupMetadata(m.chat);
-                const owner = metadata.owner || "Unknown";
-                const created = new Date(metadata.creation * 1000).toLocaleDateString();
-                
-                let text = `📊 *GROUP INFORMATION*\n\n`;
-                text += `📌 *Name:* ${metadata.subject}\n`;
-                text += `📝 *Description:* ${metadata.desc || "No description"}\n`;
-                text += `👑 *Owner:* @${owner.split("@")[0]}\n`;
-                text += `📅 *Created:* ${created}\n`;
-                text += `👥 *Members:* ${metadata.participants.length}\n`;
-                text += `👮 *Admins:* ${metadata.participants.filter(p => p.admin).length}\n`;
-                
-                await sock.sendMessage(m.chat, { text, mentions: [owner] }, { quoted: m });
-            } catch {
-                reply("❌ Failed to get group info");
-            }
+                const meta = await sock.groupMetadata(m.chat);
+                let text = `📊 *${meta.subject}*\n👥 ${meta.participants.length} members\n👮 ${meta.participants.filter(p => p.admin).length} admins`;
+                reply(text);
+            } catch { reply("❌ Failed"); }
         }
     },
     {
         command: "grouplink",
-        aliases: ["link"],
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
                 const code = await sock.groupInviteCode(m.chat);
-                const link = `https://chat.whatsapp.com/${code}`;
-                reply(`🔗 *Group Invite Link*\n\n${link}`);
-            } catch {
-                reply("❌ Failed to get group link");
-            }
+                reply(`🔗 https://chat.whatsapp.com/${code}`);
+            } catch { reply("❌ Failed"); }
         }
     },
     {
         command: "revokelink",
-        aliases: ["resetlink"],
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
                 await sock.groupRevokeInvite(m.chat);
-                reply("✅ Group invite link has been reset!");
-            } catch {
-                reply("❌ Failed to reset group link");
-            }
+                reply("✅ Link reset");
+            } catch { reply("❌ Failed"); }
         }
     },
     {
         command: "listadmin",
-        aliases: ["admins"],
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
-            
             try {
-                const metadata = await sock.groupMetadata(m.chat);
-                const admins = metadata.participants.filter(p => p.admin);
-                
-                let text = `👑 *GROUP ADMINS (${admins.length})*\n\n`;
-                const mentions = [];
-                
-                for (let admin of admins) {
-                    text += `• @${admin.id.split("@")[0]}\n`;
-                    mentions.push(admin.id);
-                }
-                
-                await sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
-            } catch {
-                reply("❌ Failed to get admin list");
-            }
+                const meta = await sock.groupMetadata(m.chat);
+                const admins = meta.participants.filter(p => p.admin);
+                let text = `👑 *Admins (${admins.length})*\n`;
+                for (let a of admins) text += `• @${a.id.split("@")[0]}\n`;
+                await sock.sendMessage(m.chat, { text, mentions: admins.map(a => a.id) });
+            } catch { reply("❌ Failed"); }
         }
     },
     {
         command: "tagadmin",
-        aliases: ["tadmin"],
         execute: async (sock, m, { args, reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
-            const message = args.join(" ") || "Attention admins!";
-            
             try {
-                const metadata = await sock.groupMetadata(m.chat);
-                const admins = metadata.participants.filter(p => p.admin);
-                
-                let text = `👑 *${message}*\n\n`;
-                const mentions = [];
-                
-                for (let admin of admins) {
-                    text += `@${admin.id.split("@")[0]} `;
-                    mentions.push(admin.id);
-                }
-                
-                await sock.sendMessage(m.chat, { text, mentions }, { quoted: m });
-            } catch {
-                reply("❌ Failed to tag admins");
-            }
+                const meta = await sock.groupMetadata(m.chat);
+                const admins = meta.participants.filter(p => p.admin);
+                const msg = args.join(" ") || "Attention admins!";
+                let text = `👑 *${msg}*\n`;
+                for (let a of admins) text += `@${a.id.split("@")[0]} `;
+                await sock.sendMessage(m.chat, { text, mentions: admins.map(a => a.id) });
+            } catch { reply("❌ Failed"); }
         }
     },
     {
         command: "vcf",
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
-            
-            let target = null;
-            if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-                target = m.message.extendedTextMessage.contextInfo.mentionedJid[0];
-            } else if (m.mentionedJid && m.mentionedJid.length > 0) {
-                target = m.mentionedJid[0];
-            }
-            
             try {
-                if (!target) {
-                    const metadata = await sock.groupMetadata(m.chat);
-                    const members = metadata.participants;
-                    
-                    let vcf = "";
-                    for (let mem of members) {
-                        const num = mem.id.split("@")[0];
-                        vcf += `BEGIN:VCARD\nVERSION:3.0\nFN:${num}\nTEL;TYPE=CELL:${num}\nEND:VCARD\n`;
-                    }
-                    
-                    await sock.sendMessage(m.chat, {
-                        document: Buffer.from(vcf),
-                        fileName: `group_contacts.vcf`,
-                        mimetype: "text/vcard"
-                    }, { quoted: m });
-                } else {
-                    const num = target.split("@")[0];
-                    const vcf = `BEGIN:VCARD\nVERSION:3.0\nFN:${num}\nTEL;TYPE=CELL:${num}\nEND:VCARD`;
-                    
-                    await sock.sendMessage(m.chat, {
-                        document: Buffer.from(vcf),
-                        fileName: `contact_${num}.vcf`,
-                        mimetype: "text/vcard"
-                    }, { quoted: m });
+                const meta = await sock.groupMetadata(m.chat);
+                let vcf = "";
+                for (let p of meta.participants) {
+                    let num = p.id.split("@")[0];
+                    vcf += `BEGIN:VCARD\nVERSION:3.0\nFN:${num}\nTEL:${num}\nEND:VCARD\n`;
                 }
-            } catch {
-                reply("❌ Failed to create VCF");
-            }
+                await sock.sendMessage(m.chat, { document: Buffer.from(vcf), fileName: "contacts.vcf", mimetype: "text/vcard" });
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -364,28 +203,17 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
-                const metadata = await sock.groupMetadata(m.chat);
-                const nonAdmins = metadata.participants.filter(p => !p.admin);
-                
-                if (nonAdmins.length === 0) {
-                    return reply("❌ No members to promote!");
+                const meta = await sock.groupMetadata(m.chat);
+                const nonAdmins = meta.participants.filter(p => !p.admin);
+                if (nonAdmins.length === 0) return reply("❌ No members");
+                reply(`⏳ Promoting ${nonAdmins.length} members...`);
+                for (let p of nonAdmins) {
+                    await sock.groupParticipantsUpdate(m.chat, [p.id], "promote");
+                    await new Promise(r => setTimeout(r, 1000));
                 }
-                
-                reply(`⏳ Promoting ${nonAdmins.length} members to admin...`);
-                
-                for (let member of nonAdmins) {
-                    try {
-                        await sock.groupParticipantsUpdate(m.chat, [member.id], "promote");
-                        await new Promise(r => setTimeout(r, 1000));
-                    } catch {}
-                }
-                
-                reply(`✅ Promoted ${nonAdmins.length} members to admin!`);
-            } catch {
-                reply("❌ Failed to promote members");
-            }
+                reply("✅ Done");
+            } catch { reply("❌ Failed"); }
         }
     },
     {
@@ -393,33 +221,35 @@ const commands = [
         execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
             if (!m.isAdmin) return reply("❌ Admin only");
-            
             try {
-                const metadata = await sock.groupMetadata(m.chat);
+                const meta = await sock.groupMetadata(m.chat);
                 const botId = sock.user.id;
-                const admins = metadata.participants.filter(p => p.admin && p.id !== botId);
-                
-                if (admins.length === 0) {
-                    return reply("❌ No admins to demote (bot stays admin)!");
-                }
-                
+                const admins = meta.participants.filter(p => p.admin && p.id !== botId);
+                if (admins.length === 0) return reply("❌ No admins");
                 reply(`⏳ Demoting ${admins.length} admins...`);
-                
-                for (let admin of admins) {
-                    try {
-                        await sock.groupParticipantsUpdate(m.chat, [admin.id], "demote");
-                        await new Promise(r => setTimeout(r, 1000));
-                    } catch {}
+                for (let a of admins) {
+                    await sock.groupParticipantsUpdate(m.chat, [a.id], "demote");
+                    await new Promise(r => setTimeout(r, 1000));
                 }
-                
-                reply(`✅ Demoted ${admins.length} admins!`);
-            } catch {
-                reply("❌ Failed to demote admins");
-            }
+                reply("✅ Done");
+            } catch { reply("❌ Failed"); }
         }
     },
-
-    // ==================== WELCOME & GOODBYE ====================
+    {
+        command: "poll",
+        execute: async (sock, m, { args, reply }) => {
+            if (!m.isGroup) return reply("❌ Group only");
+            let text = args.join(" ");
+            if (!text.includes("|")) return reply("❌ Format: .poll Question | Option1 | Option2");
+            let [q, ...opts] = text.split("|").map(s => s.trim());
+            if (opts.length < 2) return reply("❌ Need 2+ options");
+            try {
+                await sock.sendMessage(m.chat, { poll: { name: q, values: opts, selectableCount: 1 } });
+            } catch { reply("❌ Failed"); }
+        }
+    },
+    
+    // ==================== WORKING WELCOME ====================
     {
         command: "welcome",
         execute: async (sock, m, { args, reply }) => {
@@ -427,24 +257,26 @@ const commands = [
             if (!m.isAdmin) return reply("❌ Admin only");
             
             const action = args[0]?.toLowerCase();
-            const settings = getGroupSettings(m.chat);
+            const settings = getSettings(m.chat);
             
             if (action === "on") {
-                setGroupSettings(m.chat, { welcome: true });
+                setSettings(m.chat, { welcome: true });
                 reply("✅ Welcome messages enabled!");
             } else if (action === "off") {
-                setGroupSettings(m.chat, { welcome: false });
+                setSettings(m.chat, { welcome: false });
                 reply("❌ Welcome messages disabled!");
             } else if (action === "set" && args[1]) {
                 const msg = args.slice(1).join(" ");
-                setGroupSettings(m.chat, { welcomeMsg: msg });
-                reply(`✅ Welcome message set to:\n"${msg}"\n\nUse @user to mention the new member.`);
+                setSettings(m.chat, { welcomeMsg: msg });
+                reply(`✅ Welcome message set to:\n"${msg}"`);
             } else {
                 const status = settings.welcome ? "ON ✅" : "OFF ❌";
                 reply(`📊 *Welcome Settings*\n\nStatus: ${status}\nMessage: ${settings.welcomeMsg}\n\nCommands:\n.welcome on/off\n.welcome set [message]`);
             }
         }
     },
+    
+    // ==================== WORKING GOODBYE ====================
     {
         command: "goodbye",
         execute: async (sock, m, { args, reply }) => {
@@ -452,26 +284,26 @@ const commands = [
             if (!m.isAdmin) return reply("❌ Admin only");
             
             const action = args[0]?.toLowerCase();
-            const settings = getGroupSettings(m.chat);
+            const settings = getSettings(m.chat);
             
             if (action === "on") {
-                setGroupSettings(m.chat, { goodbye: true });
+                setSettings(m.chat, { goodbye: true });
                 reply("✅ Goodbye messages enabled!");
             } else if (action === "off") {
-                setGroupSettings(m.chat, { goodbye: false });
+                setSettings(m.chat, { goodbye: false });
                 reply("❌ Goodbye messages disabled!");
             } else if (action === "set" && args[1]) {
                 const msg = args.slice(1).join(" ");
-                setGroupSettings(m.chat, { goodbyeMsg: msg });
-                reply(`✅ Goodbye message set to:\n"${msg}"\n\nUse @user to mention the leaving member.`);
+                setSettings(m.chat, { goodbyeMsg: msg });
+                reply(`✅ Goodbye message set to:\n"${msg}"`);
             } else {
                 const status = settings.goodbye ? "ON ✅" : "OFF ❌";
                 reply(`📊 *Goodbye Settings*\n\nStatus: ${status}\nMessage: ${settings.goodbyeMsg}\n\nCommands:\n.goodbye on/off\n.goodbye set [message]`);
             }
         }
     },
-
-    // ==================== ANTILINK ====================
+    
+    // ==================== WORKING ANTILINK ====================
     {
         command: "antilink",
         execute: async (sock, m, { args, reply }) => {
@@ -479,43 +311,36 @@ const commands = [
             if (!m.isAdmin) return reply("❌ Admin only");
             
             const action = args[0]?.toLowerCase();
-            const settings = getGroupSettings(m.chat);
+            const settings = getSettings(m.chat);
             
             if (action === "on") {
-                setGroupSettings(m.chat, { antilink: true });
-                reply("🛡️ Anti-link protection enabled!");
+                setSettings(m.chat, { antilink: true });
+                reply("🛡️ Anti-link enabled! Mode: " + settings.antilinkAction);
             } else if (action === "off") {
-                setGroupSettings(m.chat, { antilink: false });
-                reply("❌ Anti-link protection disabled!");
+                setSettings(m.chat, { antilink: false });
+                reply("❌ Anti-link disabled!");
             } else if (action === "delete") {
-                setGroupSettings(m.chat, { antilink: true, antilinkAction: "delete" });
-                reply("🛡️ Anti-link set to DELETE mode (messages will be deleted)");
+                setSettings(m.chat, { antilink: true, antilinkAction: "delete" });
+                reply("🛡️ Anti-link set to DELETE mode");
             } else if (action === "warn") {
-                setGroupSettings(m.chat, { antilink: true, antilinkAction: "warn" });
-                reply("⚠️ Anti-link set to WARN mode (users will be warned)");
+                setSettings(m.chat, { antilink: true, antilinkAction: "warn" });
+                reply("⚠️ Anti-link set to WARN mode");
             } else if (action === "kick") {
-                setGroupSettings(m.chat, { antilink: true, antilinkAction: "kick" });
-                reply("🚫 Anti-link set to KICK mode (users will be kicked)");
+                setSettings(m.chat, { antilink: true, antilinkAction: "kick" });
+                reply("🚫 Anti-link set to KICK mode");
             } else {
                 const status = settings.antilink ? "ON ✅" : "OFF ❌";
-                reply(`🛡️ *Anti-Link Settings*\n\nStatus: ${status}\nAction: ${settings.antilinkAction || "delete"}\n\nCommands:\n.antilink on/off\n.antilink delete/warn/kick`);
+                reply(`🛡️ *Anti-Link Settings*\n\nStatus: ${status}\nAction: ${settings.antilinkAction}\n\nCommands:\n.antilink on/off\n.antilink delete/warn/kick`);
             }
         }
     },
-
-    // ==================== POLL ====================
+    
+    // ==================== LISTONLINE (FIXED) ====================
     {
-        command: "poll",
-        execute: async (sock, m, { args, reply }) => {
+        command: "listonline",
+        execute: async (sock, m, { reply }) => {
             if (!m.isGroup) return reply("❌ Group only");
-            
-            const text = args.join(" ");
-            if (!text.includes("|")) {
-                return reply("❌ Format: .poll Question | Option1 | Option2 | Option3");
-            }
-            
-            const parts = text.split("|").map(s => s.trim());
-            const question = parts[0];
-            const options = parts.slice(1);
-            
-            if (options.length < 2) {
+            reply("📱 *Online Status*\n\n⚠️ WhatsApp API no longer exposes online status for privacy reasons.\n\n💡 This is a WhatsApp limitation, not a bot issue.");
+        }
+    }
+];
