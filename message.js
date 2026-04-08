@@ -28,12 +28,16 @@ const loadCommands = (dir) => {
 
             } catch (err) {
                 console.log("❌ Failed to load:", file);
+                console.log("   Error:", err.message);
+                console.log("   Stack:", err.stack);
             }
         }
     }
 };
 
 loadCommands(path.join(__dirname, "plugins"));
+console.log("📦 Total commands loaded:", commands.length);
+console.log("📋 Commands:", commands.map(c => c.command).join(", "));
 
 // 🔥 CLEAN NUMBER
 const clean = (jid) => {
