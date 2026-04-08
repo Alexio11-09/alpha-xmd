@@ -1,166 +1,250 @@
-// © 2026 Alpha - SETTINGS SYSTEM (FULL FINAL 🔥)
+// © 2026 Alpha - SETTINGS COMMANDS
 
 const fs = require("fs");
-const path = "./database/settings.json";
 
-// 🔥 LOAD SETTINGS
-const load = () => {
-    if (!fs.existsSync(path)) {
-        const def = {
-            autoread: false,
-            autotyping: false,
-            autoreact: false,
-            autorecording: false,
-            antidelete: false,
+// Database path
+let settingsPath = './database/settings.json';
+try {
+    if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
+    if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}');
+} catch {
+    settingsPath = '/tmp/settings.json';
+}
 
-            // 🆕 NEW PRO FEATURES
-            autoviewstatus: false,
-            autoreactstatus: false,
-            antideletestatus: false,
-            antiedit: false
-        };
-        fs.writeFileSync(path, JSON.stringify(def, null, 2));
-        return def;
+// Load settings
+const loadSettings = () => {
+    try {
+        return JSON.parse(fs.readFileSync(settingsPath));
+    } catch {
+        return {};
     }
-    return JSON.parse(fs.readFileSync(path));
 };
 
-// 💾 SAVE SETTINGS
-const save = (data) => {
-    fs.writeFileSync(path, JSON.stringify(data, null, 2));
+// Save settings
+const saveSettings = (data) => {
+    try {
+        fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
+        return true;
+    } catch {
+        return false;
+    }
 };
 
-// 🔄 TOGGLE FUNCTION
-const toggle = (feature, value, reply) => {
-    const s = load();
+// Get global settings
+const getGlobalSettings = () => {
+    const settings = loadSettings();
+    return settings["global"] || {
+        autoread: true,
+        autotyping: false,
+        autorecording: false,
+        autoreact: false,
+        antidelete: false,
+        antiedit: false,
+        autoviewstatus: false,
+        autoreactstatus: false,
+        antideletestatus: false,
+        statusEmoji: "🔥"
+    };
+};
 
-    if (!["on", "off"].includes(value)) {
-        return reply("❌ Use on/off");
-    }
-
-    s[feature] = value === "on";
-    save(s);
-
-    reply(`✅ ${feature} is now ${value.toUpperCase()}`);
+// Save global settings
+const setGlobalSettings = (data) => {
+    const settings = loadSettings();
+    settings["global"] = { ...getGlobalSettings(), ...data };
+    return saveSettings(settings);
 };
 
 module.exports = [
-
-/* ================= SETTINGS PANEL ================= */
-{
-command: "settings",
-category: "settings",
-
-execute: async (sock, m, { reply }) => {
-    const s = load();
-
-    reply(
-`⚙️ *SETTINGS PANEL*
-
-👁️ Autoread: ${s.autoread ? "ON ✅" : "OFF ❌"}
-⌨️ Autotyping: ${s.autotyping ? "ON ✅" : "OFF ❌"}
-❤️ Autoreact: ${s.autoreact ? "ON ✅" : "OFF ❌"}
-🎙️ Autorecording: ${s.autorecording ? "ON ✅" : "OFF ❌"}
-🛡️ Antidelete: ${s.antidelete ? "ON ✅" : "OFF ❌"}
-
-👁️‍🗨️ AutoView Status: ${s.autoviewstatus ? "ON ✅" : "OFF ❌"}
-❤️‍🔥 AutoReact Status: ${s.autoreactstatus ? "ON ✅" : "OFF ❌"}
-🛡️ AntiDelete Status: ${s.antideletestatus ? "ON ✅" : "OFF ❌"}
-✏️ AntiEdit: ${s.antiedit ? "ON ✅" : "OFF ❌"}
-
-Use:
-.autoread on/off
-.autotyping on/off
-.autoreact on/off
-.autorecording on/off
-.antidelete on/off
-.autoviewstatus on/off
-.autoreactstatus on/off
-.antideletestatus on/off
-.antiedit on/off`
-    );
-}
-},
-
-/* ================= AUTOREAD ================= */
-{
-command: "autoread",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("autoread", args[0], reply);
-}
-},
-
-/* ================= AUTOTYPING ================= */
-{
-command: "autotyping",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("autotyping", args[0], reply);
-}
-},
-
-/* ================= AUTOREACT ================= */
-{
-command: "autoreact",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("autoreact", args[0], reply);
-}
-},
-
-/* ================= AUTORECORDING ================= */
-{
-command: "autorecording",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("autorecording", args[0], reply);
-}
-},
-
-/* ================= ANTIDELETE ================= */
-{
-command: "antidelete",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("antidelete", args[0], reply);
-}
-},
-
-/* ================= AUTOVIEW STATUS ================= */
-{
-command: "autoviewstatus",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("autoviewstatus", args[0], reply);
-}
-},
-
-/* ================= AUTOREACT STATUS ================= */
-{
-command: "autoreactstatus",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("autoreactstatus", args[0], reply);
-}
-},
-
-/* ================= ANTIDELETE STATUS ================= */
-{
-command: "antideletestatus",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("antideletestatus", args[0], reply);
-}
-},
-
-/* ================= ANTIEDIT ================= */
-{
-command: "antiedit",
-category: "settings",
-execute: async (sock, m, { args, reply }) => {
-    toggle("antiedit", args[0], reply);
-}
-}
-
+    // ==================== AUTOREAD ====================
+    {
+        command: "autoread",
+        aliases: ["read"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ autoread: true });
+                reply("✅ Auto-read enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ autoread: false });
+                reply("❌ Auto-read disabled!");
+            } else {
+                const status = settings.autoread ? "ON ✅" : "OFF ❌";
+                reply(`📊 *Auto-Read*\n\nStatus: ${status}\n\nCommands:\n.autoread on/off`);
+            }
+        }
+    },
+    
+    // ==================== AUTOTYPING ====================
+    {
+        command: "autotyping",
+        aliases: ["typing"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ autotyping: true });
+                reply("✅ Auto-typing enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ autotyping: false });
+                reply("❌ Auto-typing disabled!");
+            } else {
+                const status = settings.autotyping ? "ON ✅" : "OFF ❌";
+                reply(`📊 *Auto-Typing*\n\nStatus: ${status}\n\nCommands:\n.autotyping on/off`);
+            }
+        }
+    },
+    
+    // ==================== AUTORECORDING ====================
+    {
+        command: "autorecording",
+        aliases: ["recording"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ autorecording: true });
+                reply("✅ Auto-recording enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ autorecording: false });
+                reply("❌ Auto-recording disabled!");
+            } else {
+                const status = settings.autorecording ? "ON ✅" : "OFF ❌";
+                reply(`📊 *Auto-Recording*\n\nStatus: ${status}\n\nCommands:\n.autorecording on/off`);
+            }
+        }
+    },
+    
+    // ==================== AUTOREACT ====================
+    {
+        command: "autoreact",
+        aliases: ["react"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ autoreact: true });
+                reply("✅ Auto-react enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ autoreact: false });
+                reply("❌ Auto-react disabled!");
+            } else {
+                const status = settings.autoreact ? "ON ✅" : "OFF ❌";
+                reply(`📊 *Auto-React*\n\nStatus: ${status}\n\nCommands:\n.autoreact on/off`);
+            }
+        }
+    },
+    
+    // ==================== ANTIDELETE ====================
+    {
+        command: "antidelete",
+        aliases: ["antidel"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ antidelete: true });
+                reply("🛡️ Anti-delete enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ antidelete: false });
+                reply("❌ Anti-delete disabled!");
+            } else {
+                const status = settings.antidelete ? "ON ✅" : "OFF ❌";
+                reply(`🛡️ *Anti-Delete*\n\nStatus: ${status}\n\nCommands:\n.antidelete on/off`);
+            }
+        }
+    },
+    
+    // ==================== ANTIDELETESTATUS ====================
+    {
+        command: "antideletestatus",
+        aliases: ["antidelstatus"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ antideletestatus: true });
+                reply("🛡️ Anti-delete status enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ antideletestatus: false });
+                reply("❌ Anti-delete status disabled!");
+            } else {
+                const status = settings.antideletestatus ? "ON ✅" : "OFF ❌";
+                reply(`🛡️ *Anti-Delete Status*\n\nStatus: ${status}\n\nCommands:\n.antideletestatus on/off`);
+            }
+        }
+    },
+    
+    // ==================== ANTIVIEWSTATUS ====================
+    {
+        command: "autoviewstatus",
+        aliases: ["viewstatus"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ autoviewstatus: true });
+                reply("✅ Auto-view status enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ autoviewstatus: false });
+                reply("❌ Auto-view status disabled!");
+            } else {
+                const status = settings.autoviewstatus ? "ON ✅" : "OFF ❌";
+                reply(`📊 *Auto-View Status*\n\nStatus: ${status}\n\nCommands:\n.autoviewstatus on/off`);
+            }
+        }
+    },
+    
+    // ==================== AUTOREACTSTATUS ====================
+    {
+        command: "autoreactstatus",
+        aliases: ["reactstatus"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ autoreactstatus: true });
+                reply("✅ Auto-react status enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ autoreactstatus: false });
+                reply("❌ Auto-react status disabled!");
+            } else if (action === "set" && args[1]) {
+                setGlobalSettings({ autoreactstatus: true, statusEmoji: args[1] });
+                reply(`✅ Status reaction set to: ${args[1]}`);
+            } else {
+                const status = settings.autoreactstatus ? "ON ✅" : "OFF ❌";
+                const emoji = settings.statusEmoji || "🔥";
+                reply(`📊 *Auto-React Status*\n\nStatus: ${status}\nEmoji: ${emoji}\n\nCommands:\n.autoreactstatus on/off\n.autoreactstatus set [emoji]`);
+            }
+        }
+    },
+    
+    // ==================== ANTIEDIT ====================
+    {
+        command: "antiedit",
+        aliases: ["antieditmsg"],
+        execute: async (sock, m, { args, reply }) => {
+            const action = args[0]?.toLowerCase();
+            const settings = getGlobalSettings();
+            
+            if (action === "on") {
+                setGlobalSettings({ antiedit: true });
+                reply("✏️ Anti-edit enabled!");
+            } else if (action === "off") {
+                setGlobalSettings({ antiedit: false });
+                reply("❌ Anti-edit disabled!");
+            } else {
+                const status = settings.antiedit ? "ON ✅" : "OFF ❌";
+                reply(`✏️ *Anti-Edit*\n\nStatus: ${status}\n\nCommands:\n.antiedit on/off`);
+            }
+        }
+    }
 ];
