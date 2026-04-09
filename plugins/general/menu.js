@@ -9,19 +9,16 @@ const runtime = (seconds) => {
     const h = Math.floor(seconds % (3600 * 24) / 3600);
     const m = Math.floor(seconds % 3600 / 60);
     const s = Math.floor(seconds % 60);
-
     return `${d}d ${h}h ${m}m ${s}s`;
 };
 
 // 🌍 REAL COUNTRY DETECTOR
 const getCountry = (jid) => {
     if (!jid) return "Unknown 🌍";
-    
     try {
         const PhoneNumber = require('awesome-phonenumber');
         let number = jid.replace(/[^0-9]/g, '');
         const pn = PhoneNumber('+' + number);
-        
         if (pn.getRegionCode()) {
             const country = pn.getCountry();
             const flag = pn.getRegionCode().toUpperCase().replace(/./g, char => 
@@ -72,151 +69,164 @@ module.exports = {
 
     execute: async (sock, m, { send }) => {
         try {
-
             const now = new Date();
             const time = now.toLocaleTimeString();
             const date = now.toLocaleDateString();
-
             const pushname = m.pushName || "User";
             const uptime = runtime(process.uptime());
-
             const country = getCountry((m.sender || "").replace(/[^0-9]/g, ""));
 
             const menu = `
 ╭───〔 ${config.settings.title} 〕───⬣
 
-👤 User: ${pushname}
-🌍 Country: ${country}
-
-🕒 Time: ${time}
-📅 Date: ${date}
-⚡ Uptime: ${uptime}
-
-╰────────────⬣
-
-📊 *GENERAL*
-• .menu
-• .ping
-• .alive
-• .owner
-• .info
-
-⚙️ *SETTINGS*
-• .autoread on/off
-• .autotyping on/off
-• .autorecording on/off
-• .autoreact on/off
-• .antidelete on/off
-• .autoviewstatus on/off
-• .autoreactstatus on/off
-• .antideletestatus on/off
-• .antiedit on/off
-• .autostatus on/off
-• .autostatus react on/off
-• .autostatus emoji [emoji]
-
-📥 *DOWNLOADER*
-• .play (audio)
-• .video (video)
-• .ytmp3
-• .ytmp4
-• .tiktok
-• .fb
-• .ig
-• .mediafire
-• .twitter
-• .spotify
-• .soundcloud
-• .apk
-• .movie
-• .ringtone
-• .wallpaper
-• .pinterest
-• .threads
-• .gitclone
-
-👥 *GROUP*
-• .tagall
-• .kick
-• .add
-• .promote
-• .demote
-• .mute
-• .unmute
-• .hidetag
-• .groupinfo
-• .grouplink
-• .revokelink
-• .welcome on/off
-• .goodbye on/off
-• .antilink on/off/delete/warn/kick
-• .antilink mode owner/admins
-• .poll
-• .listadmin
-• .tagadmin
-• .listonline
-• .vcf
-• .promoteall
-• .demoteall
-• .kickall
-
-👑 *OWNER*
-• .update
-• .restart
-• .eval
-• .shutdown
-• .bc
-• .bcgc
-• .join [link]
-
-🛠️ *TOOLS*
-• .calc
-• .qr
-• .tts
-• .time
-• .sticker
-• .toimg
-• .tomp3
-• .removebg
-• .shazam
-• .lyrics
-• .translate
-• .weather
-• .news
-• .imdb
-
-🎮 *GAMES*
-• .tictactoe
-• .guess
-• .quiz
-• .riddle
-• .truth
-• .dare
-
-🎌 *ANIME*
-• .waifu
-• .neko
-• .animequote
-• .anime
-• .manga
-
-🎨 *LOGO*
-• .logo
-• .textmaker
-
-🤖 *AI*
-• .ai
-• .gpt
-• .imagine
-
-🎉 *FUN*
-• .joke
-• .quote
-• .fact
-• .flip
-• .roll
+👤 *User:* ${pushname}
+🌍 *Country:* ${country}
+🕒 *Time:* ${time}
+📅 *Date:* ${date}
+⚡ *Uptime:* ${uptime}
 
 ╰────────────⬣
+
+╭───〔 📊 GENERAL 〕───⬣
+│ • .menu
+│ • .ping
+│ • .alive
+│ • .info
+│ • .owner
+╰────────────⬣
+
+╭───〔 👑 OWNER 〕───⬣
+│ • .update
+│ • .restart
+│ • .shutdown
+│ • .eval
+│ • .bc
+│ • .bcgc
+│ • .join
+│ • .leave
+│ • .block
+│ • .unblock
+│ • .blocklist
+│ • .pm
+│ • .banuser
+│ • .unbanuser
+│ • .banlist
+│ • .addowner
+│ • .delowner
+│ • .owners
+╰────────────⬣
+
+╭───〔 👥 GROUP 〕───⬣
+│ • .tagall
+│ • .kick
+│ • .add
+│ • .promote
+│ • .demote
+│ • .mute
+│ • .unmute
+│ • .hidetag
+│ • .groupinfo
+│ • .grouplink
+│ • .revokelink
+│ • .welcome on/off
+│ • .goodbye on/off
+│ • .antilink
+│ • .poll
+│ • .listadmin
+│ • .tagadmin
+│ • .vcf
+│ • .promoteall
+│ • .demoteall
+│ • .kickall
+│ • .listonline
+│ • .lock
+│ • .unlock
+│ • .slowmode
+╰────────────⬣
+
+╭───〔 📥 DOWNLOADER 〕───⬣
+│ • .play
+│ • .tiktok
+│ • .fb
+│ • .ig
+│ • .mediafire
+│ • .twitter
+│ • .apk
+│ • .movie
+│ • .wallpaper
+│ • .gitclone
+╰────────────⬣
+
+╭───〔 ⚙️ SETTINGS 〕───⬣
+│ • .autoread on/off
+│ • .autotyping on/off
+│ • .autorecording on/off
+│ • .autoreact on/off
+│ • .antidelete on/off
+│ • .antiedit on/off
+│ • .autoviewstatus on/off
+│ • .autoreactstatus on/off
+│ • .autostatus
+│ • .setpp
+│ • .getpp
+│ • .setbio
+│ • .setname
+│ • .setprefix
+│ • .resetprefix
+╰────────────⬣
+
+╭───〔 🛠️ TOOLS 〕───⬣
+│ • .calc
+│ • .qr
+│ • .tts
+│ • .time
+│ • .sticker
+│ • .toimg
+│ • .tomp3
+│ • .removebg
+│ • .getid
+│ • .getlink
+│ • .translate
+│ • .weather
+│ • .lyrics
+╰────────────⬣
+
+╭───〔 🎮 GAMES 〕───⬣
+│ • .tictactoe
+│ • .guess
+│ • .quiz
+│ • .riddle
+│ • .truth
+│ • .dare
+╰────────────⬣
+
+╭───〔 🎌 ANIME 〕───⬣
+│ • .waifu
+│ • .neko
+│ • .animequote
+│ • .anime
+│ • .manga
+╰────────────⬣
+
+╭───〔 🤖 AI 〕───⬣
+│ • .ai
+│ • .gpt
+│ • .imagine
+╰────────────⬣
+
+╭───〔 🎉 FUN 〕───⬣
+│ • .joke
+│ • .quote
+│ • .fact
+│ • .flip
+│ • .roll
+╰────────────⬣
+
+╭───〔 🎨 LOGO 〕───⬣
+│ • .logo
+│ • .textmaker
+╰────────────⬣
+
 ${config.settings.footer}
 `;
 
@@ -227,11 +237,7 @@ ${config.settings.footer}
 
         } catch (err) {
             console.log("Menu error:", err);
-            await sock.sendMessage(
-                m.chat,
-                { text: "❌ Menu failed to load" },
-                { quoted: m }
-            );
+            await sock.sendMessage(m.chat, { text: "❌ Menu failed to load" }, { quoted: m });
         }
     }
 };
