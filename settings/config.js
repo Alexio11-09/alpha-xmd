@@ -38,10 +38,10 @@ const config = {
 
     // 💬 MESSAGES
     message: {
-        owner: "❌ This command is for the bot owner only.",
-        group: "❌ This command works in groups only.",
-        admin: "❌ Admin only command.",
-        private: "❌ This command is for private chat."
+        owner: "❌Hey you fool this command is for the bot owner only.",
+        group: "❌Hey stop that, this command works in groups only.",
+        admin: "❌Hey hey hey,first become an admin here and use this command ok.",
+        private: "❌ Don't be dumb,this command is for private chat."
     },
 
     // 🎨 BOT UI
@@ -54,7 +54,7 @@ const config = {
     // 📢 CHANNEL / NEWSLETTER
     newsletter: {
         name: "ALPHA_XMD_UPDATES",
-        id: "0029Vb7nHdBFnSzBDbvL6y1X"
+        id: "120363406868236363"
     }
 
 }
