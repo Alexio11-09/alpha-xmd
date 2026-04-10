@@ -53,8 +53,8 @@ const config = {
 
     // 📢 CHANNEL / NEWSLETTER
     newsletter: {
-        name: "ALPHA-XMD BOT",
-        id: "120363423969349257"
+        name: "ALPHA_XMD_UPDATES",
+        id: "0029Vb7nHdBFnSzBDbvL6y1X"
     }
 
 }
