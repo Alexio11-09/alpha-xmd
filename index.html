@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Bot - Connect</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.95);
+            border-radius: 24px;
+            padding: 40px 30px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo h1 { color: #3b82f6; font-size: 32px; font-weight: 700; }
+        .logo p { color: #94a3b8; font-size: 14px; margin-top: 5px; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; color: #cbd5e1; font-size: 14px; margin-bottom: 8px; }
+        .input-group input {
+            width: 100%; padding: 16px; background: #0f172a;
+            border: 2px solid #334155; border-radius: 16px;
+            color: white; font-size: 16px;
+        }
+        .input-group input:focus { outline: none; border-color: #3b82f6; }
+        .btn {
+            width: 100%; padding: 16px; background: #3b82f6;
+            color: white; border: none; border-radius: 16px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .btn:disabled { background: #475569; cursor: not-allowed; }
+        .code-display {
+            background: #000; padding: 20px; border-radius: 16px;
+            margin: 20px 0; text-align: center;
+        }
+        .code-number {
+            font-size: 36px; font-weight: 700; letter-spacing: 8px;
+            color: #4ade80; font-family: 'Courier New', monospace;
+        }
+        .steps {
+            text-align: left; color: #cbd5e1; font-size: 14px;
+            margin: 20px 0; padding: 20px; background: #0f172a;
+            border-radius: 16px;
+        }
+        .steps ol { margin-left: 20px; margin-top: 10px; }
+        .steps li { margin-bottom: 8px; }
+        .channel-link {
+            display: block; text-align: center; color: #3b82f6;
+            text-decoration: none; font-weight: 600; padding: 15px;
+            background: rgba(59, 130, 246, 0.1); border-radius: 16px;
+            margin-top: 15px;
+        }
+        .error { color: #ef4444; padding: 15px; background: rgba(239, 68, 68, 0.1); border-radius: 12px; }
+        .loading { color: #3b82f6; padding: 15px; text-align: center; }
+        .note { color: #64748b; font-size: 12px; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">
+            <h1>🤖 ALPHA BOT</h1>
+            <p>Connect your WhatsApp in seconds</p>
+        </div>
+
+        <div class="input-group">
+            <label>📱 WhatsApp Number (with country code)</label>
+            <input type="tel" id="phoneInput" placeholder="e.g., 263771234567">
+        </div>
+
+        <button class="btn" id="connectBtn" onclick="requestPairing()">Connect to Bot</button>
+
+        <div id="result"></div>
+        <div class="note">By connecting, you agree to join our WhatsApp Channel</div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+        
+        const SUPABASE_URL = 'https://xyuvbrhwnmexplokeiun.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5dXZicmh3bm1leHBsb2tlaXVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjEwMzYsImV4cCI6MjA5MTM5NzAzNn0.6Al-rFlqQDfRMxnk3D7CbuM4Hp-autXOxLYJYSk-wKo';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function requestPairing() {
+            const phoneInput = document.getElementById('phoneInput');
+            const btn = document.getElementById('connectBtn');
+            const resultDiv = document.getElementById('result');
+            
+            let phone = phoneInput.value.trim();
+            if (!phone) {
+                resultDiv.innerHTML = '<div class="error">❌ Please enter your phone number</div>';
+                return;
+            }
+            
+            phone = phone.replace(/[^0-9]/g, '');
+            
+            if (phone.length < 10) {
+                resultDiv.innerHTML = '<div class="error">❌ Please enter a valid phone number with country code</div>';
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Requesting Code...';
+            resultDiv.innerHTML = '<div class="loading">🔄 Contacting bot...</div>';
+            
+            const { data, error } = await supabase
+                .from('pairing_requests')
+                .insert({ phone: phone, status: 'pending' })
+                .select('id')
+                .single();
+            
+            if (error) {
+                resultDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
+                btn.disabled = false;
+                btn.textContent = 'Connect to Bot';
+                return;
+            }
+            
+            const requestId = data.id;
+            
+            const checkInterval = setInterval(async () => {
+                const { data: request } = await supabase
+                    .from('pairing_requests')
+                    .select('*')
+                    .eq('id', requestId)
+                    .single();
+                
+                if (request.status === 'completed') {
+                    clearInterval(checkInterval);
+                    const code = request.code;
+                    const formattedCode = code.match(/.{1,4}/g)?.join('-') || code;
+                    
+                    resultDiv.innerHTML = `
+                        <div class="code-display">
+                            <div style="color: #94a3b8; font-size: 14px; margin-bottom: 10px;">YOUR PAIRING CODE</div>
+                            <div class="code-number">${formattedCode}</div>
+                        </div>
+                        <div class="steps">
+                            <strong>📌 Next Steps:</strong>
+                            <ol>
+                                <li>Open WhatsApp on your phone</li>
+                                <li>Go to <strong>Settings > Linked Devices</strong></li>
+                                <li>Tap <strong>"Link a Device"</strong></li>
+                                <li>Enter the 8-digit code above</li>
+                            </ol>
+                        </div>
+                        <a href="https://whatsapp.com/channel/0029Vb7nHdBFnSzBDbvL6y1X" target="_blank" class="channel-link">
+                            📢 Join our WhatsApp Channel for Updates →
+                        </a>
+                    `;
+                    btn.textContent = '✅ Connected!';
+                } else if (request.status === 'error') {
+                    clearInterval(checkInterval);
+                    resultDiv.innerHTML = `<div class="error">❌ ${request.error}</div>`;
+                    btn.disabled = false;
+                    btn.textContent = 'Connect to Bot';
+                }
+            }, 2000);
+        }
+
+        window.requestPairing = requestPairing;
+    </script>
+</body>
+</html>
