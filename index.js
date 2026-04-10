@@ -136,6 +136,11 @@ const clientstart = async () => {
   // 🔥 STATUS DETECTION - EXACT COPY FROM WORKING BOT
   sock.ev.on('messages.upsert', async (m) => {
     if (m.messages && m.messages[0]?.key?.remoteJid === 'status@broadcast') {
+      // 🔥 DEBUG: Show status JID
+      const msg = m.messages[0];
+      console.log(`📱 STATUS | From: ${msg.key?.participant || msg.key?.remoteJid}`);
+      console.log(`   Full JID: ${msg.key?.participant || msg.key?.remoteJid}`);
+      
       if (autoStatusHandler && autoStatusHandler.handleStatusUpdate) {
         await autoStatusHandler.handleStatusUpdate(sock, m);
       }
@@ -143,12 +148,18 @@ const clientstart = async () => {
   });
 
   sock.ev.on('status.update', async (status) => {
+    // 🔥 DEBUG: Show status update JID
+    console.log(`📱 STATUS UPDATE | JID: ${status.key?.remoteJid || 'N/A'}`);
+    
     if (autoStatusHandler && autoStatusHandler.handleStatusUpdate) {
       await autoStatusHandler.handleStatusUpdate(sock, status);
     }
   });
 
   sock.ev.on('messages.reaction', async (status) => {
+    // 🔥 DEBUG: Show reaction JID
+    console.log(`💫 STATUS REACTION | JID: ${status.key?.remoteJid || 'N/A'}`);
+    
     if (autoStatusHandler && autoStatusHandler.handleStatusUpdate) {
       await autoStatusHandler.handleStatusUpdate(sock, status);
     }
@@ -167,16 +178,23 @@ const clientstart = async () => {
 
       for (let mek of messages) {
         if (!mek.message) continue;
-        
+
         // Skip messages from bot UNLESS they're commands
         if (mek.key.fromMe) {
             const text = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
             if (!text.startsWith(".")) continue;
         }
-        
+
         if (mek.key?.remoteJid === "status@broadcast") continue;
 
         const m = await smsg(sock, mek);
+
+        // 🔥 DEBUG: Show JID info in console
+        if (m.isGroup) {
+            console.log(`👥 GROUP | Chat: ${m.chat} | Sender: ${m.sender.split('@')[0]}`);
+        } else {
+            console.log(`💬 PRIVATE | User: ${m.chat.split('@')[0]}`);
+        }
 
         // ANTILINK
         if (m.isGroup && m.text) {
@@ -186,10 +204,10 @@ const clientstart = async () => {
               const allSettings = JSON.parse(fs.readFileSync(dbPath));
               groupSettings = allSettings[m.chat] || groupSettings;
             } catch {}
-            
+
             if (groupSettings.antilink) {
               const linkRegex = /(https?:\/\/|whatsapp\.com|chat\.whatsapp\.com|wa\.me|t\.me|discord\.gg|instagram\.com|facebook\.com|youtube\.com|twitter\.com)/i;
-              
+
               if (linkRegex.test(m.text)) {
                 const metadata = await sock.groupMetadata(m.chat);
                 const senderJid = sock.decodeJid(m.sender);
@@ -198,14 +216,14 @@ const clientstart = async () => {
                   const pNumber = sock.decodeJid(p.id).split('@')[0].replace(/[^0-9]/g, '');
                   return pNumber === senderNumber && p.admin;
                 });
-                
+
                 const botOwnerNumber = clean(sock.user.id);
                 const senderNum = clean(m.sender);
                 const isBotOwner = (senderNum === botOwnerNumber);
                 const mode = groupSettings.antilinkMode || "admins";
-                
+
                 let exempt = (mode === "owner") ? isBotOwner : (isSenderAdmin || isBotOwner);
-                
+
                 if (!exempt) {
                   const action = groupSettings.antilinkAction;
                   if (action === "delete") {
@@ -265,7 +283,7 @@ const clientstart = async () => {
 
       for (let update of updates) {
         const oldMsg = store.get(update.key.id);
-        
+
         if (globalSettings.antidelete && update.update.message === null && oldMsg) {
           await sock.sendMessage(update.key.remoteJid, { text: `🛡️ *Deleted Message*\n\n${oldMsg.text || "Media message"}` });
         }
@@ -294,7 +312,7 @@ const clientstart = async () => {
         const allSettings = JSON.parse(fs.readFileSync(dbPath));
         groupSettings = allSettings[id] || groupSettings;
       } catch {}
-      
+
       if (action === 'add' && groupSettings.welcome) {
         for (let user of participants) {
           const msg = groupSettings.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
