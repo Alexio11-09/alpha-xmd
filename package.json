@@ -24,6 +24,7 @@
     "adm-zip": "^0.5.10",
     "awesome-phonenumber": "^5.9.0",
     "axios": "^1.6.8",
+    "canvas": "^2.11.2",
     "chalk": "^4.1.2",
     "crypto-js": "^4.2.0",
     "file-type": "^18.7.0",
