@@ -1,10 +1,10 @@
-// © 2026 Alpha - AI COMMANDS (STABLE & FREE)
+// © 2026 Alpha - AI COMMANDS (WORKING FREE APIs)
 
 const axios = require('axios');
 
 module.exports = [
 
-    // ==================== 1. AI CHAT ====================
+    // ==================== 1. AI CHAT (BLACKBOX) ====================
     {
         command: "ai",
         aliases: ["ask", "chat", "gpt"],
@@ -17,26 +17,17 @@ module.exports = [
             reply("🤖 *Thinking...*");
             
             try {
-                // Using Free GPT-3.5 Turbo API
-                const response = await axios.post(
-                    'https://api.pawan.krd/v1/chat/completions',
-                    {
-                        model: 'gpt-3.5-turbo',
-                        messages: [{ role: 'user', content: question }],
-                        temperature: 0.7,
-                        max_tokens: 500
-                    },
-                    {
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer pk-this-is-a-free-api-key'
-                        }
-                    }
-                );
+                // Using Blackbox AI API (free & reliable)
+                const response = await axios.post('https://api.blackbox.ai/api/chat', {
+                    messages: [{ role: 'user', content: question }],
+                    model: 'deepseek-ai/DeepSeek-V3'
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 30000
+                });
                 
-                if (response.data && response.data.choices && response.data.choices[0]) {
-                    const answer = response.data.choices[0].message.content;
-                    reply(`🤖 *AI Response:*\n\n${answer}`);
+                if (response.data) {
+                    reply(`🤖 *AI Response:*\n\n${response.data}`);
                 } else {
                     throw new Error('Empty response');
                 }
@@ -47,7 +38,7 @@ module.exports = [
         }
     },
 
-    // ==================== 2. AI IMAGE GENERATION ====================
+    // ==================== 2. AI IMAGE GENERATION (WORKING) ====================
     {
         command: "imagine",
         aliases: ["imgai", "aigen", "aiimage"],
@@ -60,7 +51,7 @@ module.exports = [
             reply("🎨 *Generating image...*\n\n⏳ This may take 10-15 seconds.");
             
             try {
-                // Using Pollinations.ai (Stable Diffusion)
+                // Using Pollinations.ai (Stable Diffusion - reliable)
                 const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&nologo=true`;
                 
                 await sock.sendMessage(m.chat, {
