@@ -1,13 +1,13 @@
-// © 2026 Alpha - AI COMMANDS (100% FREE APIs)
+// © 2026 Alpha - AI COMMANDS (STABLE & FREE)
 
 const axios = require('axios');
 
 module.exports = [
 
-    // ==================== 1. AI CHAT (FREE) ====================
+    // ==================== 1. AI CHAT ====================
     {
         command: "ai",
-        aliases: ["ask", "chat"],
+        aliases: ["ask", "chat", "gpt"],
         category: "ai",
         execute: async (sock, m, { args, reply }) => {
             if (!args[0]) return reply("❌ Ask me something!\n\n📌 Example: .ai What is the capital of France?");
@@ -17,63 +17,60 @@ module.exports = [
             reply("🤖 *Thinking...*");
             
             try {
-                // Free GPT API
-                const response = await axios.get(`https://api.affiliateplus.xyz/api/chatbot?message=${encodeURIComponent(question)}&botname=AlphaBot&ownername=Alpha`);
-                
-                if (response.data && response.data.message) {
-                    reply(`🤖 *AI Response:*\n\n${response.data.message}`);
-                } else {
-                    // Fallback to another free API
-                    const res2 = await axios.get(`https://api.simsimi.vn/v1/simtalk?text=${encodeURIComponent(question)}&key=free`);
-                    if (res2.data && res2.data.message) {
-                        reply(`🤖 *AI Response:*\n\n${res2.data.message}`);
-                    } else {
-                        reply("❌ AI failed to respond. Try again.");
+                // Using Free GPT-3.5 Turbo API
+                const response = await axios.post(
+                    'https://api.pawan.krd/v1/chat/completions',
+                    {
+                        model: 'gpt-3.5-turbo',
+                        messages: [{ role: 'user', content: question }],
+                        temperature: 0.7,
+                        max_tokens: 500
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer pk-this-is-a-free-api-key'
+                        }
                     }
+                );
+                
+                if (response.data && response.data.choices && response.data.choices[0]) {
+                    const answer = response.data.choices[0].message.content;
+                    reply(`🤖 *AI Response:*\n\n${answer}`);
+                } else {
+                    throw new Error('Empty response');
                 }
             } catch (err) {
                 console.log('AI Error:', err.message);
-                reply("❌ AI service unavailable. Try again later.");
+                reply("❌ AI service temporarily unavailable. Try again in a few minutes.");
             }
         }
     },
 
-    // ==================== 2. AI IMAGE GENERATION (FREE) ====================
+    // ==================== 2. AI IMAGE GENERATION ====================
     {
         command: "imagine",
         aliases: ["imgai", "aigen", "aiimage"],
         category: "ai",
         execute: async (sock, m, { args, reply }) => {
-            if (!args[0]) return reply("❌ Describe an image!\n\n📌 Example: .imagine a cat wearing sunglasses");
+            if (!args[0]) return reply("❌ Describe an image!\n\n📌 Example: .imagine a cat wearing sunglasses on a beach");
             
-            const prompt = args.join(" ");
+            const prompt = encodeURIComponent(args.join(" "));
             
-            reply("🎨 *Generating image...*\n\n⏳ This may take 10-20 seconds.");
+            reply("🎨 *Generating image...*\n\n⏳ This may take 10-15 seconds.");
             
             try {
-                // Using free image generation API
-                const response = await axios.get(`https://api.nyxs.pw/ai/stable-diffusion?prompt=${encodeURIComponent(prompt)}`, { timeout: 60000 });
+                // Using Pollinations.ai (Stable Diffusion)
+                const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&nologo=true`;
                 
-                if (response.data && response.data.result) {
-                    await sock.sendMessage(m.chat, {
-                        image: { url: response.data.result },
-                        caption: `🎨 *AI Generated Image*\n\n📝 ${prompt}`
-                    }, { quoted: m });
-                } else {
-                    // Fallback to another free API
-                    const res2 = await axios.get(`https://api.lolhuman.xyz/api/text2image?apikey=free&text=${encodeURIComponent(prompt)}`, { timeout: 60000 });
-                    if (res2.data && res2.data.result) {
-                        await sock.sendMessage(m.chat, {
-                            image: { url: res2.data.result },
-                            caption: `🎨 *AI Generated Image*\n\n📝 ${prompt}`
-                        }, { quoted: m });
-                    } else {
-                        reply("❌ Failed to generate image. Try a different prompt.");
-                    }
-                }
+                await sock.sendMessage(m.chat, {
+                    image: { url: imageUrl },
+                    caption: `🎨 *AI Generated Image*\n\n📝 ${args.join(" ")}`
+                }, { quoted: m });
+                
             } catch (err) {
                 console.log('Imagine error:', err.message);
-                reply("❌ Image generation failed. Try again later.");
+                reply("❌ Failed to generate image. Try a different prompt.");
             }
         }
     }
