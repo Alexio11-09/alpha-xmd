@@ -138,10 +138,11 @@ module.exports = {
 │ • .promoteall
 │ • .demoteall
 │ • .kickall
-│ • .listonline
-│ • .lock
-│ • .unlock
-│ • .slowmode
+│ • .approveall
+│ • .kickinactive
+│ • .antibadword
+│ • .antiforeign
+│ • .antibot
 ╰────────────⬣
 
 ╭───〔 📥 DOWNLOADER 〕───⬣
