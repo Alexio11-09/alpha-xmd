@@ -1,4 +1,4 @@
-// © 2026 Alpha - OWNER COMMANDS (UPDATE REMOVED)
+// © 2026 Alpha - OWNER COMMANDS (BLOCK FIXED)
 
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -30,7 +30,7 @@ module.exports = [
         owner: true,
         execute: async (sock, m, { reply }) => {
             reply("🌐 *Fetching server IP...*");
-            
+
             exec('curl -s ifconfig.me', (err, stdout) => {
                 if (err) {
                     // Try alternative method
@@ -191,24 +191,34 @@ module.exports = [
         }
     },
 
-    // ==================== BLOCK USER ====================
+    // ==================== BLOCK USER (ENHANCED) ====================
     {
         command: "block",
         aliases: ["blockuser"],
         category: "owner",
         owner: true,
-        execute: async (sock, m, { args, reply }) => {
+        execute: async (sock, m, { args, reply, isGroup }) => {
             let target;
-            if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
-            else if (args[0] && args[0].includes('@')) target = args[0];
-            else if (args[0]) target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-            else if (m.quoted) target = m.quoted.sender;
-            else return reply("❌ Tag someone or provide a number!");
+            if (isGroup) {
+                // In group: try mention, then quoted, then number arg
+                if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
+                else if (m.quoted) target = m.quoted.sender;
+                else if (args[0]) target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                else return reply("❌ Please mention a user, reply to their message, or provide a number!");
+            } else {
+                // In private chat: block the other person (the chat JID)
+                target = m.chat;
+            }
+
+            if (target === sock.user.id) return reply("😂 I can't block myself.");
+
             try {
-                await sock.updateBlockStatus(target, 'block');
-                reply(`✅ *User Blocked!*\n\n📱 @${target.split('@')[0]}`, { mentions: [target] });
+                await sock.updateBlockStatus(target, "block");
+                const name = target.split('@')[0];
+                reply(`🚫 *Blocked!* @${name} has been blocked.`, { mentions: [target] });
             } catch (err) {
-                reply(`❌ Failed to block user:\n${err.message}`);
+                console.error("Block error:", err);
+                reply("❌ Failed to block user. " + (err.message || String(err)));
             }
         }
     },
@@ -219,18 +229,24 @@ module.exports = [
         aliases: ["unblockuser"],
         category: "owner",
         owner: true,
-        execute: async (sock, m, { args, reply }) => {
+        execute: async (sock, m, { args, reply, isGroup }) => {
             let target;
-            if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
-            else if (args[0] && args[0].includes('@')) target = args[0];
-            else if (args[0]) target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-            else if (m.quoted) target = m.quoted.sender;
-            else return reply("❌ Tag someone or provide a number!");
+            if (isGroup) {
+                if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
+                else if (m.quoted) target = m.quoted.sender;
+                else if (args[0]) target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                else return reply("❌ Please mention a user, reply to their message, or provide a number!");
+            } else {
+                target = m.chat;   // the other person in DM
+            }
+
             try {
-                await sock.updateBlockStatus(target, 'unblock');
-                reply(`✅ *User Unblocked!*\n\n📱 @${target.split('@')[0]}`, { mentions: [target] });
+                await sock.updateBlockStatus(target, "unblock");
+                const name = target.split('@')[0];
+                reply(`✅ *Unblocked!* @${name} has been unblocked.`, { mentions: [target] });
             } catch (err) {
-                reply(`❌ Failed to unblock user:\n${err.message}`);
+                console.error("Unblock error:", err);
+                reply("❌ Failed to unblock user. " + (err.message || String(err)));
             }
         }
     },
