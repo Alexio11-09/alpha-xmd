@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH .chreact FOR CHANNEL MESSAGES)
+// © 2026 Alpha - TOOLS (WITH .chreact FOR CHANNEL MESSAGE COMMENTS)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -206,65 +206,28 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (PUBLIC – CHANNEL MESSAGE REACTIONS & REPLY) ====================
+  // ==================== 17. .chreact (SIMPLE COMMENT ON CHANNEL UPDATE) ====================
   {
     command: "chreact",
-    aliases: ["channelreact", "creact"],
+    aliases: ["channelcomment", "ccomment"],
     category: "tools",
     execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply("❌ Usage: .chreact <channel_message_link> <emoji1> <emoji2> ... [reply_text]\n\n📌 Example:\n.chreact https://whatsapp.com/channel/... 😀🤣 you're lying");
+      if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 you're lying");
 
       const link = args[0];
+      // Validate link format
       const match = link.match(/channel\/(\w+)\/(\d+)/);
-      if (!match) return reply("❌ Invalid channel message link. Use a copied link from a channel update.");
+      if (!match) return reply("❌ Invalid channel message link. Copy it from a channel update.");
 
+      // Extract the comment (everything after the link)
+      const comment = args.slice(1).join(" ");
+
+      // Simply post the comment in the current chat, referencing the channel message
       const channelId = match[1];
       const messageId = match[2];
-      const channelJid = channelId + '@newsletter';
+      const channelLinkShort = `https://whatsapp.com/channel/${channelId}/${messageId}`;
 
-      const msgKey = {
-        remoteJid: channelJid,
-        id: messageId,
-        fromMe: false
-      };
-
-      const rest = args.slice(1).join(" ").trim();
-      if (!rest) return reply("❌ Provide at least one emoji to react with!");
-
-      const emojis = [];
-      let remaining = rest;
-      while (emojis.length < 10) {
-        const emojiMatch = remaining.match(/^(\p{Extended_Pictographic})/u);
-        if (!emojiMatch) break;
-        emojis.push(emojiMatch[1]);
-        remaining = remaining.slice(emojiMatch[1].length).trim();
-      }
-
-      if (emojis.length === 0) return reply("❌ No valid emoji found! Add at least one emoji after the link.");
-
-      const comment = remaining || '';
-
-      let reacted = 0;
-      for (const emoji of emojis) {
-        try {
-          await s.sendMessage(channelJid, {
-            react: {
-              text: emoji,
-              key: msgKey
-            }
-          });
-          reacted++;
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (e) {
-          console.error('React error:', e.message);
-        }
-      }
-
-      let chatMessage = `✨ Reacted with ${reacted} emoji${reacted > 1 ? 's' : ''} on the channel update!`;
-      if (comment) {
-        chatMessage += `\n💬 Reply: "${comment}"`;
-      }
-      reply(chatMessage);
+      await reply(`💬 *Comment on channel update:*\n📌 ${channelLinkShort}\n\n${comment}`);
     }
   }
 ];
