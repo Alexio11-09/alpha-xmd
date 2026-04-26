@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH .chreact FOR DIRECT CHANNEL COMMENTS)
+// © 2026 Alpha - TOOLS (WITH WORKING .chreact)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -206,7 +206,7 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (TEXT COMMENT ON CHANNEL UPDATE) ====================
+  // ==================== 17. .chreact (QUOTED REPLY TO CHANNEL UPDATE) ====================
   {
     command: "chreact",
     aliases: ["channelcomment", "creply"],
@@ -216,28 +216,29 @@ module.exports = [
 
       const link = args[0];
       const match = link.match(/channel\/(\w+)\/(\d+)/);
-      if (!match) return reply("❌ Invalid channel message link. Copy it from a channel update.");
+      if (!match) return reply("❌ Invalid channel message link.");
 
       const channelId = match[1];
       const messageId = match[2];
       const channelJid = channelId + '@newsletter';
-
       const comment = args.slice(1).join(" ").trim();
-      if (!comment) return reply("❌ Please provide a comment.");
 
       try {
-        // Send the comment directly to the channel, quoting the original message
+        // Send the comment as a quoted reply to the channel update
         await s.sendMessage(channelJid, {
           text: comment,
-          contextInfo: {
-            stanzaId: messageId,
-            participant: channelJid
+          quoted: {
+            key: {
+              remoteJid: channelJid,
+              id: messageId,
+              fromMe: false
+            }
           }
         });
-        reply(`✅ Comment sent to the channel update!`);
+        reply("✅ Comment posted on the channel update!");
       } catch (err) {
         console.error("chreact error:", err);
-        reply(`❌ Failed to post comment. Make sure the bot follows the channel.\n\nError: ${err.message}`);
+        reply(`❌ Failed: ${err.message}`);
       }
     }
   }
