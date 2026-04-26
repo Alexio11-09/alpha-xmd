@@ -1,7 +1,7 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 5 IN ONE FILE)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 6 IN ONE FILE)
 
 const os = require('os');
-const config = require("../../settings/config");   // correct path for plugins/general/
+const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -36,7 +36,7 @@ const getCountry = (jid) => {
 };
 
 module.exports = [
-    // ==================== 1. MENU (ADVANCED) ====================
+    // ==================== 1. MENU ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
@@ -67,6 +67,7 @@ module.exports = [
 │ • .alive
 │ • .info
 │ • .owner
+│ • .repo
 ╰────────────⬣
 
 ╭───〔 👑 OWNER 〕───⬣
@@ -225,7 +226,7 @@ module.exports = [
 │ • .naruto
 │ • .matrix
 │ • .graffiti
-│ • .3d
+│ • .1000d
 │ • .rainbow
 ╰────────────⬣
 
@@ -244,7 +245,7 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 2. PING (FUNNY + LATENCY) ====================
+    // ==================== 2. PING ====================
     {
         command: "ping",
         aliases: ["p"],
@@ -345,6 +346,41 @@ ${config.settings.footer}
             ];
 
             reply(R(messages), { mentions: [ownerJid] });
+        }
+    },
+
+    // ==================== 6. REPO ====================
+    {
+        command: "repo",
+        aliases: ["source", "github", "sc"],
+        category: "general",
+        execute: async (sock, m, { reply }) => {
+            const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
+            const ownerName = "Alpha";
+            const ownerContact = "wa.me/263786641436";
+            const botName = config.settings?.title || "Alpha Bot";
+
+            const texts = [
+                `📂 *${botName} – Source Code*\n\n` +
+                `🔗 *Repo:* ${repoLink}\n` +
+                `👤 *Owner:* ${ownerName}\n` +
+                `📞 *Contact:* ${ownerContact}\n\n` +
+                `⭐ Star the project & fork freely!`,
+
+                `🧬 *Open Source Bot*\n\n` +
+                `💻 *Repo:* ${repoLink}\n` +
+                `👑 *Dev:* ${ownerName}\n` +
+                `📱 *WhatsApp:* ${ownerContact}\n\n` +
+                `🤖 Build your own version with this code.`,
+
+                `⚡ *Alpha XMD Repository*\n\n` +
+                `🔗 ${repoLink}\n` +
+                `👤 *Maintainer:* ${ownerName}\n` +
+                `📞 ${ownerContact}\n\n` +
+                `📥 Clone, modify, deploy.`
+            ];
+
+            reply(texts[Math.floor(Math.random() * texts.length)]);
         }
     }
 ];
