@@ -1,4 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (SLIM + PAIR + ANTIBADWORD + ANTILINK)
+// © 2026 Alpha - MESSAGE HANDLER (SLIM + PAIR + ANTIBADWORD + ANTILINK + MODE)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -42,6 +42,23 @@ const dbPath = './database/groupSettings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
 const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
 
+// GLOBAL MODE SETTINGS
+const settingsPath = './database/settings.json';
+try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
+const getGlobalMode = () => {
+    try {
+        const s = JSON.parse(fs.readFileSync(settingsPath));
+        return s.mode || 'public';
+    } catch { return 'public'; }
+};
+const setGlobalMode = (mode) => {
+    try {
+        const s = JSON.parse(fs.readFileSync(settingsPath));
+        s.mode = mode;
+        fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
+    } catch {}
+};
+
 // COMMANDS
 const commands = [];
 const loadCommands = (dir) => {
@@ -57,6 +74,27 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
+// Add mode command directly
+commands.push({
+    command: "mode",
+    aliases: ["botmode"],
+    category: "owner",
+    owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const mode = args[0]?.toLowerCase();
+        if (mode === 'public') {
+            setGlobalMode('public');
+            return reply("✅ Bot is now in *public mode*. Everyone can use commands.");
+        } else if (mode === 'private') {
+            setGlobalMode('private');
+            return reply("🔒 Bot is now in *private mode*. Only the owner can use commands.");
+        } else {
+            const current = getGlobalMode();
+            return reply(`📱 Current mode: *${current}*\n\nChange with: .mode public / .mode private`);
+        }
+    }
+});
+
 // GAMES
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
@@ -66,7 +104,8 @@ const deny = {
     admin: "🚫 Only admins can use this.",
     group: "👥 This only works in groups.",
     botAdmin: "🤖 I need admin powers.",
-    banned: "🚫 You're banned from using the bot."
+    banned: "🚫 You're banned from using the bot.",
+    private: "🔒 The bot is in private mode. Only the owner can use commands."
 };
 
 // REACTIONS
@@ -144,6 +183,11 @@ module.exports = async (sock, m) => {
         const senderNum = clean(m.sender);
         const isOwner = config.owner.includes(senderNum) || senderNum === botNum || isTempOwner(m.sender);
 
+        // MODE CHECK (skip for mode command itself and owner always allowed)
+        if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) {
+            return reply(deny.private);
+        }
+
         if (cmdName !== 'unbanuser' && cmdName !== 'unban' && isUserBanned(m.sender) && !isOwner)
             return reply(deny.banned);
 
@@ -160,7 +204,7 @@ module.exports = async (sock, m) => {
     }
 };
 
-// PAIR HANDLER (FIXED)
+// PAIR HANDLER
 module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
     const baileys = await import('@whiskeysockets/baileys');
     const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
@@ -188,36 +232,25 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
             let settled = false;
             const finish = (data) => { if (settled) return; settled = true; resolve(data); };
             const fail = (err) => { if (settled) return; settled = true; reject(err); };
-
-            const timeout = setTimeout(() => fail(new Error('Request timed out. Please try again.')), 50000);
+            const timeout = setTimeout(() => fail(new Error('Request timed out.')), 50000);
 
             tempSock.ev.on('connection.update', async (up) => {
                 const { connection, qr } = up;
-                console.log('pair connection state:', connection); // debug
-
-                if (connection === 'open') {
-                    clearTimeout(timeout);
-                    if (method === 'code') {
-                        try {
-                            const code = await tempSock.requestPairingCode(number);
-                            console.log('✅ code obtained:', code);
-                            finish({ code });
-                        } catch (err) {
-                            console.log('❌ code request failed, trying QR fallback:', err.message);
-                            // switch to QR
-                            method = 'qr';
-                            // keep waiting for QR
-                        }
+                if (connection === 'open' && method === 'code') {
+                    try {
+                        const code = await tempSock.requestPairingCode(number);
+                        clearTimeout(timeout);
+                        finish({ code });
+                    } catch (err) {
+                        clearTimeout(timeout);
+                        fail(err);
                     }
-                } else if (connection === 'close') {
-                    clearTimeout(timeout);
-                    fail(new Error('Connection closed unexpectedly'));
-                }
-
-                if (qr && method === 'qr') {
-                    console.log('✅ QR captured');
+                } else if (qr && method === 'qr') {
                     clearTimeout(timeout);
                     finish({ qr });
+                } else if (connection === 'close') {
+                    clearTimeout(timeout);
+                    fail(new Error('Connection closed'));
                 }
             });
         });
@@ -226,25 +259,16 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
         fs.rmSync(tempDir, { recursive: true, force: true });
 
         if (result.code) {
-            reply(
-                `✅ *Pairing Code Ready*\n\n` +
-                `📞 Number: +${number}\n` +
-                `🔢 Code: *${result.code}*\n` +
-                `⏱️ Expires in 60 seconds.\n` +
-                `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
-            );
+            reply(`✅ *Pairing Code Ready*\n📞 +${number}\n🔢 *${result.code}*\n⏱️ Expires in 60s\n📱 WhatsApp → Linked devices → Link with phone number`);
         } else if (result.qr) {
             const qrBuf = await qrcode.toBuffer(result.qr, { type: 'png' });
-            await sock.sendMessage(m.chat, {
-                image: qrBuf,
-                caption: `📷 QR Code for +${number}\n\nScan with WhatsApp to link the session.\n⏱️ Expires quickly.`
-            }, { quoted: m });
+            await sock.sendMessage(m.chat, { image: qrBuf, caption: `📷 QR for +${number}\nScan to link.` }, { quoted: m });
         }
     } catch (err) {
-        console.error('Pairing error:', err);
+        console.error('Pair error:', err);
         try { tempSock?.end(); } catch {}
         try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
-        reply(`❌ Pairing failed: ${err.message || String(err)}`);
+        reply(`❌ Pairing failed: ${err.message || err}`);
     }
 };
 
