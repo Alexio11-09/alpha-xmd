@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH .react FOR CHANNEL MESSAGES)
+// © 2026 Alpha - TOOLS (WITH .chreact FOR CHANNEL MESSAGES)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -206,16 +206,15 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .react (PUBLIC – CHANNEL MESSAGE REACTIONS & REPLY) ====================
+  // ==================== 17. .chreact (PUBLIC – CHANNEL MESSAGE REACTIONS & REPLY) ====================
   {
-    command: "react",
-    aliases: ["remix", "channelreact"],
+    command: "chreact",
+    aliases: ["channelreact", "creact"],
     category: "tools",
     execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply("❌ Usage: .react <channel_message_link> <emoji1> <emoji2> ... [reply_text]\n\n📌 Example:\n.react https://whatsapp.com/channel/... 😀🤣 you're lying");
+      if (!args[0]) return reply("❌ Usage: .chreact <channel_message_link> <emoji1> <emoji2> ... [reply_text]\n\n📌 Example:\n.chreact https://whatsapp.com/channel/... 😀🤣 you're lying");
 
       const link = args[0];
-      // Parse channel link: https://whatsapp.com/channel/{channelId}/{messageId}
       const match = link.match(/channel\/(\w+)\/(\d+)/);
       if (!match) return reply("❌ Invalid channel message link. Use a copied link from a channel update.");
 
@@ -223,22 +222,18 @@ module.exports = [
       const messageId = match[2];
       const channelJid = channelId + '@newsletter';
 
-      // Build the message key to react on
       const msgKey = {
         remoteJid: channelJid,
         id: messageId,
         fromMe: false
       };
 
-      // Rest of the arguments (after link)
       const rest = args.slice(1).join(" ").trim();
       if (!rest) return reply("❌ Provide at least one emoji to react with!");
 
-      // Extract emojis (up to 10) and the remaining text as comment
       const emojis = [];
       let remaining = rest;
       while (emojis.length < 10) {
-        // Match an emoji at the start (using Unicode property)
         const emojiMatch = remaining.match(/^(\p{Extended_Pictographic})/u);
         if (!emojiMatch) break;
         emojis.push(emojiMatch[1]);
@@ -247,10 +242,8 @@ module.exports = [
 
       if (emojis.length === 0) return reply("❌ No valid emoji found! Add at least one emoji after the link.");
 
-      // remaining text (if any) is the comment to be sent in chat
       const comment = remaining || '';
 
-      // React with each emoji one by one
       let reacted = 0;
       for (const emoji of emojis) {
         try {
@@ -261,15 +254,12 @@ module.exports = [
             }
           });
           reacted++;
-          // small delay to avoid rate limits
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (e) {
           console.error('React error:', e.message);
-          // if reaction fails for any reason, continue
         }
       }
 
-      // Send a summary / comment in the chat
       let chatMessage = `✨ Reacted with ${reacted} emoji${reacted > 1 ? 's' : ''} on the channel update!`;
       if (comment) {
         chatMessage += `\n💬 Reply: "${comment}"`;
