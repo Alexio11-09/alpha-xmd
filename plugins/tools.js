@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH .url COMMAND)
+// © 2026 Alpha - TOOLS (WITH .url COMMAND USING CATBOX)
 
 const fs = require('fs');
 const path = require('path');
@@ -9,7 +9,7 @@ const moment = require('moment-timezone');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-const { writeExif } = require('../library/exif');   // for sticker (if you ever fix it)
+const { writeExif } = require('../library/exif');   // for sticker
 const webp = require('node-webpmux');
 
 const cleanupFile = (f) => setTimeout(() => { try { fs.unlinkSync(f); } catch {} }, 300000);
@@ -53,23 +53,21 @@ const success = {
     }
 };
 
-// Imgur upload helper
-async function uploadToImgur(buffer) {
-    const base64 = buffer.toString('base64');
-    const res = await axios.post('https://api.imgur.com/3/image', {
-        image: base64,
-        type: 'base64'
-    }, {
-        headers: {
-            'Authorization': 'Client-ID 546c25a59c58ad7',  // public imgur client id, safe to use
-            'Content-Type': 'application/json'
-        },
-        timeout: 15000
+// 📤 Upload buffer to Catbox.moe
+async function uploadToCatbox(buffer) {
+    const form = new (require('form-data'))();
+    form.append('reqtype', 'fileupload');
+    form.append('fileToUpload', buffer, 'image.png');
+
+    const res = await axios.post('https://catbox.moe/user/api.php', form, {
+        headers: form.getHeaders(),
+        timeout: 20000
     });
-    if (res.data && res.data.success) {
-        return res.data.data.link;
+
+    if (typeof res.data === 'string' && res.data.startsWith('http')) {
+        return res.data;
     } else {
-        throw new Error(res.data?.data?.error || 'Upload failed');
+        throw new Error('Catbox did not return a valid URL');
     }
 }
 
@@ -118,7 +116,7 @@ module.exports = [
           } catch { reply(F(fail)); }
       }
     },
-    // 5. STICKER MAKER (will fix later)
+    // 5. STICKER MAKER (will fix another day)
     {
         command: "sticker", aliases: ["s","st"], category: "tools",
         execute: async (s, m, { reply }) => {
@@ -144,7 +142,7 @@ module.exports = [
             }
         }
     },
-    // 6. STICKER TO IMAGE (same)
+    // 6. STICKER TO IMAGE
     {
         command: "toimg", aliases: ["stickertoimg","simg"], category: "tools",
         execute: async (s, m, { reply }) => {
@@ -315,7 +313,7 @@ module.exports = [
             }
         }
     },
-    // 16. URL UPLOADER (NEW)
+    // 16. URL UPLOADER (CATBOX)
     {
         command: "url",
         aliases: ["upload", "imageurl"],
@@ -332,24 +330,22 @@ module.exports = [
             reply("⏳ Uploading to cloud...");
 
             try {
-                // Download media
                 let buffer;
                 if (isImage) {
                     const stream = await downloadContentFromMessage(q.message.imageMessage, 'image');
                     buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                } else { // sticker
+                } else {
                     const stream = await downloadContentFromMessage(q.message.stickerMessage, 'image');
                     let webpBuf = Buffer.from([]);
                     for await (const chunk of stream) webpBuf = Buffer.concat([webpBuf, chunk]);
-                    // Convert sticker to PNG first
+                    // Convert sticker to PNG
                     const img = new webp.Image();
                     await img.load(webpBuf);
                     buffer = await img.toBuffer('image/png');
                 }
 
-                // Upload to Imgur
-                const url = await uploadToImgur(buffer);
+                const url = await uploadToCatbox(buffer);
                 reply(`${success.url}\n\n🔗 ${url}`);
             } catch (err) {
                 console.error("Upload error:", err);
