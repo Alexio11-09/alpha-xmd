@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH .chreact FOR CHANNEL MESSAGE COMMENTS)
+// © 2026 Alpha - TOOLS (WITH .chreact FOR DIRECT CHANNEL COMMENTS)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -206,28 +206,39 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (SIMPLE COMMENT ON CHANNEL UPDATE) ====================
+  // ==================== 17. .chreact (TEXT COMMENT ON CHANNEL UPDATE) ====================
   {
     command: "chreact",
-    aliases: ["channelcomment", "ccomment"],
+    aliases: ["channelcomment", "creply"],
     category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 you're lying");
 
       const link = args[0];
-      // Validate link format
       const match = link.match(/channel\/(\w+)\/(\d+)/);
       if (!match) return reply("❌ Invalid channel message link. Copy it from a channel update.");
 
-      // Extract the comment (everything after the link)
-      const comment = args.slice(1).join(" ");
-
-      // Simply post the comment in the current chat, referencing the channel message
       const channelId = match[1];
       const messageId = match[2];
-      const channelLinkShort = `https://whatsapp.com/channel/${channelId}/${messageId}`;
+      const channelJid = channelId + '@newsletter';
 
-      await reply(`💬 *Comment on channel update:*\n📌 ${channelLinkShort}\n\n${comment}`);
+      const comment = args.slice(1).join(" ").trim();
+      if (!comment) return reply("❌ Please provide a comment.");
+
+      try {
+        // Send the comment directly to the channel, quoting the original message
+        await s.sendMessage(channelJid, {
+          text: comment,
+          contextInfo: {
+            stanzaId: messageId,
+            participant: channelJid
+          }
+        });
+        reply(`✅ Comment sent to the channel update!`);
+      } catch (err) {
+        console.error("chreact error:", err);
+        reply(`❌ Failed to post comment. Make sure the bot follows the channel.\n\nError: ${err.message}`);
+      }
     }
   }
 ];
