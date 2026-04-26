@@ -1,7 +1,7 @@
 // © 2026 Alpha - GENERAL COMMANDS (ALL 5 IN ONE FILE)
 
 const os = require('os');
-const config = require("../../settings/config");
+const config = require("../../settings/config");   // correct path for plugins/general/
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -31,7 +31,6 @@ const getCountry = (jid) => {
         }
         return "Unknown 🌍";
     } catch (err) {
-        // fallback omitted for brevity (your original had a long list of country codes, you can add it back if you want)
         return "Unknown 🌍";
     }
 };
