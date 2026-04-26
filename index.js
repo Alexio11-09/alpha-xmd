@@ -171,14 +171,12 @@ const clientstart = async () => {
       };
       followChannel();
 
-      // ---- SEND STYLISH CONNECTION DM (CHANNEL BRANDED) ----
+      // ---- SEND CONNECTION DM TO OWNER ----
       const sendConnectionDM = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 4000));
-
           const ownerRaw = config().owner?.[0];
           if (!ownerRaw) return console.log('⚠️ No owner number in config, skipping DM.');
-
           const ownerJid = ownerRaw.includes('@') ? ownerRaw : ownerRaw + '@s.whatsapp.net';
           const botName = config().settings?.title || 'Alpha Bot';
           const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
@@ -193,7 +191,6 @@ const clientstart = async () => {
             `📢 *Channel:* ${channelLink}\n\n` +
             `🔥 Ready to use.`;
 
-          // Use channel forwarding context (same as message.js)
           await sock.sendMessage(ownerJid, {
             text: message,
             contextInfo: {
@@ -211,7 +208,6 @@ const clientstart = async () => {
         }
       };
       sendConnectionDM();
-      // ----------------------------------------------------
     }
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -257,8 +253,6 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // (your existing antilink / other filters can stay here)
-
         store.set(mek.key.id, { text: m.text || "", message: mek.message });
 
         if (m.isGroup) {
@@ -279,9 +273,14 @@ const clientstart = async () => {
         if (globalSettings.autoread) await sock.readMessages([mek.key]);
         if (globalSettings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
         if (globalSettings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
+
+        // ---- AUTOREACT (skip commands) ----
         if (globalSettings.autoreact) {
-          const emojis = ["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
-          await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: mek.key } });
+          const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+          if (!txt.startsWith(".")) {
+            const emojis = ["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
+            await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: mek.key } });
+          }
         }
 
         await messageHandler(sock, m);
