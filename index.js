@@ -1,4 +1,4 @@
-l// © 2026 Alpha. All Rights Reserved.
+// © 2026 Alpha. All Rights Reserved.
 
 const fs = require("fs");
 const { execSync } = require("child_process");
