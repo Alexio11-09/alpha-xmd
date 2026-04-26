@@ -387,7 +387,7 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 7. PAIR (PUBLIC SESSION GENERATOR) ====================
+    // ==================== 7. PAIR (FIXED – DUAL CODE / QR) ====================
     {
         command: "pair",
         aliases: ["pairing", "session"],
@@ -395,92 +395,99 @@ ${config.settings.footer}
         execute: async (sock, m, { args, reply }) => {
             if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
 
-            // Clean the number
             const number = args[0].replace(/[^0-9]/g, "");
-            if (number.length < 10) return reply("❌ Invalid phone number. Use the full country code (no +).");
+            if (number.length < 10) return reply("❌ Invalid phone number. Use full country code (no +).");
 
-            // Global rate‑limit (15 seconds)
+            // Global cooldown (15 sec)
             if (global.__pairLastRequest && Date.now() - global.__pairLastRequest < 15000) {
-                return reply("⏳ The pairing service is busy. Please wait 15 seconds before trying again.");
+                return reply("⏳ Pairing service busy. Wait 15 seconds.");
             }
             global.__pairLastRequest = Date.now();
 
-            reply(`🔐 Requesting pairing code for +${number}...\nThis may take a few seconds.`);
+            reply(`🔐 Requesting pairing code for +${number}...`);
+
+            let pairingCode = null;
+            let qrData = null;
 
             try {
-                // Dynamically import Baileys
                 const baileys = await import('@whiskeysockets/baileys');
-                const { makeWASocket, Browsers, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+                const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+                const pino = require('pino');
 
-                // Temporary auth directory – unique per request to allow concurrent usage
-                const tempDir = path.join(os.tmpdir(), `alpha_pair_${number}_${Date.now()}`);
-                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+                const tempDir = path.join(os.tmpdir(), `pair_${number}_${Date.now()}`);
+                fs.mkdirSync(tempDir, { recursive: true });
 
                 const { state } = await useMultiFileAuthState(tempDir);
                 const { version } = await fetchLatestBaileysVersion();
 
-                // Create a throw‑away socket
                 const tempSock = makeWASocket({
                     auth: state,
                     version,
                     browser: Browsers.macOS('Chrome'),
-                    logger: require('pino')({ level: 'silent' }),
+                    logger: pino({ level: 'silent' }),
                     printQRInTerminal: false
                 });
 
-                let pairingCode = null;
-                const timeoutMs = 45000;
-
-                // Wait for connection and request code
-                await new Promise((resolve, reject) => {
-                    const timer = setTimeout(() => {
-                        tempSock.end();
-                        reject(new Error("Pairing timed out. WhatsApp may be slow – try again in a minute."));
-                    }, timeoutMs);
+                // promise that resolves with either code or QR string
+                const result = await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        resolve(null); // timed out – we'll send a generic error
+                    }, 55000);
 
                     tempSock.ev.on('connection.update', async (update) => {
-                        const { connection, lastDisconnect } = update;
+                        const { connection, lastDisconnect, qr } = update;
+                        console.log('pair connection state:', connection);
+
                         if (connection === 'open') {
+                            clearTimeout(timeout);
+                            // Try code first
                             try {
-                                pairingCode = await tempSock.requestPairingCode(number);
-                                clearTimeout(timer);
-                                tempSock.end();
-                                resolve();
-                            } catch (err) {
-                                clearTimeout(timer);
-                                tempSock.end();
-                                reject(err);
+                                const code = await tempSock.requestPairingCode(number);
+                                resolve({ code });
+                            } catch (codeErr) {
+                                console.log('code request failed, waiting for QR...', codeErr.message);
+                                // Keep waiting for QR
                             }
                         } else if (connection === 'close') {
-                            clearTimeout(timer);
-                            tempSock.end();
-                            if (lastDisconnect?.error) {
-                                reject(lastDisconnect.error instanceof Error ? lastDisconnect.error : new Error(lastDisconnect.error));
-                            } else {
-                                reject(new Error("Connection closed before pairing"));
-                            }
+                            clearTimeout(timeout);
+                            resolve(null); // connection dropped
+                        }
+
+                        if (qr) {
+                            console.log('pair QR captured');
+                            clearTimeout(timeout);
+                            resolve({ qr });
                         }
                     });
                 });
 
-                // Clean temporary folder
+                // Clean up temporary socket & folder
+                try { tempSock.end(); } catch {}
                 try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
 
-                if (!pairingCode) throw new Error("Failed to obtain pairing code");
-
-                reply(
-                    `✅ *Pairing Code Ready*\n\n` +
-                    `📞 *Number:* +${number}\n` +
-                    `🔢 *Code:* *${pairingCode}*\n\n` +
-                    `⏱️ Expires in 60 seconds.\n` +
-                    `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
-                );
+                if (result && result.code) {
+                    reply(
+                        `✅ *Pairing Code Ready*\n\n` +
+                        `📞 *Number:* +${number}\n` +
+                        `🔢 *Code:* *${result.code}*\n\n` +
+                        `⏱️ Expires in 60 seconds.\n` +
+                        `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+                    );
+                } else if (result && result.qr) {
+                    // Generate QR image and send it
+                    const qrCode = require('qrcode');
+                    const qrBuffer = await qrCode.toBuffer(result.qr, { type: 'png' });
+                    await sock.sendMessage(m.chat, {
+                        image: qrBuffer,
+                        caption: `📷 *QR Code for +${number}*\n\nScan this with WhatsApp (Linked devices) to link the session.\n⏱️ Expires quickly.`
+                    }, { quoted: m });
+                } else {
+                    throw new Error("Unable to obtain pairing code or QR. Please try again later.");
+                }
 
             } catch (err) {
-                console.error("Pairing error:", err);
-                // Clean temp folder just in case
-                try { const leftover = path.join(os.tmpdir(), `alpha_pair_${number}_${Date.now()}`); fs.rmSync(leftover, { recursive: true, force: true }); } catch {}
-                reply(`❌ Failed to generate pairing code: ${err.message || String(err)}`);
+                console.error('Pair error:', err);
+                reply(`❌ Pairing failed for +${number}: ${err.message || String(err)}`);
             }
         }
     }
