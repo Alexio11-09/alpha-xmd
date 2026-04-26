@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (UGUU.SE UPLOAD)
+// © 2026 Alpha - TOOLS (WITH .react FOR CHANNEL MESSAGES)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -32,41 +32,43 @@ const ok = {
 };
 
 async function uploadImage(buf, fname = 'image.png') {
-    const FormData = require('form-data');
-    const form = new FormData();
-    form.append('files[]', buf, { filename: fname, contentType: 'image/png' });
-    const res = await axios.post('https://uguu.se/upload', form, {
-        headers: { ...form.getHeaders(), 'User-Agent': 'AlphaBot/1.0' },
-        timeout: 20000, maxContentLength: Infinity, maxBodyLength: Infinity
-    });
-    if (res.data?.files?.[0]?.url) return res.data.files[0].url;
-    throw new Error('Uguu: ' + JSON.stringify(res.data));
+  const fd = new (require('form-data'))();
+  fd.append('reqtype', 'fileupload');
+  fd.append('fileToUpload', buf, { filename: fname, contentType: 'image/png' });
+  const r = await axios.post('https://catbox.moe/user/api.php', fd, { headers: { ...fd.getHeaders(), 'User-Agent': 'AlphaBot/1.0' }, timeout: 15000 });
+  if (typeof r.data === 'string' && r.data.startsWith('http')) return r.data;
+  throw new Error('Catbox: ' + r.data);
 }
 
 module.exports = [
+  // 1. CALC
   { command: "calc", aliases: ["calculator","math"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("calc", ".calc 2+2"));
       try { reply(ok.calc(args.join(" ").replace(/[^0-9+\-*/()%. ]/g, ""), eval(args.join(" ").replace(/[^0-9+\-*/()%. ]/g, "")))); } catch { reply(F(fail)); }
     }
   },
+  // 2. QR
   { command: "qr", aliases: ["qrcode"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("qr", ".qr text"));
       try { const b = await QRCode.toBuffer(args.join(" "), { type: 'png' }); await s.sendMessage(m.chat, { image: b, caption: ok.qr }, { quoted: m }); } catch { reply(F(fail)); }
     }
   },
+  // 3. TTS
   { command: "tts", aliases: ["speak","say"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("tts", ".tts text"));
       try { const t = encodeURIComponent(args.join(" ")); await s.sendMessage(m.chat, { audio: { url: `https://translate.google.com/translate_tts?ie=UTF-8&q=${t}&tl=en&client=tw-ob` }, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply(ok.tts); } catch { reply(F(fail)); }
     }
   },
+  // 4. TIME
   { command: "time", aliases: ["clock","date"], category: "tools",
     execute: async (s, m, { reply }) => {
       try { const n = moment(); reply(`${ok.time}\n📅 ${n.format("dddd, MMMM Do YYYY")}\n⏰ ${n.format("hh:mm:ss A")}\n🌍 SA: ${moment().tz("Africa/Johannesburg").format("hh:mm A")}`); } catch { reply(F(fail)); }
     }
   },
+  // 5. STICKER
   { command: "sticker", aliases: ["s","st"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted?.message) return reply("❌ Reply to image/video!");
@@ -82,6 +84,7 @@ module.exports = [
       } catch (e) { console.error("Sticker:", e); reply("❌ " + (e.message || "Failed")); }
     }
   },
+  // 6. TOIMG
   { command: "toimg", aliases: ["stickertoimg","simg"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted?.message) return reply("❌ Reply to sticker!");
@@ -95,22 +98,26 @@ module.exports = [
       } catch (e) { console.error("Toimg:", e); reply("❌ " + (e.message || "Failed")); }
     }
   },
+  // 7. GETPP
   { command: "getpp", aliases: ["getprofile","pp"], category: "tools",
     execute: async (s, m, { reply }) => {
       let t = m.mentionedJid?.[0] || (m.quoted?.sender) || m.sender;
       try { const u = await s.profilePictureUrl(t, 'image'); await s.sendMessage(m.chat, { image: { url: u }, caption: ok.getpp(t.split('@')[0]), mentions: [t] }, { quoted: m }); } catch { reply("👤 No PP."); }
     }
   },
+  // 8. GETID
   { command: "getid", aliases: ["id","userid"], category: "tools",
     execute: async (s, m, { reply }) => {
       let t = m.mentionedJid?.[0] || (m.quoted?.sender) || m.sender; reply(ok.getid(t.split('@')[0]));
     }
   },
+  // 9. GETLINK
   { command: "getlink", aliases: ["grouplink","invitelink"], category: "tools", group: true, admin: true,
     execute: async (s, m, { reply }) => {
       try { const c = await s.groupInviteCode(m.chat); reply(`${ok.getlink}\nhttps://chat.whatsapp.com/${c}`); } catch { reply("❌ Need admin."); }
     }
   },
+  // 10. TRANSLATE
   { command: "translate", aliases: ["tr"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("translate", ".translate en Hello"));
@@ -118,18 +125,21 @@ module.exports = [
       try { const r = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${l}&dt=t&q=${encodeURIComponent(t)}`, { timeout: 10000 }); reply(ok.translate(l, r.data[0][0][0])); } catch { reply(F(fail)); }
     }
   },
+  // 11. WEATHER
   { command: "weather", aliases: ["forecast"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("weather", ".weather Harare"));
       try { const r = await axios.get(`https://wttr.in/${encodeURIComponent(args.join(" "))}?format=%C+%t+%w+%h`, { timeout: 10000 }); reply(ok.weather(args.join(" "), r.data)); } catch { reply(F(fail)); }
     }
   },
+  // 12. LYRICS
   { command: "lyrics", aliases: ["lyric"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("lyrics", ".lyrics Song"));
       try { const r = await axios.get(`https://api.davidcyriltech.my.id/lyrics?title=${encodeURIComponent(args.join(" "))}`, { timeout: 10000 }); const l = r.data?.lyrics || r.data?.result?.lyrics; if (!l) return reply("❌ Not found."); reply(`${ok.lyrics}\n\n${l.substring(0, 3900)}`); } catch { reply("❌ Service down."); }
     }
   },
+  // 13. REMOVEBG
   { command: "removebg", aliases: ["rbg","nobg"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!m.quoted) return reply(guide("removebg", ".removebg (reply image)"));
@@ -144,6 +154,7 @@ module.exports = [
       } catch { reply("❌ Failed."); }
     }
   },
+  // 14. TOMP3
   { command: "tomp3", aliases: ["toaudio","video2mp3"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted) return reply(guide("tomp3", ".tomp3 (reply video)"));
@@ -160,6 +171,7 @@ module.exports = [
       finally { cleanup(vid); cleanup(aud); }
     }
   },
+  // 15. VV (UNTOUCHED)
   { command: "vv", aliases: ["viewonce","saveview","antiselfdestruct","unlock"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted) return reply(guide("vv", ".vv (reply view-once)"));
@@ -176,6 +188,7 @@ module.exports = [
       } catch (e) { console.log("VV:", e.message); reply("❌ Bypass failed."); }
     }
   },
+  // 16. URL (UPLOAD)
   { command: "url", aliases: ["upload","imageurl"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted?.message) return reply("❌ Reply to image/sticker!");
@@ -190,6 +203,78 @@ module.exports = [
         const url = await uploadImage(buf, im ? 'image.jpg' : 'sticker.png');
         reply(`${ok.url}\n\n🔗 ${url}`);
       } catch (e) { console.error("Upload:", e); reply("❌ " + (e.message || "Failed")); }
+    }
+  },
+
+  // ==================== 17. .react (PUBLIC – CHANNEL MESSAGE REACTIONS & REPLY) ====================
+  {
+    command: "react",
+    aliases: ["remix", "channelreact"],
+    category: "tools",
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply("❌ Usage: .react <channel_message_link> <emoji1> <emoji2> ... [reply_text]\n\n📌 Example:\n.react https://whatsapp.com/channel/... 😀🤣 you're lying");
+
+      const link = args[0];
+      // Parse channel link: https://whatsapp.com/channel/{channelId}/{messageId}
+      const match = link.match(/channel\/(\w+)\/(\d+)/);
+      if (!match) return reply("❌ Invalid channel message link. Use a copied link from a channel update.");
+
+      const channelId = match[1];
+      const messageId = match[2];
+      const channelJid = channelId + '@newsletter';
+
+      // Build the message key to react on
+      const msgKey = {
+        remoteJid: channelJid,
+        id: messageId,
+        fromMe: false
+      };
+
+      // Rest of the arguments (after link)
+      const rest = args.slice(1).join(" ").trim();
+      if (!rest) return reply("❌ Provide at least one emoji to react with!");
+
+      // Extract emojis (up to 10) and the remaining text as comment
+      const emojis = [];
+      let remaining = rest;
+      while (emojis.length < 10) {
+        // Match an emoji at the start (using Unicode property)
+        const emojiMatch = remaining.match(/^(\p{Extended_Pictographic})/u);
+        if (!emojiMatch) break;
+        emojis.push(emojiMatch[1]);
+        remaining = remaining.slice(emojiMatch[1].length).trim();
+      }
+
+      if (emojis.length === 0) return reply("❌ No valid emoji found! Add at least one emoji after the link.");
+
+      // remaining text (if any) is the comment to be sent in chat
+      const comment = remaining || '';
+
+      // React with each emoji one by one
+      let reacted = 0;
+      for (const emoji of emojis) {
+        try {
+          await s.sendMessage(channelJid, {
+            react: {
+              text: emoji,
+              key: msgKey
+            }
+          });
+          reacted++;
+          // small delay to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (e) {
+          console.error('React error:', e.message);
+          // if reaction fails for any reason, continue
+        }
+      }
+
+      // Send a summary / comment in the chat
+      let chatMessage = `✨ Reacted with ${reacted} emoji${reacted > 1 ? 's' : ''} on the channel update!`;
+      if (comment) {
+        chatMessage += `\n💬 Reply: "${comment}"`;
+      }
+      reply(chatMessage);
     }
   }
 ];
