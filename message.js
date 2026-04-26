@@ -160,46 +160,91 @@ module.exports = async (sock, m) => {
     }
 };
 
-// PAIR HANDLER
+// PAIR HANDLER (FIXED)
 module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
     const baileys = await import('@whiskeysockets/baileys');
     const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
     const pino = require('pino'), qrcode = require('qrcode'), os = require('os'), path = require('path'), fs = require('fs');
 
-    reply(`⏳ Generating ${method==='qr'?'QR code':'pairing code'}...`);
+    reply(`⏳ Generating ${method==='qr'?'QR code':'pairing code'} for +${number}...`);
 
     const tempDir = path.join(os.tmpdir(), `p_${number}_${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
+    let tempSock;
     try {
         const { state } = await useMultiFileAuthState(tempDir);
         const { version } = await fetchLatestBaileysVersion();
-        const tempSock = makeWASocket({ auth: state, version, browser: Browsers.macOS('Chrome'), logger: pino({ level: 'silent' }), printQRInTerminal: false });
+
+        tempSock = makeWASocket({
+            auth: state,
+            version,
+            browser: Browsers.macOS('Chrome'),
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false
+        });
 
         const result = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Timeout')), 60000);
+            let settled = false;
+            const finish = (data) => { if (settled) return; settled = true; resolve(data); };
+            const fail = (err) => { if (settled) return; settled = true; reject(err); };
+
+            const timeout = setTimeout(() => fail(new Error('Request timed out. Please try again.')), 50000);
+
             tempSock.ev.on('connection.update', async (up) => {
                 const { connection, qr } = up;
-                if (connection === 'open' && method === 'code') {
-                    try { const code = await tempSock.requestPairingCode(number); clearTimeout(timeout); resolve({ code }); } catch (e) { clearTimeout(timeout); reject(e); }
-                } else if (qr && method === 'qr') { clearTimeout(timeout); resolve({ qr }); }
-                else if (connection === 'close') { clearTimeout(timeout); resolve(null); }
+                console.log('pair connection state:', connection); // debug
+
+                if (connection === 'open') {
+                    clearTimeout(timeout);
+                    if (method === 'code') {
+                        try {
+                            const code = await tempSock.requestPairingCode(number);
+                            console.log('✅ code obtained:', code);
+                            finish({ code });
+                        } catch (err) {
+                            console.log('❌ code request failed, trying QR fallback:', err.message);
+                            // switch to QR
+                            method = 'qr';
+                            // keep waiting for QR
+                        }
+                    }
+                } else if (connection === 'close') {
+                    clearTimeout(timeout);
+                    fail(new Error('Connection closed unexpectedly'));
+                }
+
+                if (qr && method === 'qr') {
+                    console.log('✅ QR captured');
+                    clearTimeout(timeout);
+                    finish({ qr });
+                }
             });
         });
 
         tempSock.end();
         fs.rmSync(tempDir, { recursive: true, force: true });
 
-        if (!result) throw new Error('Could not obtain pairing info.');
         if (result.code) {
-            reply(`✅ *Pairing Code*\n📞 +${number}\n🔢 *${result.code}*\n⏱️ Expires in 60s`);
+            reply(
+                `✅ *Pairing Code Ready*\n\n` +
+                `📞 Number: +${number}\n` +
+                `🔢 Code: *${result.code}*\n` +
+                `⏱️ Expires in 60 seconds.\n` +
+                `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+            );
         } else if (result.qr) {
-            const qrBuf = await qrcode.toBuffer(result.qr, { type:'png' });
-            await sock.sendMessage(m.chat, { image: qrBuf, caption: `📷 QR for +${number}\nScan with WhatsApp Linked devices.` }, { quoted: m });
+            const qrBuf = await qrcode.toBuffer(result.qr, { type: 'png' });
+            await sock.sendMessage(m.chat, {
+                image: qrBuf,
+                caption: `📷 QR Code for +${number}\n\nScan with WhatsApp to link the session.\n⏱️ Expires quickly.`
+            }, { quoted: m });
         }
     } catch (err) {
-        console.error('Pair error:', err);
-        reply(`❌ Failed: ${err.message || err}`);
+        console.error('Pairing error:', err);
+        try { tempSock?.end(); } catch {}
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+        reply(`❌ Pairing failed: ${err.message || String(err)}`);
     }
 };
 
