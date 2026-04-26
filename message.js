@@ -104,8 +104,7 @@ const deny = {
     admin: "🚫 Only admins can use this.",
     group: "👥 This only works in groups.",
     botAdmin: "🤖 I need admin powers.",
-    banned: "🚫 You're banned from using the bot.",
-    private: "🔒 The bot is in private mode. Only the owner can use commands."
+    banned: "🚫 You're banned from using the bot."
 };
 
 // REACTIONS
@@ -177,16 +176,16 @@ module.exports = async (sock, m) => {
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
 
-        await reactRandom(sock, m);
-
         const botNum = clean(sock.user.id);
         const senderNum = clean(m.sender);
         const isOwner = config.owner.includes(senderNum) || senderNum === botNum || isTempOwner(m.sender);
 
-        // MODE CHECK (skip for mode command itself and owner always allowed)
+        // MODE CHECK: in private mode, silently ignore non-owner commands (except 'mode' itself)
         if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) {
-            return reply(deny.private);
+            return;  // just ignore, no reply
         }
+
+        await reactRandom(sock, m);
 
         if (cmdName !== 'unbanuser' && cmdName !== 'unban' && isUserBanned(m.sender) && !isOwner)
             return reply(deny.banned);
