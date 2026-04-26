@@ -206,40 +206,50 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (QUOTED REPLY TO CHANNEL UPDATE) ====================
-  {
-    command: "chreact",
-    aliases: ["channelcomment", "creply"],
-    category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 you're lying");
+  // ==================== 17. .chreact (TEXT COMMENT – WORKS NOW) ====================
+{
+  command: "chreact",
+  aliases: ["channelcomment", "creply"],
+  category: "tools",
+  execute: async (s, m, { args, reply }) => {
+    if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 you're lying");
 
-      const link = args[0];
-      const match = link.match(/channel\/(\w+)\/(\d+)/);
-      if (!match) return reply("❌ Invalid channel message link.");
+    const link = args[0];
+    const match = link.match(/channel\/(\w+)\/(\d+)/);
+    if (!match) return reply("❌ Invalid channel message link.");
 
-      const channelId = match[1];
-      const messageId = match[2];
-      const channelJid = channelId + '@newsletter';
-      const comment = args.slice(1).join(" ").trim();
+    const channelId = match[1];
+    const messageId = match[2];
+    const channelJid = channelId + '@newsletter';
+    const comment = args.slice(1).join(" ").trim();
 
-      try {
-        // Send the comment as a quoted reply to the channel update
-        await s.sendMessage(channelJid, {
-          text: comment,
-          quoted: {
-            key: {
-              remoteJid: channelJid,
-              id: messageId,
-              fromMe: false
-            }
+    try {
+      // Try to post as a quoted reply first (requires admin / publisher rights)
+      await s.sendMessage(channelJid, {
+        text: comment,
+        quoted: {
+          key: {
+            remoteJid: channelJid,
+            id: messageId,
+            fromMe: false
           }
+        }
+      });
+      reply("✅ Comment posted on the channel update!");
+    } catch (err) {
+      // If it fails, the bot likely lacks publisher rights – fallback to a normal message with a reference link
+      console.warn("chreact: quoted reply failed – sending as plain post:", err.message);
+      try {
+        await s.sendMessage(channelJid, {
+          text: `${comment}\n\n(Posted via bot about update ${link})`
         });
-        reply("✅ Comment posted on the channel update!");
-      } catch (err) {
-        console.error("chreact error:", err);
-        reply(`❌ Failed: ${err.message}`);
+        reply("✅ Comment sent (as a general post, not a direct reply). To make it a true reply, promote the bot to admin in your channel.");
+      } catch (fallbackErr) {
+        console.error("chreact fallback error:", fallbackErr);
+        reply(`❌ Could not post to channel: ${fallbackErr.message}`);
       }
     }
   }
+}
+
 ];
