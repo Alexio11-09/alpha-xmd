@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (FINAL WORKING)
+// © 2026 Alpha - TOOLS (WITH .url COMMAND)
 
 const fs = require('fs');
 const path = require('path');
@@ -9,19 +9,18 @@ const moment = require('moment-timezone');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-const { writeExif } = require('../library/exif');   // YOUR proven library
+const { writeExif } = require('../library/exif');   // for sticker (if you ever fix it)
+const webp = require('node-webpmux');
 
-// ---------- HELPERS ----------
 const cleanupFile = (f) => setTimeout(() => { try { fs.unlinkSync(f); } catch {} }, 300000);
 
-// ---------- FUNNY REPLIES ----------
 const F = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const fail = [
-    "👾 Oops, my circuits got tangled. Try again?",
+    "👾 Oops, my circuits tangled. Try again?",
     "💥 Failed! But I'm still cool.",
     "😅 Something broke. Could you try again?",
-    "🤷‍♂️ Well that didn't work. Blame the internet gremlins."
+    "🤷‍♂️ That didn't work. Blame the internet gremlins."
 ];
 
 const guide = (cmd, usage) => F([
@@ -46,12 +45,33 @@ const success = {
     lyrics: F([ "🎵 Found the lyrics! Sing along.", "🎤 Lyrics loaded. Karaoke time?", "📝 Here are the words. Don't forget the chorus." ]),
     removebg: F([ "✨ Background removed! Magic, right?", "🪄 Abracadabra, no more background.", "🎨 Image background has vanished." ]),
     tomp3: F([ "⏳ Converting to MP3… this might take a moment.", "🎧 Audio extracted successfully! Bump it.", "🔊 Video turned into music. Enjoy!" ]),
+    url: F([ "🌐 Image uploaded! Here's your link.", "📤 Upload success! Link:", "🔗 Your image is now online." ]),
     vv: {
         image: F([ "👀 View‑once? Not on my watch! Image saved.", "📸 Snap saved! That view‑once trick won't work here.", "🖼️ Image bypassed. You're welcome." ]),
         video: F([ "🎥 Video rescued from the void. No more self‑destruct.", "📹 View‑once video? I've got it forever now.", "🎬 Video saved! That disappearing act failed." ]),
         audio: F([ "🎵 Audio saved. Nice try, view‑once.", "🔊 Voice note? I'll keep a copy.", "🎤 Audio bypassed. You can replay it now." ])
     }
 };
+
+// Imgur upload helper
+async function uploadToImgur(buffer) {
+    const base64 = buffer.toString('base64');
+    const res = await axios.post('https://api.imgur.com/3/image', {
+        image: base64,
+        type: 'base64'
+    }, {
+        headers: {
+            'Authorization': 'Client-ID 546c25a59c58ad7',  // public imgur client id, safe to use
+            'Content-Type': 'application/json'
+        },
+        timeout: 15000
+    });
+    if (res.data && res.data.success) {
+        return res.data.data.link;
+    } else {
+        throw new Error(res.data?.data?.error || 'Upload failed');
+    }
+}
 
 module.exports = [
     // 1. CALC
@@ -98,40 +118,24 @@ module.exports = [
           } catch { reply(F(fail)); }
       }
     },
-    // 5. STICKER MAKER (USING YOUR EXIF LIBRARY)
+    // 5. STICKER MAKER (will fix later)
     {
         command: "sticker", aliases: ["s","st"], category: "tools",
         execute: async (s, m, { reply }) => {
             if (!m.quoted || !m.quoted.message) return reply("❌ Please *reply* to an image or video.");
-
             const q = m.quoted;
             const msgType = Object.keys(q.message)[0];
-            if (msgType !== 'imageMessage' && msgType !== 'videoMessage')
-                return reply("❌ The replied message must be an image or a video.");
-
+            if (msgType !== 'imageMessage' && msgType !== 'videoMessage') return reply("❌ The replied message must be an image or a video.");
             reply("⏳ Cooking a sticker...");
             try {
                 const content = q.message[msgType];
-                const stream = await downloadContentFromMessage(
-                    content,
-                    msgType === 'imageMessage' ? 'image' : 'video'
-                );
+                const stream = await downloadContentFromMessage(content, msgType === 'imageMessage' ? 'image' : 'video');
                 let buffer = Buffer.from([]);
                 for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                // Use your own reliable converter
                 const stickerBuffer = await writeExif(
-                    {
-                        data: buffer,
-                        mimetype: msgType === 'imageMessage' ? 'image/jpeg' : 'video/mp4'
-                    },
-                    {
-                        packname: 'Alpha Bot',
-                        author: 'Sticker Maker',
-                        categories: ['🤖']
-                    }
+                    { data: buffer, mimetype: msgType === 'imageMessage' ? 'image/jpeg' : 'video/mp4' },
+                    { packname: 'Alpha Bot', author: 'Sticker Maker', categories: ['🤖'] }
                 );
-
                 await s.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
                 reply(success.sticker);
             } catch (err) {
@@ -140,25 +144,20 @@ module.exports = [
             }
         }
     },
-    // 6. STICKER TO IMAGE (VIA node-webpmux)
+    // 6. STICKER TO IMAGE (same)
     {
         command: "toimg", aliases: ["stickertoimg","simg"], category: "tools",
         execute: async (s, m, { reply }) => {
             if (!m.quoted || !m.quoted.message) return reply("❌ Please *reply* to a sticker.");
             const q = m.quoted;
             if (Object.keys(q.message)[0] !== 'stickerMessage') return reply("❌ The replied message must be a sticker.");
-
             try {
                 const content = q.message.stickerMessage;
                 const stream = await downloadContentFromMessage(content, 'image');
-                let buffer = Buffer.from([]);
-                for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                const webp = require('node-webpmux');
-                const img = new webp.Image();
-                await img.load(buffer);
+                let buf = Buffer.from([]);
+                for await (const c of stream) buf = Buffer.concat([buf, c]);
+                const img = new webp.Image(); await img.load(buf);
                 const png = await img.toBuffer('image/png');
-
                 await s.sendMessage(m.chat, { image: png, caption: success.toimg }, { quoted: m });
             } catch (err) {
                 console.error("Toimg error:", err);
@@ -292,7 +291,6 @@ module.exports = [
                              q.message?.videoMessage?.viewOnce ||
                              q.message?.audioMessage?.viewOnce;
             if (!isViewOnce) return reply("👀 That's not a view‑once message. I can already see it!");
-
             try {
                 const content = q.message.imageMessage ||
                                 q.message.videoMessage ||
@@ -303,7 +301,6 @@ module.exports = [
                 );
                 let buffer = Buffer.from([]);
                 for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
                 if (mime.includes('image')) {
                     await s.sendMessage(m.chat, { image: buffer, caption: success.vv.image }, { quoted: m });
                 } else if (mime.includes('video')) {
@@ -315,6 +312,48 @@ module.exports = [
             } catch (err) {
                 console.log("VV error:", err.message);
                 reply("❌ Failed to bypass view‑once. The media may have already expired or been read.");
+            }
+        }
+    },
+    // 16. URL UPLOADER (NEW)
+    {
+        command: "url",
+        aliases: ["upload", "imageurl"],
+        category: "tools",
+        execute: async (s, m, { reply }) => {
+            if (!m.quoted || !m.quoted.message) return reply("❌ Please *reply* to an image or sticker.");
+
+            const q = m.quoted;
+            const msgType = Object.keys(q.message)[0];
+            const isImage = msgType === 'imageMessage';
+            const isSticker = msgType === 'stickerMessage';
+            if (!isImage && !isSticker) return reply("❌ The replied message must be an image or a sticker.");
+
+            reply("⏳ Uploading to cloud...");
+
+            try {
+                // Download media
+                let buffer;
+                if (isImage) {
+                    const stream = await downloadContentFromMessage(q.message.imageMessage, 'image');
+                    buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                } else { // sticker
+                    const stream = await downloadContentFromMessage(q.message.stickerMessage, 'image');
+                    let webpBuf = Buffer.from([]);
+                    for await (const chunk of stream) webpBuf = Buffer.concat([webpBuf, chunk]);
+                    // Convert sticker to PNG first
+                    const img = new webp.Image();
+                    await img.load(webpBuf);
+                    buffer = await img.toBuffer('image/png');
+                }
+
+                // Upload to Imgur
+                const url = await uploadToImgur(buffer);
+                reply(`${success.url}\n\n🔗 ${url}`);
+            } catch (err) {
+                console.error("Upload error:", err);
+                reply("❌ Upload failed: " + (err.message || String(err)));
             }
         }
     }
