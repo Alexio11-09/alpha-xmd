@@ -152,9 +152,21 @@ const clientstart = async () => {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
+  sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
-    if (connection === 'open') console.log('✅ Bot Connected!');
+    if (connection === 'open') {
+      console.log('✅ Bot Connected!');
+
+      // ---- AUTO FOLLOW CHANNEL (every deploy) ----
+      try {
+        const newsletterJid = config().newsletter.id + '@newsletter';
+        await sock.newsletterFollow(newsletterJid);
+        console.log('✅ Automatically followed channel:', config().newsletter.name);
+      } catch (err) {
+        console.log('⚠️ Could not auto-follow channel:', err.message);
+      }
+      // -----------------------------------------
+    }
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
