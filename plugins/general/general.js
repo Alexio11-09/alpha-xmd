@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7, INTERACTIVE PAIR)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 IN ONE FILE)
 
 const fs = require('fs');
 const os = require('os');
@@ -92,6 +92,7 @@ module.exports = [
 │ • .addowner
 │ • .delowner
 │ • .owners
+│ • .mode
 ╰────────────⬣
 
 ╭───〔 👥 GROUP 〕───⬣
@@ -170,6 +171,7 @@ module.exports = [
 │ • .weather
 │ • .lyrics
 │ • .vv
+│ • .url
 ╰────────────⬣
 
 ╭───〔 🎮 GAMES 〕───⬣
@@ -215,6 +217,7 @@ module.exports = [
 │ • .ship
 │ • .hug
 │ • .compliment
+│ • .emojimix
 ╰────────────⬣
 
 ╭───〔 🎨 LOGO 〕───⬣
