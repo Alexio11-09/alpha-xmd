@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH .url COMMAND USING CATBOX)
+// © 2026 Alpha - TOOLS (WITH .url COMMAND USING CATBOX + DETAILED ERRORS)
 
 const fs = require('fs');
 const path = require('path');
@@ -54,10 +54,13 @@ const success = {
 };
 
 // 📤 Upload buffer to Catbox.moe
-async function uploadToCatbox(buffer) {
+async function uploadToCatbox(buffer, filename = 'image.png') {
     const form = new (require('form-data'))();
     form.append('reqtype', 'fileupload');
-    form.append('fileToUpload', buffer, 'image.png');
+    form.append('fileToUpload', buffer, {
+        filename,
+        contentType: 'image/png'
+    });
 
     const res = await axios.post('https://catbox.moe/user/api.php', form, {
         headers: form.getHeaders(),
@@ -67,7 +70,7 @@ async function uploadToCatbox(buffer) {
     if (typeof res.data === 'string' && res.data.startsWith('http')) {
         return res.data;
     } else {
-        throw new Error('Catbox did not return a valid URL');
+        throw new Error('Catbox returned: ' + (res.data || 'Unknown error'));
     }
 }
 
@@ -116,7 +119,7 @@ module.exports = [
           } catch { reply(F(fail)); }
       }
     },
-    // 5. STICKER MAKER (will fix another day)
+    // 5. STICKER MAKER (same as before)
     {
         command: "sticker", aliases: ["s","st"], category: "tools",
         execute: async (s, m, { reply }) => {
@@ -142,7 +145,7 @@ module.exports = [
             }
         }
     },
-    // 6. STICKER TO IMAGE
+    // 6. STICKER TO IMAGE (same)
     {
         command: "toimg", aliases: ["stickertoimg","simg"], category: "tools",
         execute: async (s, m, { reply }) => {
@@ -313,7 +316,7 @@ module.exports = [
             }
         }
     },
-    // 16. URL UPLOADER (CATBOX)
+    // 16. URL UPLOADER (Catbox with error reporting)
     {
         command: "url",
         aliases: ["upload", "imageurl"],
@@ -330,6 +333,7 @@ module.exports = [
             reply("⏳ Uploading to cloud...");
 
             try {
+                // Download media
                 let buffer;
                 if (isImage) {
                     const stream = await downloadContentFromMessage(q.message.imageMessage, 'image');
@@ -339,14 +343,16 @@ module.exports = [
                     const stream = await downloadContentFromMessage(q.message.stickerMessage, 'image');
                     let webpBuf = Buffer.from([]);
                     for await (const chunk of stream) webpBuf = Buffer.concat([webpBuf, chunk]);
-                    // Convert sticker to PNG
+                    // Convert sticker to PNG for upload
                     const img = new webp.Image();
                     await img.load(webpBuf);
                     buffer = await img.toBuffer('image/png');
                 }
 
-                const url = await uploadToCatbox(buffer);
+                // Upload to Catbox
+                const url = await uploadToCatbox(buffer, isImage ? 'image.jpg' : 'sticker.png');
                 reply(`${success.url}\n\n🔗 ${url}`);
+
             } catch (err) {
                 console.error("Upload error:", err);
                 reply("❌ Upload failed: " + (err.message || String(err)));
