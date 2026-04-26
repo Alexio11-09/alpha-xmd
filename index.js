@@ -157,41 +157,48 @@ const clientstart = async () => {
     if (connection === 'open') {
       console.log('✅ Bot Connected!');
 
-      // ---- AUTO FOLLOW CHANNEL (improved) ----
+      // ---- AUTO FOLLOW CHANNEL ----
       const followChannel = async () => {
         try {
-          // Wait for the socket to fully settle
           await new Promise(resolve => setTimeout(resolve, 3000));
-
           const newsletterJid = config().newsletter.id + '@newsletter';
-          console.log('🔄 Attempting to follow channel:', newsletterJid);
-
-          // Check if already following (may not be supported in all Baileys versions)
-          try {
-            const subscriptions = await sock.newsletterSubscriptions();
-            const alreadyFollowing = subscriptions?.some(sub => sub.jid === newsletterJid);
-            if (alreadyFollowing) {
-              console.log('✅ Already following channel');
-              return;
-            }
-          } catch (checkErr) {
-            console.log('⚠️ Could not check subscriptions, trying follow anyway');
-          }
-
-          // Follow the channel
+          console.log('🔄 Following channel:', newsletterJid);
           await sock.newsletterFollow(newsletterJid);
-          console.log('✅ Successfully followed channel:', config().newsletter.name);
-        } catch (followErr) {
-          console.error('❌ Failed to follow channel:', followErr.message);
-          if (followErr.message?.includes('already')) {
-            console.log('Already subscribed – no action needed.');
-          }
+          console.log('✅ Followed channel:', config().newsletter.name);
+        } catch (err) {
+          console.error('❌ Channel follow error:', err.message);
         }
       };
-
-      // Run follow attempt (non-blocking)
       followChannel();
-      // ----------------------------------------------------
+
+      // ---- SEND CONNECTION DM TO OWNER ----
+      const sendConnectionDM = async () => {
+        try {
+          // wait a bit so socket is fully ready
+          await new Promise(resolve => setTimeout(resolve, 4000));
+
+          const ownerRaw = config().owner?.[0];
+          if (!ownerRaw) return console.log('⚠️ No owner number in config, skipping DM.');
+
+          const ownerJid = ownerRaw.includes('@') ? ownerRaw : ownerRaw + '@s.whatsapp.net';
+          const uptime = process.uptime();
+          const now = new Date();
+
+          const message = `🤖 *Alpha Bot Connected!*\n\n` +
+            `📅 Date: ${now.toLocaleDateString()}\n` +
+            `🕒 Time: ${now.toLocaleTimeString()}\n` +
+            `⏳ Uptime: ${Math.floor(uptime)}s\n\n` +
+            `✅ Bot is online and ready to use.\n` +
+            `📢 Channel: https://whatsapp.com/channel/${config().newsletter.id}`;
+
+          await sock.sendMessage(ownerJid, { text: message });
+          console.log('✅ Connection DM sent to owner');
+        } catch (err) {
+          console.error('❌ Failed to send connection DM:', err.message);
+        }
+      };
+      sendConnectionDM();
+      // ---------------------------------
     }
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -228,7 +235,6 @@ const clientstart = async () => {
       for (let mek of messages) {
         if (!mek.message) continue;
 
-        // Skip bot's own messages unless it's a command
         if (mek.key.fromMe) {
             const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
             if (!txt.startsWith(".")) continue;
@@ -238,10 +244,7 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // ANTILINK (keep your existing block unchanged)
-        if (m.isGroup && m.text) {
-          // ... (your antilink code from above, exactly as before) ...
-        }
+        // Your existing antilink / other filters can stay here
 
         store.set(mek.key.id, { text: m.text || "", message: mek.message });
 
