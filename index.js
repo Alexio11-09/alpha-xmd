@@ -1,4 +1,4 @@
-// © 2026 Alpha. All Rights Reserved.
+l// © 2026 Alpha. All Rights Reserved.
 
 const fs = require("fs");
 const { execSync } = require("child_process");
@@ -171,34 +171,47 @@ const clientstart = async () => {
       };
       followChannel();
 
-      // ---- SEND CONNECTION DM TO OWNER ----
+      // ---- SEND STYLISH CONNECTION DM (CHANNEL BRANDED) ----
       const sendConnectionDM = async () => {
         try {
-          // wait a bit so socket is fully ready
           await new Promise(resolve => setTimeout(resolve, 4000));
 
           const ownerRaw = config().owner?.[0];
           if (!ownerRaw) return console.log('⚠️ No owner number in config, skipping DM.');
 
           const ownerJid = ownerRaw.includes('@') ? ownerRaw : ownerRaw + '@s.whatsapp.net';
-          const uptime = process.uptime();
-          const now = new Date();
+          const botName = config().settings?.title || 'Alpha Bot';
+          const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
+          const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
+          const ownerContact = "wa.me/263786641436";
 
-          const message = `🤖 *Alpha Bot Connected!*\n\n` +
-            `📅 Date: ${now.toLocaleDateString()}\n` +
-            `🕒 Time: ${now.toLocaleTimeString()}\n` +
-            `⏳ Uptime: ${Math.floor(uptime)}s\n\n` +
-            `✅ Bot is online and ready to use.\n` +
-            `📢 Channel: https://whatsapp.com/channel/${config().newsletter.id}`;
+          const message = `╭───〔  🤖 *${botName}*  〕───⬣\n\n` +
+            `✅ *Bot Online*\n` +
+            `👑 *Owner:* Alpha\n` +
+            `📞 *Contact:* ${ownerContact}\n` +
+            `📂 *Repo:* ${repoLink}\n` +
+            `📢 *Channel:* ${channelLink}\n\n` +
+            `🔥 Ready to use.`;
 
-          await sock.sendMessage(ownerJid, { text: message });
+          // Use channel forwarding context (same as message.js)
+          await sock.sendMessage(ownerJid, {
+            text: message,
+            contextInfo: {
+              forwardingScore: 999,
+              isForwarded: true,
+              forwardedNewsletterMessageInfo: {
+                newsletterJid: config().newsletter.id + "@newsletter",
+                newsletterName: config().newsletter.name
+              }
+            }
+          });
           console.log('✅ Connection DM sent to owner');
         } catch (err) {
           console.error('❌ Failed to send connection DM:', err.message);
         }
       };
       sendConnectionDM();
-      // ---------------------------------
+      // ----------------------------------------------------
     }
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -244,7 +257,7 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // Your existing antilink / other filters can stay here
+        // (your existing antilink / other filters can stay here)
 
         store.set(mek.key.id, { text: m.text || "", message: mek.message });
 
