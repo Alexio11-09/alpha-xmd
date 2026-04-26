@@ -1,11 +1,13 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 6 IN ONE FILE)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 IN ONE FILE)
 
+const fs = require('fs');
 const os = require('os');
+const path = require('path');
 const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ⏱️ RUNTIME (used by menu, alive, info)
+// ⏱️ RUNTIME
 function runtime(seconds) {
     seconds = Number(seconds);
     const d = Math.floor(seconds / (3600 * 24));
@@ -15,7 +17,7 @@ function runtime(seconds) {
     return `${d}d ${h}h ${m}m ${s}s`;
 }
 
-// 🌍 COUNTRY DETECTOR (used by menu)
+// 🌍 COUNTRY DETECTOR
 const getCountry = (jid) => {
     if (!jid) return "Unknown 🌍";
     try {
@@ -68,6 +70,7 @@ module.exports = [
 │ • .info
 │ • .owner
 │ • .repo
+│ • .pair
 ╰────────────⬣
 
 ╭───〔 👑 OWNER 〕───⬣
@@ -381,6 +384,104 @@ ${config.settings.footer}
             ];
 
             reply(texts[Math.floor(Math.random() * texts.length)]);
+        }
+    },
+
+    // ==================== 7. PAIR (PUBLIC SESSION GENERATOR) ====================
+    {
+        command: "pair",
+        aliases: ["pairing", "session"],
+        category: "general",
+        execute: async (sock, m, { args, reply }) => {
+            if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
+
+            // Clean the number
+            const number = args[0].replace(/[^0-9]/g, "");
+            if (number.length < 10) return reply("❌ Invalid phone number. Use the full country code (no +).");
+
+            // Global rate‑limit (15 seconds)
+            if (global.__pairLastRequest && Date.now() - global.__pairLastRequest < 15000) {
+                return reply("⏳ The pairing service is busy. Please wait 15 seconds before trying again.");
+            }
+            global.__pairLastRequest = Date.now();
+
+            reply(`🔐 Requesting pairing code for +${number}...\nThis may take a few seconds.`);
+
+            try {
+                // Dynamically import Baileys
+                const baileys = await import('@whiskeysockets/baileys');
+                const { makeWASocket, Browsers, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+
+                // Temporary auth directory – unique per request to allow concurrent usage
+                const tempDir = path.join(os.tmpdir(), `alpha_pair_${number}_${Date.now()}`);
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+                const { state } = await useMultiFileAuthState(tempDir);
+                const { version } = await fetchLatestBaileysVersion();
+
+                // Create a throw‑away socket
+                const tempSock = makeWASocket({
+                    auth: state,
+                    version,
+                    browser: Browsers.macOS('Chrome'),
+                    logger: require('pino')({ level: 'silent' }),
+                    printQRInTerminal: false
+                });
+
+                let pairingCode = null;
+                const timeoutMs = 45000;
+
+                // Wait for connection and request code
+                await new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => {
+                        tempSock.end();
+                        reject(new Error("Pairing timed out. WhatsApp may be slow – try again in a minute."));
+                    }, timeoutMs);
+
+                    tempSock.ev.on('connection.update', async (update) => {
+                        const { connection, lastDisconnect } = update;
+                        if (connection === 'open') {
+                            try {
+                                pairingCode = await tempSock.requestPairingCode(number);
+                                clearTimeout(timer);
+                                tempSock.end();
+                                resolve();
+                            } catch (err) {
+                                clearTimeout(timer);
+                                tempSock.end();
+                                reject(err);
+                            }
+                        } else if (connection === 'close') {
+                            clearTimeout(timer);
+                            tempSock.end();
+                            if (lastDisconnect?.error) {
+                                reject(lastDisconnect.error instanceof Error ? lastDisconnect.error : new Error(lastDisconnect.error));
+                            } else {
+                                reject(new Error("Connection closed before pairing"));
+                            }
+                        }
+                    });
+                });
+
+                // Clean temporary folder
+                try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+
+                if (!pairingCode) throw new Error("Failed to obtain pairing code");
+
+                reply(
+                    `✅ *Pairing Code Ready*\n\n` +
+                    `📞 *Number:* +${number}\n` +
+                    `🔢 *Code:* *${pairingCode}*\n\n` +
+                    `⏱️ Expires in 60 seconds.\n` +
+                    `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+                );
+
+            } catch (err) {
+                console.error("Pairing error:", err);
+                // Clean temp folder just in case
+                try { const leftover = path.join(os.tmpdir(), `alpha_pair_${number}_${Date.now()}`); fs.rmSync(leftover, { recursive: true, force: true }); } catch {}
+                reply(`❌ Failed to generate pairing code: ${err.message || String(err)}`);
+            }
         }
     }
 ];
