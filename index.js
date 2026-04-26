@@ -157,15 +157,41 @@ const clientstart = async () => {
     if (connection === 'open') {
       console.log('✅ Bot Connected!');
 
-      // ---- AUTO FOLLOW CHANNEL (every deploy) ----
-      try {
-        const newsletterJid = config().newsletter.id + '@newsletter';
-        await sock.newsletterFollow(newsletterJid);
-        console.log('✅ Automatically followed channel:', config().newsletter.name);
-      } catch (err) {
-        console.log('⚠️ Could not auto-follow channel:', err.message);
-      }
-      // -----------------------------------------
+      // ---- AUTO FOLLOW CHANNEL (improved) ----
+      const followChannel = async () => {
+        try {
+          // Wait for the socket to fully settle
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          const newsletterJid = config().newsletter.id + '@newsletter';
+          console.log('🔄 Attempting to follow channel:', newsletterJid);
+
+          // Check if already following (may not be supported in all Baileys versions)
+          try {
+            const subscriptions = await sock.newsletterSubscriptions();
+            const alreadyFollowing = subscriptions?.some(sub => sub.jid === newsletterJid);
+            if (alreadyFollowing) {
+              console.log('✅ Already following channel');
+              return;
+            }
+          } catch (checkErr) {
+            console.log('⚠️ Could not check subscriptions, trying follow anyway');
+          }
+
+          // Follow the channel
+          await sock.newsletterFollow(newsletterJid);
+          console.log('✅ Successfully followed channel:', config().newsletter.name);
+        } catch (followErr) {
+          console.error('❌ Failed to follow channel:', followErr.message);
+          if (followErr.message?.includes('already')) {
+            console.log('Already subscribed – no action needed.');
+          }
+        }
+      };
+
+      // Run follow attempt (non-blocking)
+      followChannel();
+      // ----------------------------------------------------
     }
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
