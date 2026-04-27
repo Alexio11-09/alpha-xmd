@@ -253,8 +253,13 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // Store message with sender for antidelete
-        store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender });
+        // Store message with sender and pushName for antidelete
+        store.set(mek.key.id, {
+            text: m.text || "",
+            message: mek.message,
+            sender: m.sender,
+            pushName: m.pushName || null   // 🔥 store the push name
+        });
 
         if (m.isGroup) {
           try {
@@ -290,7 +295,7 @@ const clientstart = async () => {
     } catch (err) {}
   });
 
-  // ANTIDELETE (UPGRADED) + ANTIEDIT (KEPT AS BEFORE)
+  // ANTIDELETE (UPGRADED + SMART SENDER DISPLAY) + ANTIEDIT
   sock.ev.on('messages.update', async (updates) => {
     try {
       // Refresh global settings
@@ -299,7 +304,6 @@ const clientstart = async () => {
         if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
       } catch {}
 
-      // Antidelete config
       const adConfig = globalSettings.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
       const ownerJid = (config().owner?.[0] || '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
@@ -312,11 +316,15 @@ const clientstart = async () => {
           if (!adConfig.enabled) continue;
 
           const chatJid = update.key.remoteJid;
-          const senderJid = oldMsg.sender || update.key.participant || chatJid;
-          const senderName = senderJid.split('@')[0];
           const isGroup = chatJid.endsWith('@g.us');
+          const senderJid = oldMsg.sender || update.key.participant || chatJid;
+          const senderNumber = senderJid.split('@')[0];
+          // In private: use push name if available, else number
+          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== ''
+            ? oldMsg.pushName
+            : senderNumber;
 
-          // FIXED: Properly await group metadata
+          // Determine chat name
           let chatName = 'Private Chat';
           if (isGroup) {
             try {
@@ -333,14 +341,22 @@ const clientstart = async () => {
 
           let text;
           if (adConfig.style === 'fancy') {
-            text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 *Sender:* @${senderName}\n│ 📍 *Chat:* ${chatName}\n│ 🕒 *Time:* ${time}\n│ 📅 *Date:* ${date}\n│\n│ 🗑️ *Deleted Message:*\n│ ┌─────────────────────┐\n│ │ ${(oldMsg.text || 'Media message').replace(/\n/g, '\n│ │ ')}\n│ └─────────────────────┘\n│\n│ 🛡️ *Saved by Alpha Bot*\n╰────────────⬣`;
+            if (isGroup) {
+              // Group: show @mention
+              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 *Sender:* @${senderNumber}\n│ 📍 *Chat:* ${chatName}\n│ 🕒 *Time:* ${time}\n│ 📅 *Date:* ${date}\n│\n│ 🗑️ *Deleted Message:*\n│ ┌─────────────────────┐\n│ │ ${(oldMsg.text || 'Media message').replace(/\n/g, '\n│ │ ')}\n│ └─────────────────────┘\n│\n│ 🛡️ *Saved by Alpha Bot*\n╰────────────⬣`;
+            } else {
+              // Private: push name or number
+              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 *Sender:* ${senderDisplayPrivate}\n│ 📍 *Chat:* Private\n│ 🕒 *Time:* ${time}\n│ 📅 *Date:* ${date}\n│\n│ 🗑️ *Deleted Message:*\n│ ┌─────────────────────┐\n│ │ ${(oldMsg.text || 'Media message').replace(/\n/g, '\n│ │ ')}\n│ └─────────────────────┘\n│\n│ 🛡️ *Saved by Alpha Bot*\n╰────────────⬣`;
+            }
           } else {
             const funny = ["🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️","📝 Deleted message rescued:","🤫 Shh… a message disappeared, but not from me.","👀 I saw what you deleted! Here it is:","🗑️ Trash tried to eat this message, but I caught it."];
             text = funny[Math.floor(Math.random() * funny.length)] + `\n\n${oldMsg.text || 'Media message'}`;
           }
 
-          const mentions = (adConfig.style === 'fancy' && senderJid !== sock.user.id) ? [senderJid] : [];
+          // Mentions only in groups + fancy style + sender not bot itself
+          const mentions = (isGroup && adConfig.style === 'fancy' && senderJid !== sock.user.id) ? [senderJid] : [];
 
+          // Destinations
           const destinations = [];
           if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJid);
           if ((adConfig.mode === 'owner' || adConfig.mode === 'both') && ownerJid) destinations.push(ownerJid);
@@ -366,7 +382,7 @@ const clientstart = async () => {
               await sock.sendMessage(dest, { text, ...opts });
             }
 
-            // Auto-react
+            // Auto-react on the alert (if enabled) only in the original chat
             if (adConfig.react && dest === chatJid) {
               try {
                 await sock.sendMessage(dest, { react: { text: '👀', key: update.key } });
