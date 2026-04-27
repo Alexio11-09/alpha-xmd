@@ -1,4 +1,4 @@
-// © 2026 Alpha - BOT SETTINGS (FULL FUNNY & CLEAN)
+// © 2026 Alpha - BOT SETTINGS (ANTIDELETE UPGRADED)
 
 const fs = require('fs');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
@@ -59,14 +59,62 @@ module.exports = [
       }
     },
 
-    // ==================== ANTIDELETE ====================
-    { command: "antidelete", aliases: ["antidel"], category: "settings", owner: true,
-      execute: async (s, m, { args, reply }) => {
-          const a = args[0]?.toLowerCase();
-          if (a === "on") { setGlobal({ antidelete: true }); reply(R(["🛡️ Anti‑delete ON! I'll catch every sneaky delete.", "🗑️ Deleted messages won't escape me now."])); }
-          else if (a === "off") { setGlobal({ antidelete: false }); reply(R(["❌ Anti‑delete OFF. Deletions are free.", "👋 No more message rescue. Whatever you delete is gone."])); }
-          else { const status = getGlobal().antidelete ? "ON ✅" : "OFF ❌"; reply(`📊 *Anti‑Delete:* ${status}\nChange with: .antidelete on/off`); }
-      }
+    // ==================== ANTIDELETE (UPGRADED) ====================
+    {
+        command: "antidelete",
+        aliases: ["antidel", "adconfig"],
+        category: "settings",
+        owner: true,
+        execute: async (s, m, { args, reply }) => {
+            const sub = args[0]?.toLowerCase();
+            const g = getGlobal();
+            const ad = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+
+            // Show current config if no args
+            if (!sub) {
+                return reply(
+                    `🛡️ *Antidelete Configuration*\n\n` +
+                    `🔹 Status: ${ad.enabled ? '✅ ON' : '❌ OFF'}\n` +
+                    `🔹 Mode: ${ad.mode} (chat/owner/both)\n` +
+                    `🔹 Style: ${ad.style} (fancy/simple)\n` +
+                    `🔹 Reaction: ${ad.react ? '👀 ON' : 'OFF'}\n\n` +
+                    `📌 Usage:\n` +
+                    `.antidelete on/off\n` +
+                    `.antidelete mode chat/owner/both\n` +
+                    `.antidelete style fancy/simple\n` +
+                    `.antidelete react on/off`
+                );
+            }
+
+            // Update settings
+            if (sub === 'on' || sub === 'off') {
+                ad.enabled = sub === 'on';
+            } else if (sub === 'mode') {
+                const mode = args[1]?.toLowerCase();
+                if (['chat', 'owner', 'both'].includes(mode)) {
+                    ad.mode = mode;
+                } else {
+                    return reply("❌ Invalid mode. Use: chat, owner, both");
+                }
+            } else if (sub === 'style') {
+                const style = args[1]?.toLowerCase();
+                if (['fancy', 'simple'].includes(style)) {
+                    ad.style = style;
+                } else {
+                    return reply("❌ Invalid style. Use: fancy, simple");
+                }
+            } else if (sub === 'react') {
+                const r = args[1]?.toLowerCase();
+                if (r === 'on') ad.react = true;
+                else if (r === 'off') ad.react = false;
+                else return reply("❌ Use: react on/off");
+            } else {
+                return reply("❌ Unknown option. Use on/off, mode, style, react");
+            }
+
+            setGlobal({ antidelete: ad });
+            reply(`✅ Antidelete updated!\nStatus: ${ad.enabled ? 'ON' : 'OFF'}, Mode: ${ad.mode}, Style: ${ad.style}, React: ${ad.react ? 'ON' : 'OFF'}`);
+        }
     },
 
     // ==================== ANTIEDIT ====================
@@ -135,19 +183,29 @@ module.exports = [
     },
 
     // ==================== SETTINGS OVERVIEW ====================
-    { command: "settings", aliases: ["config","botsettings"], category: "settings", owner: true,
-      execute: async (s, m, { reply }) => {
-          const cfg = getGlobal();
-          let text = `⚙️ *Current Settings*\n\n`;
-          text += `📖 Auto‑Read: ${cfg.autoread ? '✅' : '❌'}\n`;
-          text += `⌨️ Auto‑Typing: ${cfg.autotyping ? '✅' : '❌'}\n`;
-          text += `🎤 Auto‑Recording: ${cfg.autorecording ? '✅' : '❌'}\n`;
-          text += `😍 Auto‑React: ${cfg.autoreact ? '✅' : '❌'}\n`;
-          text += `🛡️ Anti‑Delete: ${cfg.antidelete ? '✅' : '❌'}\n`;
-          text += `✏️ Anti‑Edit: ${cfg.antiedit ? '✅' : '❌'}\n`;
-          text += `🔧 Prefix: ${cfg.prefix || '.'}\n\n`;
-          text += `💡 *Status auto‑features are now under* .autostatus *(separate module)*`;
-          reply(text);
-      }
+    {
+        command: "settings",
+        aliases: ["config", "botsettings"],
+        category: "settings",
+        owner: true,
+        execute: async (s, m, { reply }) => {
+            const cfg = getGlobal();
+            const ad = cfg.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+            let text = `⚙️ *Current Settings*\n\n`;
+            text += `📖 Auto‑Read: ${cfg.autoread ? '✅' : '❌'}\n`;
+            text += `⌨️ Auto‑Typing: ${cfg.autotyping ? '✅' : '❌'}\n`;
+            text += `🎤 Auto‑Recording: ${cfg.autorecording ? '✅' : '❌'}\n`;
+            text += `😍 Auto‑React: ${cfg.autoreact ? '✅' : '❌'}\n`;
+            text += `🛡️ Anti‑Delete: ${ad.enabled ? '✅' : '❌'}\n`;
+            if (ad.enabled) {
+                text += `   ├ Mode: ${ad.mode}\n`;
+                text += `   ├ Style: ${ad.style}\n`;
+                text += `   └ Reaction: ${ad.react ? '👀' : 'OFF'}\n`;
+            }
+            text += `✏️ Anti‑Edit: ${cfg.antiedit ? '✅' : '❌'}\n`;
+            text += `🔧 Prefix: ${cfg.prefix || '.'}\n\n`;
+            text += `💡 Use .antidelete to configure deletion alerts.`;
+            reply(text);
+        }
     }
 ];
