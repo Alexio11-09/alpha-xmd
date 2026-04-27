@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + LOADING EFFECT STAYS + EVIL JORDAN SONG)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + LOADING EFFECT + AUDIO FIX)
 
 const fs = require('fs');
 const os = require('os');
@@ -38,7 +38,7 @@ const getCountry = (jid) => {
 };
 
 module.exports = [
-    // ==================== 1. MENU (ENHANCED) ====================
+    // ==================== 1. MENU (ENHANCED – SEPARATE AUDIO TRY) ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
@@ -46,25 +46,21 @@ module.exports = [
         execute: async (sock, m, { send }) => {
             try {
                 // ----- 🎬 LIGHTNING LOADING EFFECT -----
-                // 1. Send a "0%" message
                 const loadMsg = await sock.sendMessage(m.chat, {
                     text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
                 }, { quoted: m });
 
-                // 2. Wait a tiny moment, then edit to "100%"
                 await new Promise(resolve => setTimeout(resolve, 700));
                 await sock.sendMessage(m.chat, {
                     text: "⚡ Loaded 100% ████████████",
-                    edit: loadMsg.key   // editing supported by Baileys
+                    edit: loadMsg.key
                 });
-
-                // NOTE: We do NOT delete the loading message – it stays visible.
 
                 // ----- 🎵 SONG URL (from config, with fallback) -----
                 const menuSongUrl = (config.settings && config.settings.menuSongUrl)
-                    || "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";   // Evil Jordan default
+                    || "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";
 
-                // ----- 📋 MENU TEMPLATE (same as before) -----
+                // ----- 📋 MENU TEMPLATE (same as always) -----
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -287,12 +283,17 @@ ${config.settings.footer}
                     caption: menu
                 });
 
-                // ----- 🎵 SEND EVIL JORDAN INTRO -----
-                await sock.sendMessage(m.chat, {
-                    audio: { url: menuSongUrl },
-                    mimetype: 'audio/mpeg',
-                    ptt: true   // voice note (smaller); set to false for regular audio
-                }, { quoted: m });
+                // ----- 🎵 SEND SONG – do NOT break the menu if this fails -----
+                try {
+                    await sock.sendMessage(m.chat, {
+                        audio: { url: menuSongUrl },
+                        mimetype: 'audio/mpeg',
+                        ptt: true   // voice note (set false for regular audio file)
+                    }, { quoted: m });
+                } catch (audioErr) {
+                    console.log("⚠️ Menu audio failed:", audioErr.message);
+                    // silently skip – the menu already appeared successfully
+                }
 
             } catch (err) {
                 console.log("Menu error:", err);
