@@ -206,13 +206,13 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (TEXT COMMENT – WORKS NOW) ====================
+ // ==================== 17. .chreact (TEXT REACTION HACK) ====================
 {
   command: "chreact",
   aliases: ["channelcomment", "creply"],
   category: "tools",
   execute: async (s, m, { args, reply }) => {
-    if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 you're lying");
+    if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 your comment");
 
     const link = args[0];
     const match = link.match(/channel\/(\w+)\/(\d+)/);
@@ -224,32 +224,35 @@ module.exports = [
     const comment = args.slice(1).join(" ").trim();
 
     try {
-      // Try to post as a quoted reply first (requires admin / publisher rights)
-      await s.sendMessage(channelJid, {
-        text: comment,
-        quoted: {
+      // Attempt to send a fake reaction using relayMessage (works in some Baileys versions)
+      await s.relayMessage(channelJid, {
+        reactionMessage: {
           key: {
             remoteJid: channelJid,
             id: messageId,
             fromMe: false
-          }
+          },
+          text: comment,         // The text we want to "react" with
+          senderTimestampMs: Date.now()
         }
-      });
-      reply("✅ Comment posted on the channel update!");
-    } catch (err) {
-      // If it fails, the bot likely lacks publisher rights – fallback to a normal message with a reference link
-      console.warn("chreact: quoted reply failed – sending as plain post:", err.message);
+      }, { participant: channelJid });
+
+      reply("✅ Text reaction posted on the channel update!");
+      console.log("chreact: sent fake reaction with text:", comment);
+    } catch (reactionErr) {
+      console.warn("chreact: reactionMessage failed, falling back to plain post:", reactionErr.message);
+
+      // Fallback: post as a normal message with a reference
       try {
         await s.sendMessage(channelJid, {
-          text: `${comment}\n\n(Posted via bot about update ${link})`
+          text: `${comment}\n\n(About: ${link})`
         });
-        reply("✅ Comment sent (as a general post, not a direct reply). To make it a true reply, promote the bot to admin in your channel.");
-      } catch (fallbackErr) {
-        console.error("chreact fallback error:", fallbackErr);
-        reply(`❌ Could not post to channel: ${fallbackErr.message}`);
+        reply("✅ Comment sent (as a normal post). To enable true text reactions, ensure the bot is publisher of the channel.");
+      } catch (postErr) {
+        console.error("chreact fallback error:", postErr);
+        reply(`❌ Failed to post: ${postErr.message}`);
       }
     }
-  }
-}
+   }
 
 ];
