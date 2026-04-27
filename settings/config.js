@@ -48,7 +48,8 @@ const config = {
     settings: {
         title: "ALPHA-XMD BOT",
         description: "Custom WhatsApp Bot by Alpha",
-        footer: "⚡ Powered by Alpha-XMD"
+        footer: "⚡ Powered by Alpha-XMD",
+        menuSongUrl: "https://on.soundcloud.com/dJE8AW8UyPVxJfxvEY"   // <-- Your Evil Jordan intro link
     },
 
     // 📢 CHANNEL / NEWSLETTER
