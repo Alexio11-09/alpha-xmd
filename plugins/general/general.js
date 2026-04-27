@@ -412,7 +412,7 @@ ${config.settings.footer}
         aliases: ["source", "github", "sc"],
         category: "general",
         execute: async (sock, m, { reply }) => {
-            const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
+            const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
             const ownerName = "Alpha";
             const ownerContact = "wa.me/263786641436";
             const botName = config.settings?.title || "Alpha Bot";
