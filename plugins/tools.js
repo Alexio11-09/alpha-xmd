@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH WORKING .chreact)
+// © 2026 Alpha - TOOLS (WITH FINAL .chreact)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -206,53 +206,53 @@ module.exports = [
     }
   },
 
- // ==================== 17. .chreact (TEXT REACTION HACK) ====================
-{
-  command: "chreact",
-  aliases: ["channelcomment", "creply"],
-  category: "tools",
-  execute: async (s, m, { args, reply }) => {
-    if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 your comment");
+  // ==================== 17. .chreact (TEXT REACTION HACK) ====================
+  {
+    command: "chreact",
+    aliases: ["channelcomment", "creply"],
+    category: "tools",
+    execute: async (s, m, { args, reply }) => {
+      if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 your comment");
 
-    const link = args[0];
-    const match = link.match(/channel\/(\w+)\/(\d+)/);
-    if (!match) return reply("❌ Invalid channel message link.");
+      const link = args[0];
+      const match = link.match(/channel\/(\w+)\/(\d+)/);
+      if (!match) return reply("❌ Invalid channel message link.");
 
-    const channelId = match[1];
-    const messageId = match[2];
-    const channelJid = channelId + '@newsletter';
-    const comment = args.slice(1).join(" ").trim();
+      const channelId = match[1];
+      const messageId = match[2];
+      const channelJid = channelId + '@newsletter';
+      const comment = args.slice(1).join(" ").trim();
 
-    try {
-      // Attempt to send a fake reaction using relayMessage (works in some Baileys versions)
-      await s.relayMessage(channelJid, {
-        reactionMessage: {
-          key: {
-            remoteJid: channelJid,
-            id: messageId,
-            fromMe: false
-          },
-          text: comment,         // The text we want to "react" with
-          senderTimestampMs: Date.now()
-        }
-      }, { participant: channelJid });
-
-      reply("✅ Text reaction posted on the channel update!");
-      console.log("chreact: sent fake reaction with text:", comment);
-    } catch (reactionErr) {
-      console.warn("chreact: reactionMessage failed, falling back to plain post:", reactionErr.message);
-
-      // Fallback: post as a normal message with a reference
       try {
-        await s.sendMessage(channelJid, {
-          text: `${comment}\n\n(About: ${link})`
-        });
-        reply("✅ Comment sent (as a normal post). To enable true text reactions, ensure the bot is publisher of the channel.");
-      } catch (postErr) {
-        console.error("chreact fallback error:", postErr);
-        reply(`❌ Failed to post: ${postErr.message}`);
+        // Attempt to send a fake reaction using relayMessage (works in some Baileys versions)
+        await s.relayMessage(channelJid, {
+          reactionMessage: {
+            key: {
+              remoteJid: channelJid,
+              id: messageId,
+              fromMe: false
+            },
+            text: comment,         // The text we want to "react" with
+            senderTimestampMs: Date.now()
+          }
+        }, { participant: channelJid });
+
+        reply("✅ Text reaction posted on the channel update!");
+        console.log("chreact: sent fake reaction with text:", comment);
+      } catch (reactionErr) {
+        console.warn("chreact: reactionMessage failed, falling back to plain post:", reactionErr.message);
+
+        // Fallback: post as a normal message with a reference
+        try {
+          await s.sendMessage(channelJid, {
+            text: `${comment}\n\n(About: ${link})`
+          });
+          reply("✅ Comment sent (as a normal post). To enable true text reactions, ensure the bot is publisher of the channel.");
+        } catch (postErr) {
+          console.error("chreact fallback error:", postErr);
+          reply(`❌ Failed to post: ${postErr.message}`);
+        }
       }
     }
-   }
-
+  }
 ];
