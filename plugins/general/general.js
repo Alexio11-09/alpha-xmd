@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + LOADING EFFECT + SONG – CONFIGURABLE)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + LOADING EFFECT STAYS + EVIL JORDAN SONG)
 
 const fs = require('fs');
 const os = require('os');
@@ -58,17 +58,13 @@ module.exports = [
                     edit: loadMsg.key   // editing supported by Baileys
                 });
 
-                // 3. Delete the loading message (fails silently if not admin)
-                await new Promise(resolve => setTimeout(resolve, 300));
-                try {
-                    await sock.sendMessage(m.chat, { delete: loadMsg.key });
-                } catch {}
+                // NOTE: We do NOT delete the loading message – it stays visible.
 
                 // ----- 🎵 SONG URL (from config, with fallback) -----
                 const menuSongUrl = (config.settings && config.settings.menuSongUrl)
-                    || "https://files.catbox.moe/6s0zq0.mp3";   // default placeholder
+                    || "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";   // Evil Jordan default
 
-                // ----- 📋 MENU TEMPLATE (same as always) -----
+                // ----- 📋 MENU TEMPLATE (same as before) -----
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -291,11 +287,11 @@ ${config.settings.footer}
                     caption: menu
                 });
 
-                // ----- 🎵 SEND THE SONG (EVIL JORDAN INTRO) -----
+                // ----- 🎵 SEND EVIL JORDAN INTRO -----
                 await sock.sendMessage(m.chat, {
                     audio: { url: menuSongUrl },
                     mimetype: 'audio/mpeg',
-                    ptt: true   // voice note (smaller); change to false for regular audio file
+                    ptt: true   // voice note (smaller); set to false for regular audio
                 }, { quoted: m });
 
             } catch (err) {
@@ -306,7 +302,6 @@ ${config.settings.footer}
     },
 
     // ==================== 2. PING ====================
-    // (unchanged)
     {
         command: "ping",
         aliases: ["p"],
@@ -324,6 +319,154 @@ ${config.settings.footer}
         }
     },
 
-    // (rest of commands unchanged... for brevity, they are exactly as before)
-    // ... alive, info, owner, repo, pair identical to previous version
+    // ==================== 3. ALIVE ====================
+    {
+        command: "alive",
+        aliases: ["online", "test"],
+        category: "general",
+        execute: async (sock, m, { reply }) => {
+            const uptime = runtime(process.uptime());
+            const memory = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+            const ping = m.messageTimestamp ? (Date.now() - (m.messageTimestamp * 1000)) : '??';
+
+            const quotes = [
+                `✅ I'm alive and kicking! ⏳ Uptime: ${uptime} | 🧠 RAM: ${memory}MB | 📡 Ping: ${ping}ms`,
+                `🟢 Reporting for duty! Uptime: ${uptime} | Ping: ${ping}ms | RAM: ${memory}MB`,
+                `💪 Still breathing, human. Uptime: ${uptime} | Ping: ${ping}ms`,
+                `🤖 Beep boop… I'm online! Uptime: ${uptime} | Memory: ${memory}MB`,
+                `🏃‍♂️ Running like a champ. Uptime: ${uptime} | Ping: ${ping}ms`
+            ];
+
+            reply(R(quotes));
+        }
+    },
+
+    // ==================== 4. BOT INFO ====================
+    {
+        command: "info",
+        aliases: ["botinfo", "status"],
+        category: "general",
+        execute: async (sock, m, { reply }) => {
+            const uptime = runtime(process.uptime());
+            const memory = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+            const platform = os.platform();
+            const hostname = os.hostname();
+            const nodeVersion = process.version;
+            const botName = config.settings?.title || 'Alpha Bot';
+            const owner = config.owner?.[0] || 'Unknown';
+            const ownerJid = owner.includes('@') ? owner : owner + '@s.whatsapp.net';
+
+            const infos = [
+                `📊 *${botName} Info*\n\n` +
+                `⏳ Uptime: ${uptime}\n` +
+                `🧠 Memory: ${memory} MB\n` +
+                `💻 Platform: ${platform}\n` +
+                `🖥️ Host: ${hostname}\n` +
+                `🔧 Node.js: ${nodeVersion}\n` +
+                `👑 Owner: @${owner}`,
+
+                `🤖 *Bot Status*\n\n` +
+                `🟢 Status: Online\n` +
+                `⏱️ Running: ${uptime}\n` +
+                `📡 Ping: Fast\n` +
+                `🧠 RAM: ${memory}MB\n` +
+                `👤 Owner: @${owner}`,
+
+                `📋 *Technical Info*\n\n` +
+                `⚡ Uptime: ${uptime}\n` +
+                `💾 Memory: ${memory}MB\n` +
+                `🖥️ OS: ${platform}\n` +
+                `🔢 Node: ${nodeVersion}\n` +
+                `👑 @${owner}`
+            ];
+
+            reply(R(infos), { mentions: [ownerJid] });
+        }
+    },
+
+    // ==================== 5. OWNER CONTACT ====================
+    {
+        command: "owner",
+        aliases: ["creator", "dev"],
+        category: "general",
+        execute: async (sock, m, { reply }) => {
+            const ownerNumber = config.owner?.[0] || 'Unknown';
+            const ownerName = config.settings?.title?.split(' ')[0] || 'Alpha';
+            const ownerJid = ownerNumber.includes('@') ? ownerNumber : ownerNumber + '@s.whatsapp.net';
+
+            const messages = [
+                `👑 *Owner:* @${ownerNumber}\n👤 *Name:* ${ownerName}\n\n💬 Tap the mention to send a DM. I'm happy to help!`,
+                `🤴 *The Boss*\n📞 @${ownerNumber}\n👤 ${ownerName}\n\nMessage me directly for business or support!`,
+                `🫅 *Contact the King*\n👤 ${ownerName}\n📱 @${ownerNumber}\n\nSlide into my DMs anytime.`,
+                `👤 *Bot Creator*\n${ownerName}\n📞 @${ownerNumber}\n\nReach out for collaborations or issues.`
+            ];
+
+            reply(R(messages), { mentions: [ownerJid] });
+        }
+    },
+
+    // ==================== 6. REPO ====================
+    {
+        command: "repo",
+        aliases: ["source", "github", "sc"],
+        category: "general",
+        execute: async (sock, m, { reply }) => {
+            const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
+            const ownerName = "Alpha";
+            const ownerContact = "wa.me/263786641436";
+            const botName = config.settings?.title || "Alpha Bot";
+
+            const texts = [
+                `📂 *${botName} – Source Code*\n\n` +
+                `🔗 *Repo:* ${repoLink}\n` +
+                `👤 *Owner:* ${ownerName}\n` +
+                `📞 *Contact:* ${ownerContact}\n\n` +
+                `⭐ Star the project & fork freely!`,
+
+                `🧬 *Open Source Bot*\n\n` +
+                `💻 *Repo:* ${repoLink}\n` +
+                `👑 *Dev:* ${ownerName}\n` +
+                `📱 *WhatsApp:* ${ownerContact}\n\n` +
+                `🤖 Build your own version with this code.`,
+
+                `⚡ *Alpha XMD Repository*\n\n` +
+                `🔗 ${repoLink}\n` +
+                `👤 *Maintainer:* ${ownerName}\n` +
+                `📞 ${ownerContact}\n\n` +
+                `📥 Clone, modify, deploy.`
+            ];
+
+            reply(texts[Math.floor(Math.random() * texts.length)]);
+        }
+    },
+
+    // ==================== 7. PAIR (INTERACTIVE) ====================
+    {
+        command: "pair",
+        aliases: ["pairing", "session"],
+        category: "general",
+        execute: async (sock, m, { args, reply }) => {
+            if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
+
+            const number = args[0].replace(/[^0-9]/g, "");
+            if (number.length < 10) return reply("❌ Invalid phone number. Use full country code (no +).");
+
+            // Already a pending session?
+            const pairSessionKey = m.chat + m.sender;
+            if (global.pairSessions && global.pairSessions[pairSessionKey]) {
+                return reply("⚠️ You already have a pending pairing request. Reply with *1* for QR or *2* for code.");
+            }
+
+            if (!global.pairSessions) global.pairSessions = {};
+            global.pairSessions[pairSessionKey] = number;
+
+            return reply(
+                `🔐 *Pairing for +${number}*\n\n` +
+                `Reply with:\n` +
+                `*1.* 📷 QR Code\n` +
+                `*2.* 🔢 Pairing Code\n\n` +
+                `⌛ Reply in 2 minutes.`
+            );
+        }
+    }
 ];
