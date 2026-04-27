@@ -49,7 +49,7 @@ const config = {
         title: "ALPHA-XMD BOT",
         description: "Custom WhatsApp Bot by Alpha",
         footer: "⚡ Powered by Alpha-XMD",
-        menuSongUrl: "https://on.soundcloud.com/dJE8AW8UyPVxJfxvEY"   // <-- Your Evil Jordan intro link
+        menuSongUrl: "https://files.catbox.moe/soKHEOR3yQOZE51.mp3"   // 👈 Evil Jordan intro (direct mp3)
     },
 
     // 📢 CHANNEL / NEWSLETTER
