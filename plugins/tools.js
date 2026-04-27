@@ -1,9 +1,10 @@
-// © 2026 Alpha - TOOLS (WITH .chreact USING newsletterSend)
+// © 2026 Alpha - TOOLS (WITH .img IMAGE SEARCH)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg'); ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 const { writeExif } = require('../library/exif'), webp = require('node-webpmux');
+const { imageSearch } = require('@mudbill/duckduckgo-images-api');
 const cleanup = (f) => setTimeout(() => { try { fs.unlinkSync(f); } catch {} }, 300000);
 const F = (a) => a[Math.floor(Math.random()*a.length)];
 const fail = ["👾 Oops! Try again?","💥 Failed!","😅 Something broke.","🤷‍♂️ Blame the gremlins."];
@@ -24,6 +25,7 @@ const ok = {
   removebg: F(["✨ No bg!","🪄 Magic!","🎨 Done."]),
   tomp3: F(["⏳ Converting...","🎧 MP3 ready!","🔊 Done!"]),
   url: F(["🌐 Uploaded!","📤 Link:","🔗 Online:"]),
+  img: F(["🖼️ Images found!","📸 Here you go:","🔍 Search result:"]),
   vv: {
     img: F(["👀 Saved!","📸 Snapped!","🖼️ Bypass."]),
     vid: F(["🎥 Rescued!","📹 Saved!","🎬 Bypass."]),
@@ -41,30 +43,34 @@ async function uploadImage(buf, fname = 'image.png') {
 }
 
 module.exports = [
-  // (1‑16 unchanged, same as previous working tools)
+  // 1. CALC
   { command: "calc", aliases: ["calculator","math"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("calc", ".calc 2+2"));
       try { reply(ok.calc(args.join(" ").replace(/[^0-9+\-*/()%. ]/g, ""), eval(args.join(" ").replace(/[^0-9+\-*/()%. ]/g, "")))); } catch { reply(F(fail)); }
     }
   },
+  // 2. QR
   { command: "qr", aliases: ["qrcode"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("qr", ".qr text"));
       try { const b = await QRCode.toBuffer(args.join(" "), { type: 'png' }); await s.sendMessage(m.chat, { image: b, caption: ok.qr }, { quoted: m }); } catch { reply(F(fail)); }
     }
   },
+  // 3. TTS
   { command: "tts", aliases: ["speak","say"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("tts", ".tts text"));
       try { const t = encodeURIComponent(args.join(" ")); await s.sendMessage(m.chat, { audio: { url: `https://translate.google.com/translate_tts?ie=UTF-8&q=${t}&tl=en&client=tw-ob` }, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply(ok.tts); } catch { reply(F(fail)); }
     }
   },
+  // 4. TIME
   { command: "time", aliases: ["clock","date"], category: "tools",
     execute: async (s, m, { reply }) => {
       try { const n = moment(); reply(`${ok.time}\n📅 ${n.format("dddd, MMMM Do YYYY")}\n⏰ ${n.format("hh:mm:ss A")}\n🌍 SA: ${moment().tz("Africa/Johannesburg").format("hh:mm A")}`); } catch { reply(F(fail)); }
     }
   },
+  // 5. STICKER
   { command: "sticker", aliases: ["s","st"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted?.message) return reply("❌ Reply to image/video!");
@@ -80,6 +86,7 @@ module.exports = [
       } catch (e) { console.error("Sticker:", e); reply("❌ " + (e.message || "Failed")); }
     }
   },
+  // 6. TOIMG
   { command: "toimg", aliases: ["stickertoimg","simg"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted?.message) return reply("❌ Reply to sticker!");
@@ -93,22 +100,26 @@ module.exports = [
       } catch (e) { console.error("Toimg:", e); reply("❌ " + (e.message || "Failed")); }
     }
   },
+  // 7. GETPP
   { command: "getpp", aliases: ["getprofile","pp"], category: "tools",
     execute: async (s, m, { reply }) => {
       let t = m.mentionedJid?.[0] || (m.quoted?.sender) || m.sender;
       try { const u = await s.profilePictureUrl(t, 'image'); await s.sendMessage(m.chat, { image: { url: u }, caption: ok.getpp(t.split('@')[0]), mentions: [t] }, { quoted: m }); } catch { reply("👤 No PP."); }
     }
   },
+  // 8. GETID
   { command: "getid", aliases: ["id","userid"], category: "tools",
     execute: async (s, m, { reply }) => {
       let t = m.mentionedJid?.[0] || (m.quoted?.sender) || m.sender; reply(ok.getid(t.split('@')[0]));
     }
   },
+  // 9. GETLINK
   { command: "getlink", aliases: ["grouplink","invitelink"], category: "tools", group: true, admin: true,
     execute: async (s, m, { reply }) => {
       try { const c = await s.groupInviteCode(m.chat); reply(`${ok.getlink}\nhttps://chat.whatsapp.com/${c}`); } catch { reply("❌ Need admin."); }
     }
   },
+  // 10. TRANSLATE
   { command: "translate", aliases: ["tr"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("translate", ".translate en Hello"));
@@ -116,18 +127,21 @@ module.exports = [
       try { const r = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${l}&dt=t&q=${encodeURIComponent(t)}`, { timeout: 10000 }); reply(ok.translate(l, r.data[0][0][0])); } catch { reply(F(fail)); }
     }
   },
+  // 11. WEATHER
   { command: "weather", aliases: ["forecast"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("weather", ".weather Harare"));
       try { const r = await axios.get(`https://wttr.in/${encodeURIComponent(args.join(" "))}?format=%C+%t+%w+%h`, { timeout: 10000 }); reply(ok.weather(args.join(" "), r.data)); } catch { reply(F(fail)); }
     }
   },
+  // 12. LYRICS
   { command: "lyrics", aliases: ["lyric"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!args[0]) return reply(guide("lyrics", ".lyrics Song"));
       try { const r = await axios.get(`https://api.davidcyriltech.my.id/lyrics?title=${encodeURIComponent(args.join(" "))}`, { timeout: 10000 }); const l = r.data?.lyrics || r.data?.result?.lyrics; if (!l) return reply("❌ Not found."); reply(`${ok.lyrics}\n\n${l.substring(0, 3900)}`); } catch { reply("❌ Service down."); }
     }
   },
+  // 13. REMOVEBG
   { command: "removebg", aliases: ["rbg","nobg"], category: "tools",
     execute: async (s, m, { args, reply }) => {
       if (!m.quoted) return reply(guide("removebg", ".removebg (reply image)"));
@@ -142,6 +156,7 @@ module.exports = [
       } catch { reply("❌ Failed."); }
     }
   },
+  // 14. TOMP3
   { command: "tomp3", aliases: ["toaudio","video2mp3"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted) return reply(guide("tomp3", ".tomp3 (reply video)"));
@@ -158,6 +173,7 @@ module.exports = [
       finally { cleanup(vid); cleanup(aud); }
     }
   },
+  // 15. VV (UNTOUCHED)
   { command: "vv", aliases: ["viewonce","saveview","antiselfdestruct","unlock"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted) return reply(guide("vv", ".vv (reply view-once)"));
@@ -174,6 +190,7 @@ module.exports = [
       } catch (e) { console.log("VV:", e.message); reply("❌ Bypass failed."); }
     }
   },
+  // 16. URL (UPLOAD)
   { command: "url", aliases: ["upload","imageurl"], category: "tools",
     execute: async (s, m, { reply }) => {
       if (!m.quoted?.message) return reply("❌ Reply to image/sticker!");
@@ -191,37 +208,55 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (newsletterSend) ====================
+  // ==================== 18. .img (DUCKDUCKGO IMAGE SEARCH) ====================
   {
-    command: "chreact",
-    aliases: ["channelcomment", "creply"],
+    command: "img",
+    aliases: ["image", "pic", "gimage"],
     category: "tools",
     execute: async (s, m, { args, reply }) => {
-      if (args.length < 2) return reply("❌ Usage: .chreact <channel_message_link> <your comment>\n\n📌 Example:\n.chreact https://whatsapp.com/channel/0029Vb.../123 your comment");
+      if (!args[0]) return reply("❌ Usage: .img <search query>\n\n📌 Example: .img doja cat");
 
-      const link = args[0];
-      const match = link.match(/channel\/(\w+)\/(\d+)/);
-      if (!match) return reply("❌ Invalid channel message link.");
-
-      const channelId = match[1];
-      const messageId = match[2];
-      const channelJid = channelId + '@newsletter';
-      const comment = args.slice(1).join(" ").trim();
+      const query = args.join(" ");
+      reply(`🔍 Searching images for *${query}*...`);
 
       try {
-        // Primary: use the newsletter-specific send method (available in Baileys 6.5+)
-        if (typeof s.newsletterSend === 'function') {
-          await s.newsletterSend(channelJid, { text: comment });
-          reply("✅ Comment posted on the channel!");
-          console.log("chreact: posted via newsletterSend");
-        } else {
-          // Fallback: try the raw sendMessage, but it might fail with JID decode error
-          await s.sendMessage(channelJid, { text: comment });
-          reply("✅ Comment posted (using standard send).");
+        const results = await imageSearch({
+          query: query,
+          safe: false,
+          iterations: 1
+        });
+
+        if (!results || results.length === 0) {
+          return reply(`❌ No images found for "${query}".`);
+        }
+
+        // Pick up to 5 random results, avoiding duplicate or broken URLs
+        const shuffled = results
+          .filter(r => r.image && r.image.startsWith('http'))
+          .sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, 5);
+
+        if (selected.length === 0) {
+          return reply(`❌ No valid image URLs found for "${query}".`);
+        }
+
+        // Send each image
+        for (let i = 0; i < selected.length; i++) {
+          try {
+            await s.sendMessage(m.chat, {
+              image: { url: selected[i].image },
+              caption: i === 0 ? `${ok.img}\n🔍 *${query}* (${i+1}/${selected.length})` : `🔍 *${query}* (${i+1}/${selected.length})`
+            }, { quoted: i === 0 ? m : undefined });
+            // Small delay between images
+            if (i < selected.length - 1) await new Promise(r => setTimeout(r, 500));
+          } catch (imgErr) {
+            // Skip broken image, try next
+            console.log("Img send error:", imgErr.message);
+          }
         }
       } catch (err) {
-        console.error("chreact error:", err);
-        reply(`❌ Failed to post comment: ${err.message}`);
+        console.error("Img search error:", err);
+        reply(`❌ Image search failed: ${err.message || "Unknown error"}`);
       }
     }
   }
