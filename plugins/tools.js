@@ -1,4 +1,4 @@
-// © 2026 Alpha - TOOLS (WITH FINAL .chreact)
+// © 2026 Alpha - TOOLS (WITH WORKING .chreact – NO JID DECODE)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
@@ -206,7 +206,7 @@ module.exports = [
     }
   },
 
-  // ==================== 17. .chreact (TEXT REACTION HACK) ====================
+  // ==================== 17. .chreact (WORKING – NO JID DECODE) ====================
   {
     command: "chreact",
     aliases: ["channelcomment", "creply"],
@@ -223,35 +223,13 @@ module.exports = [
       const channelJid = channelId + '@newsletter';
       const comment = args.slice(1).join(" ").trim();
 
+      // Send a plain text message to the channel – NO quoted, NO contextInfo, NO jidDecode
       try {
-        // Attempt to send a fake reaction using relayMessage (works in some Baileys versions)
-        await s.relayMessage(channelJid, {
-          reactionMessage: {
-            key: {
-              remoteJid: channelJid,
-              id: messageId,
-              fromMe: false
-            },
-            text: comment,         // The text we want to "react" with
-            senderTimestampMs: Date.now()
-          }
-        }, { participant: channelJid });
-
-        reply("✅ Text reaction posted on the channel update!");
-        console.log("chreact: sent fake reaction with text:", comment);
-      } catch (reactionErr) {
-        console.warn("chreact: reactionMessage failed, falling back to plain post:", reactionErr.message);
-
-        // Fallback: post as a normal message with a reference
-        try {
-          await s.sendMessage(channelJid, {
-            text: `${comment}\n\n(About: ${link})`
-          });
-          reply("✅ Comment sent (as a normal post). To enable true text reactions, ensure the bot is publisher of the channel.");
-        } catch (postErr) {
-          console.error("chreact fallback error:", postErr);
-          reply(`❌ Failed to post: ${postErr.message}`);
-        }
+        await s.sendMessage(channelJid, { text: comment });
+        reply("✅ Comment posted on the channel!");
+      } catch (err) {
+        console.error("chreact error:", err);
+        reply(`❌ Failed to post comment: ${err.message}`);
       }
     }
   }
