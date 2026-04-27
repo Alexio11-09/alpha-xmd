@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7 IN ONE FILE)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + UPDATED MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -38,7 +38,7 @@ const getCountry = (jid) => {
 };
 
 module.exports = [
-    // ==================== 1. MENU ====================
+    // ==================== 1. MENU (UPDATED) ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
@@ -138,12 +138,33 @@ module.exports = [
 │ • .img
 ╰────────────⬣
 
+╭───〔 🖥️ CPANEL 〕───⬣
+│ • .addserver
+│ • .delserver
+│ • .listservers
+│ • .sendpanel
+│ • .1gb
+│ • .2gb
+│ • .3gb
+│ • .4gb
+│ • .5gb
+│ • .6gb
+│ • .7gb
+│ • .8gb
+│ • .9gb
+│ • .unli
+│ • .admin
+│ • .addprem
+│ • .delprem
+│ • .premiumlist
+╰────────────⬣
+
 ╭───〔 ⚙️ SETTINGS 〕───⬣
 │ • .autoread on/off
 │ • .autotyping on/off
 │ • .autorecording on/off
 │ • .autoreact on/off
-│ • .antidelete on/off
+│ • .antidelete (mode/style/react)
 │ • .antiedit on/off
 │ • .autoviewstatus on/off
 │ • .autoreactstatus on/off
@@ -172,6 +193,7 @@ module.exports = [
 │ • .lyrics
 │ • .vv
 │ • .url
+│ • .chreact
 ╰────────────⬣
 
 ╭───〔 🎮 GAMES 〕───⬣
