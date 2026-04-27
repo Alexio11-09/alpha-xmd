@@ -63,6 +63,23 @@ try {
     settingsPath = '/tmp/settings.json';
 }
 
+// ---------- MIGRATE OLD ANTIDELETE BOOLEAN ----------
+try {
+    const raw = JSON.parse(fs.readFileSync(settingsPath));
+    if (raw.global && typeof raw.global.antidelete === 'boolean') {
+        const oldValue = raw.global.antidelete;
+        raw.global.antidelete = {
+            enabled: oldValue,
+            mode: 'chat',
+            style: 'fancy',
+            react: true
+        };
+        fs.writeFileSync(settingsPath, JSON.stringify(raw, null, 2));
+        console.log('🔄 Migrated antidelete setting to new format.');
+    }
+} catch {}
+
+// ---------- GLOBAL SETTINGS ----------
 let globalSettings = {
     autoread: true, autotyping: false, autorecording: false, autoreact: false,
     antidelete: false, antiedit: false
@@ -258,7 +275,7 @@ const clientstart = async () => {
             text: m.text || "",
             message: mek.message,
             sender: m.sender,
-            pushName: m.pushName || null   // 🔥 store the push name
+            pushName: m.pushName || null
         });
 
         if (m.isGroup) {
@@ -319,12 +336,10 @@ const clientstart = async () => {
           const isGroup = chatJid.endsWith('@g.us');
           const senderJid = oldMsg.sender || update.key.participant || chatJid;
           const senderNumber = senderJid.split('@')[0];
-          // In private: use push name if available, else number
           const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== ''
             ? oldMsg.pushName
             : senderNumber;
 
-          // Determine chat name
           let chatName = 'Private Chat';
           if (isGroup) {
             try {
@@ -342,10 +357,8 @@ const clientstart = async () => {
           let text;
           if (adConfig.style === 'fancy') {
             if (isGroup) {
-              // Group: show @mention
               text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 *Sender:* @${senderNumber}\n│ 📍 *Chat:* ${chatName}\n│ 🕒 *Time:* ${time}\n│ 📅 *Date:* ${date}\n│\n│ 🗑️ *Deleted Message:*\n│ ┌─────────────────────┐\n│ │ ${(oldMsg.text || 'Media message').replace(/\n/g, '\n│ │ ')}\n│ └─────────────────────┘\n│\n│ 🛡️ *Saved by Alpha Bot*\n╰────────────⬣`;
             } else {
-              // Private: push name or number
               text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 *Sender:* ${senderDisplayPrivate}\n│ 📍 *Chat:* Private\n│ 🕒 *Time:* ${time}\n│ 📅 *Date:* ${date}\n│\n│ 🗑️ *Deleted Message:*\n│ ┌─────────────────────┐\n│ │ ${(oldMsg.text || 'Media message').replace(/\n/g, '\n│ │ ')}\n│ └─────────────────────┘\n│\n│ 🛡️ *Saved by Alpha Bot*\n╰────────────⬣`;
             }
           } else {
@@ -353,10 +366,8 @@ const clientstart = async () => {
             text = funny[Math.floor(Math.random() * funny.length)] + `\n\n${oldMsg.text || 'Media message'}`;
           }
 
-          // Mentions only in groups + fancy style + sender not bot itself
           const mentions = (isGroup && adConfig.style === 'fancy' && senderJid !== sock.user.id) ? [senderJid] : [];
 
-          // Destinations
           const destinations = [];
           if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJid);
           if ((adConfig.mode === 'owner' || adConfig.mode === 'both') && ownerJid) destinations.push(ownerJid);
@@ -382,7 +393,6 @@ const clientstart = async () => {
               await sock.sendMessage(dest, { text, ...opts });
             }
 
-            // Auto-react on the alert (if enabled) only in the original chat
             if (adConfig.react && dest === chatJid) {
               try {
                 await sock.sendMessage(dest, { react: { text: '👀', key: update.key } });
