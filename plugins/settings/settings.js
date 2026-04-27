@@ -1,4 +1,4 @@
-// © 2026 Alpha - BOT SETTINGS (ANTIDELETE UPGRADED)
+// © 2026 Alpha - BOT SETTINGS (WITH CHREACT AUTO‑REACT)
 
 const fs = require('fs');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
@@ -59,7 +59,7 @@ module.exports = [
       }
     },
 
-    // ==================== ANTIDELETE (UPGRADED) ====================
+    // ==================== ANTIDELETE (upgraded) ====================
     {
         command: "antidelete",
         aliases: ["antidel", "adconfig"],
@@ -70,7 +70,6 @@ module.exports = [
             const g = getGlobal();
             const ad = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
 
-            // Show current config if no args
             if (!sub) {
                 return reply(
                     `🛡️ *Antidelete Configuration*\n\n` +
@@ -86,7 +85,6 @@ module.exports = [
                 );
             }
 
-            // Update settings
             if (sub === 'on' || sub === 'off') {
                 ad.enabled = sub === 'on';
             } else if (sub === 'mode') {
@@ -183,29 +181,69 @@ module.exports = [
     },
 
     // ==================== SETTINGS OVERVIEW ====================
+    { command: "settings", aliases: ["config","botsettings"], category: "settings", owner: true,
+      execute: async (s, m, { reply }) => {
+          const cfg = getGlobal();
+          const ad = cfg.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+          const cr = cfg.chreact || { enabled: false, emojis: ['💬'] };
+          let text = `⚙️ *Current Settings*\n\n`;
+          text += `📖 Auto‑Read: ${cfg.autoread ? '✅' : '❌'}\n`;
+          text += `⌨️ Auto‑Typing: ${cfg.autotyping ? '✅' : '❌'}\n`;
+          text += `🎤 Auto‑Recording: ${cfg.autorecording ? '✅' : '❌'}\n`;
+          text += `😍 Auto‑React: ${cfg.autoreact ? '✅' : '❌'}\n`;
+          text += `🛡️ Anti‑Delete: ${ad.enabled ? '✅' : '❌'}\n`;
+          if (ad.enabled) {
+              text += `   ├ Mode: ${ad.mode}\n`;
+              text += `   ├ Style: ${ad.style}\n`;
+              text += `   └ Reaction: ${ad.react ? '👀' : 'OFF'}\n`;
+          }
+          text += `💬 Channel‑React: ${cr.enabled ? '✅' : '❌'}\n`;
+          if (cr.enabled) {
+              text += `   └ Emojis: ${cr.emojis.join(' ')}\n`;
+          }
+          text += `✏️ Anti‑Edit: ${cfg.antiedit ? '✅' : '❌'}\n`;
+          text += `🔧 Prefix: ${cfg.prefix || '.'}\n\n`;
+          text += `💡 Use .chreact to configure channel auto‑reactions.`;
+          reply(text);
+      }
+    },
+
+    // ==================== CHREACT (CHANNEL AUTO‑REACT) ====================
     {
-        command: "settings",
-        aliases: ["config", "botsettings"],
+        command: "chreact",
+        aliases: ["channelreact", "autoreactchannel"],
         category: "settings",
         owner: true,
-        execute: async (s, m, { reply }) => {
-            const cfg = getGlobal();
-            const ad = cfg.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
-            let text = `⚙️ *Current Settings*\n\n`;
-            text += `📖 Auto‑Read: ${cfg.autoread ? '✅' : '❌'}\n`;
-            text += `⌨️ Auto‑Typing: ${cfg.autotyping ? '✅' : '❌'}\n`;
-            text += `🎤 Auto‑Recording: ${cfg.autorecording ? '✅' : '❌'}\n`;
-            text += `😍 Auto‑React: ${cfg.autoreact ? '✅' : '❌'}\n`;
-            text += `🛡️ Anti‑Delete: ${ad.enabled ? '✅' : '❌'}\n`;
-            if (ad.enabled) {
-                text += `   ├ Mode: ${ad.mode}\n`;
-                text += `   ├ Style: ${ad.style}\n`;
-                text += `   └ Reaction: ${ad.react ? '👀' : 'OFF'}\n`;
+        execute: async (s, m, { args, reply }) => {
+            const sub = args[0]?.toLowerCase();
+            const g = getGlobal();
+            const cr = g.chreact || { enabled: false, emojis: ['💬'] };
+
+            if (!sub) {
+                return reply(
+                    `💬 *Channel Auto‑React*\n\n` +
+                    `🔹 Status: ${cr.enabled ? '✅ ON' : '❌ OFF'}\n` +
+                    `🔹 Emojis: ${cr.emojis.join(' ')}\n\n` +
+                    `📌 Usage:\n` +
+                    `.chreact on/off\n` +
+                    `.chreact set 😂🔥❤️`
+                );
             }
-            text += `✏️ Anti‑Edit: ${cfg.antiedit ? '✅' : '❌'}\n`;
-            text += `🔧 Prefix: ${cfg.prefix || '.'}\n\n`;
-            text += `💡 Use .antidelete to configure deletion alerts.`;
-            reply(text);
+
+            if (sub === 'on' || sub === 'off') {
+                cr.enabled = sub === 'on';
+            } else if (sub === 'set') {
+                if (!args[1]) return reply("❌ Provide at least one emoji.\n📌 Example: .chreact set 😂🔥❤️");
+                const emojis = args.slice(1).join('').match(/\p{Extended_Pictographic}/gu) || [];
+                if (emojis.length === 0) return reply("❌ No valid emoji found.");
+                cr.emojis = emojis.slice(0, 5); // max 5 emojis
+            } else {
+                return reply("❌ Unknown option. Use on/off, set <emojis>");
+            }
+
+            setGlobal({ chreact: cr });
+            reply(`✅ Channel Auto‑React updated!\nStatus: ${cr.enabled ? 'ON' : 'OFF'}\nEmojis: ${cr.emojis.join(' ')}`);
         }
     }
+
 ];
