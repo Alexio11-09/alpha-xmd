@@ -315,9 +315,17 @@ const clientstart = async () => {
           const senderJid = oldMsg.sender || update.key.participant || chatJid;
           const senderName = senderJid.split('@')[0];
           const isGroup = chatJid.endsWith('@g.us');
-          const chatName = isGroup
-            ? (() => { try { const m = await sock.groupMetadata(chatJid); return m.subject; } catch { return 'Group'; } })()
-            : 'Private Chat';
+
+          // FIXED: Properly await group metadata
+          let chatName = 'Private Chat';
+          if (isGroup) {
+            try {
+              const gm = await sock.groupMetadata(chatJid);
+              chatName = gm.subject;
+            } catch {
+              chatName = 'Group';
+            }
+          }
 
           const now = new Date();
           const time = now.toLocaleTimeString();
