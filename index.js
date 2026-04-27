@@ -63,23 +63,6 @@ try {
     settingsPath = '/tmp/settings.json';
 }
 
-// ---------- MIGRATE OLD ANTIDELETE BOOLEAN ----------
-try {
-    const raw = JSON.parse(fs.readFileSync(settingsPath));
-    if (raw.global && typeof raw.global.antidelete === 'boolean') {
-        const oldValue = raw.global.antidelete;
-        raw.global.antidelete = {
-            enabled: oldValue,
-            mode: 'chat',
-            style: 'fancy',
-            react: true
-        };
-        fs.writeFileSync(settingsPath, JSON.stringify(raw, null, 2));
-        console.log('🔄 Migrated antidelete setting to new format.');
-    }
-} catch {}
-
-// ---------- GLOBAL SETTINGS ----------
 let globalSettings = {
     autoread: true, autotyping: false, autorecording: false, autoreact: false,
     antidelete: false, antiedit: false
@@ -247,6 +230,38 @@ const clientstart = async () => {
     }
   });
 
+  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
+  const channelJid = config().newsletter.id + '@newsletter';   // your configured channel
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    if (!messages || !messages[0]) return;
+    const msg = messages[0];
+    if (msg.key?.remoteJid !== channelJid) return;   // only channel messages
+
+    // Refresh global settings to get latest chreact config
+    try {
+        const saved = JSON.parse(fs.readFileSync(settingsPath));
+        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
+    } catch {}
+
+    const crConfig = globalSettings.chreact || { enabled: false, emojis: ['💬'] };
+    if (!crConfig.enabled) return;
+
+    // React with each emoji (small delay to avoid rate limits)
+    for (const emoji of crConfig.emojis) {
+      try {
+        await sock.sendMessage(channelJid, {
+          react: {
+            text: emoji,
+            key: { remoteJid: channelJid, id: msg.key.id, fromMe: false }
+          }
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (err) {
+        console.log('chreact error:', err.message);
+      }
+    }
+  });
+
   // ========== MAIN MESSAGE HANDLER ==========
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
@@ -267,6 +282,7 @@ const clientstart = async () => {
         }
 
         if (mek.key?.remoteJid === "status@broadcast") continue;
+        if (mek.key?.remoteJid === channelJid) continue;   // skip channel messages (already handled above)
 
         const m = await smsg(sock, mek);
 
