@@ -253,7 +253,8 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        store.set(mek.key.id, { text: m.text || "", message: mek.message });
+        // Store message with sender for antidelete
+        store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender });
 
         if (m.isGroup) {
           try {
@@ -289,22 +290,84 @@ const clientstart = async () => {
     } catch (err) {}
   });
 
-  // ANTIDELETE + ANTIEDIT (funny)
+  // ANTIDELETE (UPGRADED) + ANTIEDIT (KEPT AS BEFORE)
   sock.ev.on('messages.update', async (updates) => {
     try {
+      // Refresh global settings
       try {
         const saved = JSON.parse(fs.readFileSync(settingsPath));
         if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
-      } catch (err) {}
+      } catch {}
+
+      // Antidelete config
+      const adConfig = globalSettings.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+      const ownerJid = (config().owner?.[0] || '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
       for (let update of updates) {
         const oldMsg = store.get(update.key.id);
+        if (!oldMsg) continue;
 
-        if (globalSettings.antidelete && update.update.message === null && oldMsg) {
-          const msg = funnyDeleted[Math.floor(Math.random() * funnyDeleted.length)];
-          await sock.sendMessage(update.key.remoteJid, { text: `${msg}\n\n${oldMsg.text || "Media message"}` });
+        // ----- ANTIDELETE -----
+        if (update.update.message === null) {
+          if (!adConfig.enabled) continue;
+
+          const chatJid = update.key.remoteJid;
+          const senderJid = oldMsg.sender || update.key.participant || chatJid;
+          const senderName = senderJid.split('@')[0];
+          const isGroup = chatJid.endsWith('@g.us');
+          const chatName = isGroup
+            ? (() => { try { const m = await sock.groupMetadata(chatJid); return m.subject; } catch { return 'Group'; } })()
+            : 'Private Chat';
+
+          const now = new Date();
+          const time = now.toLocaleTimeString();
+          const date = now.toLocaleDateString();
+
+          let text;
+          if (adConfig.style === 'fancy') {
+            text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 *Sender:* @${senderName}\n│ 📍 *Chat:* ${chatName}\n│ 🕒 *Time:* ${time}\n│ 📅 *Date:* ${date}\n│\n│ 🗑️ *Deleted Message:*\n│ ┌─────────────────────┐\n│ │ ${(oldMsg.text || 'Media message').replace(/\n/g, '\n│ │ ')}\n│ └─────────────────────┘\n│\n│ 🛡️ *Saved by Alpha Bot*\n╰────────────⬣`;
+          } else {
+            const funny = ["🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️","📝 Deleted message rescued:","🤫 Shh… a message disappeared, but not from me.","👀 I saw what you deleted! Here it is:","🗑️ Trash tried to eat this message, but I caught it."];
+            text = funny[Math.floor(Math.random() * funny.length)] + `\n\n${oldMsg.text || 'Media message'}`;
+          }
+
+          const mentions = (adConfig.style === 'fancy' && senderJid !== sock.user.id) ? [senderJid] : [];
+
+          const destinations = [];
+          if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJid);
+          if ((adConfig.mode === 'owner' || adConfig.mode === 'both') && ownerJid) destinations.push(ownerJid);
+
+          for (const dest of destinations) {
+            const opts = {};
+            if (mentions.length > 0 && dest === chatJid) opts.mentions = mentions;
+
+            if (adConfig.style === 'fancy') {
+              await sock.sendMessage(dest, {
+                text,
+                contextInfo: {
+                  forwardingScore: 999,
+                  isForwarded: true,
+                  forwardedNewsletterMessageInfo: {
+                    newsletterJid: config().newsletter.id + "@newsletter",
+                    newsletterName: config().newsletter.name
+                  }
+                },
+                ...opts
+              });
+            } else {
+              await sock.sendMessage(dest, { text, ...opts });
+            }
+
+            // Auto-react
+            if (adConfig.react && dest === chatJid) {
+              try {
+                await sock.sendMessage(dest, { react: { text: '👀', key: update.key } });
+              } catch {}
+            }
+          }
         }
 
+        // ----- ANTIEDIT (unchanged) -----
         if (globalSettings.antiedit && update.update?.message) {
           let newText = "";
           try {
@@ -312,13 +375,15 @@ const clientstart = async () => {
             const type = Object.keys(msg)[0];
             newText = msg[type]?.text || msg[type]?.caption || "";
           } catch {}
-          if (oldMsg && oldMsg.text && newText && oldMsg.text !== newText) {
+          if (oldMsg?.text && newText && oldMsg.text !== newText) {
             const msg = funnyEdited[Math.floor(Math.random() * funnyEdited.length)];
             await sock.sendMessage(update.key.remoteJid, { text: `${msg}\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}` });
           }
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.log("Antidelete/antiedit error:", err);
+    }
   });
 
   // WELCOME & GOODBYE (funny)
