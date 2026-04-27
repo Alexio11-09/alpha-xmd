@@ -1,4 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (SLIM + PAIR + ANTIBADWORD + ANTILINK + MODE)
+// © 2026 Alpha - MESSAGE HANDLER (SLIM + PAIR + ANTIBADWORD + ANTILINK + MODE + ANTIDELETECONFIG)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -42,21 +42,24 @@ const dbPath = './database/groupSettings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
 const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
 
-// GLOBAL MODE SETTINGS
+// GLOBAL MODE & ANTIDELETE SETTINGS
 const settingsPath = './database/settings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
-const getGlobalMode = () => {
-    try {
-        const s = JSON.parse(fs.readFileSync(settingsPath));
-        return s.mode || 'public';
-    } catch { return 'public'; }
+const getGlobalSettings = () => {
+    try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
 };
-const setGlobalMode = (mode) => {
+const setGlobalSettings = (newGlobal) => {
     try {
         const s = JSON.parse(fs.readFileSync(settingsPath));
-        s.mode = mode;
+        s.global = newGlobal;
         fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
     } catch {}
+};
+const getGlobalMode = () => getGlobalSettings().mode || 'public';
+const setGlobalMode = (mode) => {
+    const g = getGlobalSettings();
+    g.mode = mode;
+    setGlobalSettings(g);
 };
 
 // COMMANDS
@@ -74,7 +77,7 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
-// Add mode command directly
+// Add mode command directly (already there)
 commands.push({
     command: "mode",
     aliases: ["botmode"],
@@ -92,6 +95,62 @@ commands.push({
             const current = getGlobalMode();
             return reply(`📱 Current mode: *${current}*\n\nChange with: .mode public / .mode private`);
         }
+    }
+});
+
+// Add antidelete config command
+commands.push({
+    command: "antideleteconfig",
+    aliases: ["adconfig", "antidelete"],
+    category: "owner",
+    owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const sub = args[0]?.toLowerCase();
+        const g = getGlobalSettings();
+        const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+
+        if (!sub) {
+            return reply(`🛡️ *Antidelete Settings*\n\n` +
+                `🔹 Enabled: ${cfg.enabled ? '✅' : '❌'}\n` +
+                `🔹 Mode: ${cfg.mode}\n` +
+                `🔹 Style: ${cfg.style}\n` +
+                `🔹 Reaction: ${cfg.react ? '👀 ON' : 'OFF'}\n\n` +
+                `Usage:\n` +
+                `.antidelete on/off\n` +
+                `.antidelete mode chat/owner/both\n` +
+                `.antidelete style fancy/simple\n` +
+                `.antidelete react on/off`);
+        }
+
+        if (sub === 'on' || sub === 'off') {
+            cfg.enabled = sub === 'on';
+        } else if (sub === 'mode') {
+            const mode = args[1]?.toLowerCase();
+            if (['chat', 'owner', 'both'].includes(mode)) {
+                cfg.mode = mode;
+            } else {
+                return reply("❌ Invalid mode. Use: chat, owner, both");
+            }
+        } else if (sub === 'style') {
+            const style = args[1]?.toLowerCase();
+            if (['fancy', 'simple'].includes(style)) {
+                cfg.style = style;
+            } else {
+                return reply("❌ Invalid style. Use: fancy, simple");
+            }
+        } else if (sub === 'react') {
+            const react = args[1]?.toLowerCase();
+            if (react === 'on') cfg.react = true;
+            else if (react === 'off') cfg.react = false;
+            else return reply("❌ Use: react on/off");
+        } else {
+            return reply("❌ Unknown option. Use on/off, mode, style, react");
+        }
+
+        g.antidelete = cfg;
+        setGlobalSettings(g);
+
+        reply(`✅ Antidelete updated:\nEnabled: ${cfg.enabled ? 'ON' : 'OFF'}, Mode: ${cfg.mode}, Style: ${cfg.style}, React: ${cfg.react ? 'ON' : 'OFF'}`);
     }
 });
 
@@ -180,10 +239,8 @@ module.exports = async (sock, m) => {
         const senderNum = clean(m.sender);
         const isOwner = config.owner.includes(senderNum) || senderNum === botNum || isTempOwner(m.sender);
 
-        // MODE CHECK: in private mode, silently ignore non-owner commands (except 'mode' itself)
-        if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) {
-            return;  // just ignore, no reply
-        }
+        // MODE CHECK
+        if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) return;
 
         await reactRandom(sock, m);
 
@@ -259,9 +316,18 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
 
         if (result.code) {
             reply(`✅ *Pairing Code Ready*\n📞 +${number}\n🔢 *${result.code}*\n⏱️ Expires in 60s\n📱 WhatsApp → Linked devices → Link with phone number`);
+            // Channel invite
+            await sock.sendMessage(m.chat, {
+                text: `📢 *Stay connected!*\n\nJoin our official channel for updates, support, and news.\n\n🔗 https://whatsapp.com/channel/${config.newsletter.id}`,
+                contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } }
+            }, { quoted: m });
         } else if (result.qr) {
             const qrBuf = await qrcode.toBuffer(result.qr, { type: 'png' });
             await sock.sendMessage(m.chat, { image: qrBuf, caption: `📷 QR for +${number}\nScan to link.` }, { quoted: m });
+            await sock.sendMessage(m.chat, {
+                text: `📢 *Stay connected!*\n\nJoin our official channel for updates, support, and news.\n\n🔗 https://whatsapp.com/channel/${config.newsletter.id}`,
+                contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } }
+            }, { quoted: m });
         }
     } catch (err) {
         console.error('Pair error:', err);
