@@ -1,4 +1,4 @@
-// © 2026 Alpha - AUTO STATUS (RELIABLE)
+// © 2026 Alpha - AUTO STATUS (FIXED REACTION)
 
 const fs = require('fs');
 const path = require('path');
@@ -22,6 +22,7 @@ async function reactToStatus(sock, statusKey) {
     if (!isReactEnabled()) return;
     const emoji = getReactEmoji();
     try {
+        // The ONLY reliable way to react to a status
         await sock.sendMessage('status@broadcast', {
             react: {
                 text: emoji,
@@ -33,22 +34,27 @@ async function reactToStatus(sock, statusKey) {
                 }
             }
         });
-    } catch {}
+        console.log(`💚 Reacted to status from ${statusKey.participant || statusKey.remoteJid}`);
+    } catch (err) {
+        console.log('❌ Status reaction error:', err.message);
+    }
 }
 
 async function handleStatusUpdate(sock, status) {
     if (!isAutoStatusEnabled()) return;
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Handle status from messages.upsert
+    // Handle status from messages.upsert (the main method)
     if (status.messages && status.messages.length > 0) {
         const msg = status.messages[0];
         if (msg.key && msg.key.remoteJid === 'status@broadcast') {
             try {
                 await sock.readMessages([msg.key]);
+                console.log(`👁️ Viewed status from ${msg.key.participant || msg.key.remoteJid}`);
                 await reactToStatus(sock, msg.key);
             } catch (err) {
                 if (err.message?.includes('rate-overlimit')) {
+                    console.log('⚠️ Rate limit, retrying...');
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     await sock.readMessages([msg.key]);
                 }
@@ -57,7 +63,7 @@ async function handleStatusUpdate(sock, status) {
         }
     }
 
-    // Handle direct status updates
+    // Fallback: direct status key (from status.update event)
     if (status.key && status.key.remoteJid === 'status@broadcast') {
         try {
             await sock.readMessages([status.key]);
@@ -66,20 +72,6 @@ async function handleStatusUpdate(sock, status) {
             if (err.message?.includes('rate-overlimit')) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 await sock.readMessages([status.key]);
-            }
-        }
-        return;
-    }
-
-    // Handle status in reactions
-    if (status.reaction && status.reaction.key.remoteJid === 'status@broadcast') {
-        try {
-            await sock.readMessages([status.reaction.key]);
-            await reactToStatus(sock, status.reaction.key);
-        } catch (err) {
-            if (err.message?.includes('rate-overlimit')) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await sock.readMessages([status.reaction.key]);
             }
         }
     }
