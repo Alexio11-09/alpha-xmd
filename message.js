@@ -1,4 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (SLIM + PAIR + ANTIBADWORD + ANTILINK + MODE + ANTIDELETECONFIG)
+// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES + PAIR FIX)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -77,7 +77,7 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
-// Add mode command directly (already there)
+// Add mode command
 commands.push({
     command: "mode",
     aliases: ["botmode"],
@@ -149,7 +149,6 @@ commands.push({
 
         g.antidelete = cfg;
         setGlobalSettings(g);
-
         reply(`✅ Antidelete updated:\nEnabled: ${cfg.enabled ? 'ON' : 'OFF'}, Mode: ${cfg.mode}, Style: ${cfg.style}, React: ${cfg.react ? 'ON' : 'OFF'}`);
     }
 });
@@ -260,15 +259,18 @@ module.exports = async (sock, m) => {
     }
 };
 
-// PAIR HANDLER
+// PAIR HANDLER (FIXED – WAIT FOR CONNECTION BEFORE REQUESTING CODE)
 module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
     const baileys = await import('@whiskeysockets/baileys');
     const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
     const pino = require('pino'), qrcode = require('qrcode'), os = require('os'), path = require('path'), fs = require('fs');
 
-    reply(`⏳ Generating ${method==='qr'?'QR code':'pairing code'} for +${number}...`);
+    // Clean the number – E.164 format WITHOUT plus sign
+    const cleanNumber = number.replace(/[^0-9]/g, '');
 
-    const tempDir = path.join(os.tmpdir(), `p_${number}_${Date.now()}`);
+    reply(`⏳ Generating ${method==='qr'?'QR code':'pairing code'} for +${cleanNumber}...`);
+
+    const tempDir = path.join(os.tmpdir(), `p_${cleanNumber}_${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
     let tempSock;
@@ -281,59 +283,84 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
             version,
             browser: Browsers.macOS('Chrome'),
             logger: pino({ level: 'silent' }),
-            printQRInTerminal: false
+            printQRInTerminal: false,
+            connectTimeoutMs: 30000
         });
 
         const result = await new Promise((resolve, reject) => {
             let settled = false;
             const finish = (data) => { if (settled) return; settled = true; resolve(data); };
             const fail = (err) => { if (settled) return; settled = true; reject(err); };
-            const timeout = setTimeout(() => fail(new Error('Request timed out.')), 50000);
+            const timeout = setTimeout(() => fail(new Error('Request timed out. Try again later.')), 60000);
+
+            let codeRequested = false;
 
             tempSock.ev.on('connection.update', async (up) => {
                 const { connection, qr } = up;
-                if (connection === 'open' && method === 'code') {
-                    try {
-                        const code = await tempSock.requestPairingCode(number);
-                        clearTimeout(timeout);
-                        finish({ code });
-                    } catch (err) {
-                        clearTimeout(timeout);
-                        fail(err);
-                    }
-                } else if (qr && method === 'qr') {
+                console.log('🔌 Pair socket connection:', connection, '| QR present:', !!qr);
+
+                // ── QR method ──
+                if (qr && method === 'qr' && !settled) {
                     clearTimeout(timeout);
                     finish({ qr });
-                } else if (connection === 'close') {
+                    return;
+                }
+
+                // ── Pairing code method – wait for the right connection state ──
+                if (connection === 'connecting' || connection === 'open') {
+
+                    if (method === 'code' && !codeRequested && !settled) {
+                        codeRequested = true;
+
+                        try {
+                            const code = await tempSock.requestPairingCode(cleanNumber);
+                            clearTimeout(timeout);
+                            finish({ code });
+                        } catch (err) {
+                            // If it fails, keep listening – maybe the socket wasn't fully ready
+                            console.log('⚠️ Code request failed, retrying on next state change...', err.message);
+                            codeRequested = false; // allow one retry
+                        }
+                    }
+                }
+
+                // ── Connection closed ──
+                if (connection === 'close') {
                     clearTimeout(timeout);
-                    fail(new Error('Connection closed'));
+                    fail(new Error('Connection closed before pairing could complete'));
                 }
             });
         });
 
-        tempSock.end();
-        fs.rmSync(tempDir, { recursive: true, force: true });
+        // Cleanup
+        try { tempSock.end(); } catch {}
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
 
+        // ── Send result ──
         if (result.code) {
-            reply(`✅ *Pairing Code Ready*\n📞 +${number}\n🔢 *${result.code}*\n⏱️ Expires in 60s\n📱 WhatsApp → Linked devices → Link with phone number`);
-            // Channel invite
-            await sock.sendMessage(m.chat, {
-                text: `📢 *Stay connected!*\n\nJoin our official channel for updates, support, and news.\n\n🔗 https://whatsapp.com/channel/${config.newsletter.id}`,
-                contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } }
-            }, { quoted: m });
+            reply(
+                `✅ *Pairing Code Ready*\n\n` +
+                `📞 *Number:* +${cleanNumber}\n` +
+                `🔢 *Code:* *${result.code}*\n\n` +
+                `⏱️ Expires in 60 seconds.\n` +
+                `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+            );
         } else if (result.qr) {
             const qrBuf = await qrcode.toBuffer(result.qr, { type: 'png' });
-            await sock.sendMessage(m.chat, { image: qrBuf, caption: `📷 QR for +${number}\nScan to link.` }, { quoted: m });
             await sock.sendMessage(m.chat, {
-                text: `📢 *Stay connected!*\n\nJoin our official channel for updates, support, and news.\n\n🔗 https://whatsapp.com/channel/${config.newsletter.id}`,
-                contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } }
+                image: qrBuf,
+                caption: `📷 *QR Code for +${cleanNumber}*\n\nScan with WhatsApp to link the session.\n⏱️ Expires quickly.`
             }, { quoted: m });
+        } else {
+            throw new Error('No pairing result obtained');
         }
+
     } catch (err) {
         console.error('Pair error:', err);
+        // Cleanup on failure
         try { tempSock?.end(); } catch {}
         try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
-        reply(`❌ Pairing failed: ${err.message || err}`);
+        reply(`❌ Pairing failed: ${err.message || String(err)}`);
     }
 };
 
