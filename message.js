@@ -293,8 +293,6 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
             const fail = (err) => { if (settled) return; settled = true; reject(err); };
             const timeout = setTimeout(() => fail(new Error('Request timed out. Try again later.')), 60000);
 
-            let codeRequested = false;
-
             tempSock.ev.on('connection.update', async (up) => {
                 const { connection, qr } = up;
                 console.log('🔌 Pair socket connection:', connection, '| QR present:', !!qr);
@@ -309,17 +307,13 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
                 // ── Pairing code method – wait for the right connection state ──
                 if (connection === 'connecting' || connection === 'open') {
 
-                    if (method === 'code' && !codeRequested && !settled) {
-                        codeRequested = true;
-
+                    if (method === 'code' && !settled) {
+                        clearTimeout(timeout);
                         try {
                             const code = await tempSock.requestPairingCode(cleanNumber);
-                            clearTimeout(timeout);
                             finish({ code });
                         } catch (err) {
-                            // If it fails, keep listening – maybe the socket wasn't fully ready
-                            console.log('⚠️ Code request failed, retrying on next state change...', err.message);
-                            codeRequested = false; // allow one retry
+                            fail(err);
                         }
                     }
                 }
