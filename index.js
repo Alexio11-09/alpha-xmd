@@ -231,13 +231,12 @@ const clientstart = async () => {
   });
 
   // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
-  const channelJid = config().newsletter.id + '@newsletter';   // your configured channel
+  const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
-    if (msg.key?.remoteJid !== channelJid) return;   // only channel messages
+    if (msg.key?.remoteJid !== channelJid) return;
 
-    // Refresh global settings to get latest chreact config
     try {
         const saved = JSON.parse(fs.readFileSync(settingsPath));
         if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
@@ -246,15 +245,19 @@ const clientstart = async () => {
     const crConfig = globalSettings.chreact || { enabled: false, emojis: ['💬'] };
     if (!crConfig.enabled) return;
 
-    // React with each emoji (small delay to avoid rate limits)
     for (const emoji of crConfig.emojis) {
       try {
-        await sock.sendMessage(channelJid, {
-          react: {
-            text: emoji,
-            key: { remoteJid: channelJid, id: msg.key.id, fromMe: false }
-          }
-        });
+        if (sock.newsletterReact) {
+          await sock.newsletterReact(channelJid, msg.key.id, emoji);
+        } else {
+          await sock.relayMessage(channelJid, {
+            reactionMessage: {
+              key: { remoteJid: channelJid, id: msg.key.id, fromMe: false },
+              text: emoji,
+              senderTimestampMs: Date.now()
+            }
+          }, {});
+        }
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (err) {
         console.log('chreact error:', err.message);
@@ -282,9 +285,27 @@ const clientstart = async () => {
         }
 
         if (mek.key?.remoteJid === "status@broadcast") continue;
-        if (mek.key?.remoteJid === channelJid) continue;   // skip channel messages (already handled above)
+        if (mek.key?.remoteJid === channelJid) continue;
 
         const m = await smsg(sock, mek);
+
+        // ========== 📋 LIVE MESSAGE LOGGER (CONSOLE) ==========
+        const msgType = Object.keys(mek.message || {})[0] || 'unknown';
+        const senderJid = m.sender || mek.key.participant || mek.key.remoteJid;
+        const senderClean = senderJid.split('@')[0];
+        const pushName = m.pushName || 'N/A';
+        const chatJidLog = m.chat || mek.key.remoteJid;
+        const msgText = m.text || '[N/A]';
+        const msgTime = new Date().toLocaleTimeString();
+
+        console.log(`\n${'─'.repeat(40)}`);
+        console.log(`📨 *Message Type:* ${msgType}`);
+        console.log(`🕒 *Time:* ${msgTime}`);
+        console.log(`👤 *Sender:* ${senderClean}`);
+        console.log(`🏷️ *Name:* ${pushName}`);
+        console.log(`💬 *Chat ID:* ${chatJidLog}`);
+        console.log(`📝 *Message:* ${msgText.substring(0, 200)}`);
+        // =====================================================
 
         // Store message with sender and pushName for antidelete
         store.set(mek.key.id, {
@@ -298,8 +319,8 @@ const clientstart = async () => {
           try {
             const metadata = await sock.groupMetadata(m.chat);
             const participants = metadata.participants;
-            const senderJid = sock.decodeJid(m.sender);
-            const senderNumber = senderJid.split('@')[0].replace(/[^0-9]/g, '');
+            const senderJidDecoded = sock.decodeJid(m.sender);
+            const senderNumber = senderJidDecoded.split('@')[0].replace(/[^0-9]/g, '');
             m.isAdmin = participants.some(p => {
               const pJid = sock.decodeJid(p.id);
               const pNumber = pJid.split('@')[0].replace(/[^0-9]/g, '');
@@ -331,7 +352,6 @@ const clientstart = async () => {
   // ANTIDELETE (UPGRADED + SMART SENDER DISPLAY) + ANTIEDIT
   sock.ev.on('messages.update', async (updates) => {
     try {
-      // Refresh global settings
       try {
         const saved = JSON.parse(fs.readFileSync(settingsPath));
         if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
@@ -348,10 +368,10 @@ const clientstart = async () => {
         if (update.update.message === null) {
           if (!adConfig.enabled) continue;
 
-          const chatJid = update.key.remoteJid;
-          const isGroup = chatJid.endsWith('@g.us');
-          const senderJid = oldMsg.sender || update.key.participant || chatJid;
-          const senderNumber = senderJid.split('@')[0];
+          const chatJidDel = update.key.remoteJid;
+          const isGroup = chatJidDel.endsWith('@g.us');
+          const senderJidDel = oldMsg.sender || update.key.participant || chatJidDel;
+          const senderNumber = senderJidDel.split('@')[0];
           const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== ''
             ? oldMsg.pushName
             : senderNumber;
@@ -359,7 +379,7 @@ const clientstart = async () => {
           let chatName = 'Private Chat';
           if (isGroup) {
             try {
-              const gm = await sock.groupMetadata(chatJid);
+              const gm = await sock.groupMetadata(chatJidDel);
               chatName = gm.subject;
             } catch {
               chatName = 'Group';
@@ -382,15 +402,15 @@ const clientstart = async () => {
             text = funny[Math.floor(Math.random() * funny.length)] + `\n\n${oldMsg.text || 'Media message'}`;
           }
 
-          const mentions = (isGroup && adConfig.style === 'fancy' && senderJid !== sock.user.id) ? [senderJid] : [];
+          const mentions = (isGroup && adConfig.style === 'fancy' && senderJidDel !== sock.user.id) ? [senderJidDel] : [];
 
           const destinations = [];
-          if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJid);
+          if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJidDel);
           if ((adConfig.mode === 'owner' || adConfig.mode === 'both') && ownerJid) destinations.push(ownerJid);
 
           for (const dest of destinations) {
             const opts = {};
-            if (mentions.length > 0 && dest === chatJid) opts.mentions = mentions;
+            if (mentions.length > 0 && dest === chatJidDel) opts.mentions = mentions;
 
             if (adConfig.style === 'fancy') {
               await sock.sendMessage(dest, {
@@ -409,7 +429,7 @@ const clientstart = async () => {
               await sock.sendMessage(dest, { text, ...opts });
             }
 
-            if (adConfig.react && dest === chatJid) {
+            if (adConfig.react && dest === chatJidDel) {
               try {
                 await sock.sendMessage(dest, { react: { text: '👀', key: update.key } });
               } catch {}
