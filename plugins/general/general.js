@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + LOADING EFFECT + AUDIO FIX)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + ONE‑CLICK PAIR)
 
 const fs = require('fs');
 const os = require('os');
@@ -190,6 +190,7 @@ module.exports = [
 │ • .setname
 │ • .setprefix
 │ • .resetprefix
+│ • .chreact
 ╰────────────⬣
 
 ╭───〔 🛠️ TOOLS 〕───⬣
@@ -209,7 +210,7 @@ module.exports = [
 │ • .lyrics
 │ • .vv
 │ • .url
-│ • .chreact
+│ • .img
 ╰────────────⬣
 
 ╭───〔 🎮 GAMES 〕───⬣
@@ -288,11 +289,10 @@ ${config.settings.footer}
                     await sock.sendMessage(m.chat, {
                         audio: { url: menuSongUrl },
                         mimetype: 'audio/mpeg',
-                        ptt: true   // voice note (set false for regular audio file)
+                        ptt: true
                     }, { quoted: m });
                 } catch (audioErr) {
                     console.log("⚠️ Menu audio failed:", audioErr.message);
-                    // silently skip – the menu already appeared successfully
                 }
 
             } catch (err) {
@@ -412,7 +412,7 @@ ${config.settings.footer}
         aliases: ["source", "github", "sc"],
         category: "general",
         execute: async (sock, m, { reply }) => {
-            const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
+            const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
             const ownerName = "Alpha";
             const ownerContact = "wa.me/263786641436";
             const botName = config.settings?.title || "Alpha Bot";
@@ -441,7 +441,7 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 7. PAIR (INTERACTIVE) ====================
+    // ==================== 7. PAIR (ONE‑CLICK CODE – NO PROMPT) ====================
     {
         command: "pair",
         aliases: ["pairing", "session"],
@@ -449,25 +449,79 @@ ${config.settings.footer}
         execute: async (sock, m, { args, reply }) => {
             if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
 
-            const number = args[0].replace(/[^0-9]/g, "");
-            if (number.length < 10) return reply("❌ Invalid phone number. Use full country code (no +).");
+            const rawNumber = args[0].replace(/[^0-9]/g, "");
+            if (rawNumber.length < 10) return reply("❌ Invalid phone number. Use full country code without '+'.");
 
-            // Already a pending session?
-            const pairSessionKey = m.chat + m.sender;
-            if (global.pairSessions && global.pairSessions[pairSessionKey]) {
-                return reply("⚠️ You already have a pending pairing request. Reply with *1* for QR or *2* for code.");
+            reply(`🔐 Requesting pairing code for +${rawNumber}...`);
+
+            // Use a dedicated temporary socket
+            const baileys = await import('@whiskeysockets/baileys');
+            const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+            const pino = require('pino');
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs');
+
+            const tempDir = path.join(os.tmpdir(), `pair_${rawNumber}_${Date.now()}`);
+            fs.mkdirSync(tempDir, { recursive: true });
+
+            let tempSock;
+            let pairingCode = null;
+
+            try {
+                const { state } = await useMultiFileAuthState(tempDir);
+                const { version } = await fetchLatestBaileysVersion();
+
+                tempSock = makeWASocket({
+                    auth: state,
+                    version,
+                    browser: Browsers.macOS('Chrome'),
+                    logger: pino({ level: 'silent' }),
+                    printQRInTerminal: false,
+                    connectTimeoutMs: 30000
+                });
+
+                // Wait for connection to be ready, then request the code
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error("Connection timed out. WhatsApp may be busy — try again in a minute."));
+                    }, 45000);
+
+                    tempSock.ev.on('connection.update', async (update) => {
+                        const { connection } = update;
+                        if (connection === 'open') {
+                            try {
+                                pairingCode = await tempSock.requestPairingCode(rawNumber);
+                                clearTimeout(timeout);
+                                resolve();
+                            } catch (err) {
+                                clearTimeout(timeout);
+                                reject(new Error("Failed to request pairing code: " + (err.message || String(err))));
+                            }
+                        } else if (connection === 'close') {
+                            clearTimeout(timeout);
+                            reject(new Error("Connection closed unexpectedly"));
+                        }
+                    });
+                });
+
+                // If we got a code, send it
+                reply(
+                    `✅ *Pairing Code Ready*\n\n` +
+                    `📞 *Number:* +${rawNumber}\n` +
+                    `🔢 *Code:* *${pairingCode}*\n\n` +
+                    `⏱️ Expires in 60 seconds.\n` +
+                    `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+                );
+
+            } catch (err) {
+                console.error('Pair error:', err);
+                reply(`❌ Pairing failed: ${err.message || String(err)}`);
+            } finally {
+                // Clean up temporary socket and files
+                if (tempSock) try { tempSock.end(); } catch {}
+                try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
             }
-
-            if (!global.pairSessions) global.pairSessions = {};
-            global.pairSessions[pairSessionKey] = number;
-
-            return reply(
-                `🔐 *Pairing for +${number}*\n\n` +
-                `Reply with:\n` +
-                `*1.* 📷 QR Code\n` +
-                `*2.* 🔢 Pairing Code\n\n` +
-                `⌛ Reply in 2 minutes.`
-            );
         }
     }
 ];
