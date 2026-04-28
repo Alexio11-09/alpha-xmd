@@ -1,4 +1,4 @@
-// © 2026 Alpha - AUTO STATUS (FIXED REACTION)
+// © 2026 Alpha - AUTO STATUS (FIXED — PARTICIPANT IN KEY)
 
 const fs = require('fs');
 const path = require('path');
@@ -18,23 +18,24 @@ function isAutoStatusEnabled() { return getConfig().enabled; }
 function isReactEnabled() { return getConfig().reactOn; }
 function getReactEmoji() { return getConfig().reactEmoji || '🔥'; }
 
-async function reactToStatus(sock, statusKey) {
+async function reactToStatus(sock, msg) {
     if (!isReactEnabled()) return;
     const emoji = getReactEmoji();
     try {
-        // The ONLY reliable way to react to a status
+        const participant = msg.key.participant || msg.key.remoteJid;
+        // Use the standard sock.sendMessage with react payload
         await sock.sendMessage('status@broadcast', {
             react: {
                 text: emoji,
                 key: {
                     remoteJid: 'status@broadcast',
-                    id: statusKey.id,
-                    participant: statusKey.participant || statusKey.remoteJid,
+                    id: msg.key.id,
+                    participant: participant,
                     fromMe: false
                 }
             }
         });
-        console.log(`💚 Reacted to status from ${statusKey.participant || statusKey.remoteJid}`);
+        console.log(`💚 Reacted to status from ${participant}`);
     } catch (err) {
         console.log('❌ Status reaction error:', err.message);
     }
@@ -42,37 +43,47 @@ async function reactToStatus(sock, statusKey) {
 
 async function handleStatusUpdate(sock, status) {
     if (!isAutoStatusEnabled()) return;
+
+    // Determine the status message to read
+    const msg = status.messages ? status.messages[0] : status;
+
+    if (!msg || !msg.key) return;
+    if (msg.key.remoteJid !== 'status@broadcast') return;
+
+    // Small delay to avoid rate limits
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Handle status from messages.upsert (the main method)
-    if (status.messages && status.messages.length > 0) {
-        const msg = status.messages[0];
-        if (msg.key && msg.key.remoteJid === 'status@broadcast') {
-            try {
-                await sock.readMessages([msg.key]);
-                console.log(`👁️ Viewed status from ${msg.key.participant || msg.key.remoteJid}`);
-                await reactToStatus(sock, msg.key);
-            } catch (err) {
-                if (err.message?.includes('rate-overlimit')) {
-                    console.log('⚠️ Rate limit, retrying...');
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    await sock.readMessages([msg.key]);
-                }
-            }
-            return;
-        }
-    }
+    try {
+        // Build the key WITH participant — required for status read receipts
+        const keyToRead = {
+            remoteJid: 'status@broadcast',
+            id: msg.key.id,
+            participant: msg.key.participant || msg.key.remoteJid,
+            fromMe: false
+        };
 
-    // Fallback: direct status key (from status.update event)
-    if (status.key && status.key.remoteJid === 'status@broadcast') {
-        try {
-            await sock.readMessages([status.key]);
-            await reactToStatus(sock, status.key);
-        } catch (err) {
-            if (err.message?.includes('rate-overlimit')) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await sock.readMessages([status.key]);
+        await sock.readMessages([keyToRead]);
+        console.log(`👁️ Viewed status from ${msg.key.participant || msg.key.remoteJid}`);
+
+        // React to the status if enabled
+        await reactToStatus(sock, msg);
+
+    } catch (err) {
+        if (err.message?.includes('rate-overlimit')) {
+            console.log('⚠️ Rate limit, retrying...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            try {
+                await sock.readMessages([{
+                    remoteJid: 'status@broadcast',
+                    id: msg.key.id,
+                    participant: msg.key.participant || msg.key.remoteJid,
+                    fromMe: false
+                }]);
+            } catch (retryErr) {
+                console.log('❌ Retry failed:', retryErr.message);
             }
+        } else {
+            console.log('❌ Status view error:', err.message);
         }
     }
 }
@@ -117,5 +128,5 @@ module.exports = [
     }
 ];
 
-// export the handler for index.js
+// Export the handler for index.js
 module.exports.handleStatusUpdate = handleStatusUpdate;
