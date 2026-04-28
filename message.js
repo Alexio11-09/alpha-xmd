@@ -1,4 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES + PAIR FIX)
+// © 2026 Alpha - MESSAGE HANDLER (STABLE + PAIR REPLY FIX)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -77,7 +77,7 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
-// Add mode command
+// Add mode command (unchanged)
 commands.push({
     command: "mode",
     aliases: ["botmode"],
@@ -98,7 +98,7 @@ commands.push({
     }
 });
 
-// Add antidelete config command
+// Add antidelete config command (unchanged)
 commands.push({
     command: "antideleteconfig",
     aliases: ["adconfig", "antidelete"],
@@ -178,17 +178,24 @@ module.exports = async (sock, m) => {
 
         if (!m.text) return;
 
-        // ----------- PAIR SESSION ---------------
+        // ----------- PAIR SESSION (FIXED – handles quoted replies) ---------------
         const pairKey = m.chat + m.sender;
         if (global.pairSessions && global.pairSessions[pairKey]) {
+            // Extract the first line of the reply (ignoring any quoted text)
+            const firstLine = m.text.split('\n')[0].trim();
             const num = global.pairSessions[pairKey];
-            const choice = m.text.trim();
-            if (choice === '1' || choice === '2') {
+
+            if (firstLine === '1' || firstLine === '2') {
                 delete global.pairSessions[pairKey];
-                const method = choice === '1' ? 'qr' : 'code';
+                const method = firstLine === '1' ? 'qr' : 'code';
                 return module.exports.handlePairChoice(sock, m, num, method, reply, send);
+            } else {
+                // Invalid response – clear session and guide user
+                delete global.pairSessions[pairKey];
+                return reply("❌ Invalid choice. Please reply with *1* for QR Code or *2* for Pairing Code. Try again with .pair <number>.");
             }
         }
+        // ------------------------------------------------------
 
         const prefix = config.prefix || ".";
         if (!m.text.startsWith(prefix)) {
@@ -259,13 +266,12 @@ module.exports = async (sock, m) => {
     }
 };
 
-// PAIR HANDLER (FIXED – WAIT FOR CONNECTION BEFORE REQUESTING CODE)
+// PAIR HANDLER (unchanged, already fixed waiting for connection)
 module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
     const baileys = await import('@whiskeysockets/baileys');
     const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
     const pino = require('pino'), qrcode = require('qrcode'), os = require('os'), path = require('path'), fs = require('fs');
 
-    // Clean the number – E.164 format WITHOUT plus sign
     const cleanNumber = number.replace(/[^0-9]/g, '');
 
     reply(`⏳ Generating ${method==='qr'?'QR code':'pairing code'} for +${cleanNumber}...`);
@@ -293,65 +299,51 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
             const fail = (err) => { if (settled) return; settled = true; reject(err); };
             const timeout = setTimeout(() => fail(new Error('Request timed out. Try again later.')), 60000);
 
+            let codeRequested = false;
+
             tempSock.ev.on('connection.update', async (up) => {
                 const { connection, qr } = up;
-                console.log('🔌 Pair socket connection:', connection, '| QR present:', !!qr);
 
-                // ── QR method ──
                 if (qr && method === 'qr' && !settled) {
                     clearTimeout(timeout);
                     finish({ qr });
                     return;
                 }
 
-                // ── Pairing code method – wait for the right connection state ──
                 if (connection === 'connecting' || connection === 'open') {
-
-                    if (method === 'code' && !settled) {
-                        clearTimeout(timeout);
+                    if (method === 'code' && !codeRequested && !settled) {
+                        codeRequested = true;
                         try {
                             const code = await tempSock.requestPairingCode(cleanNumber);
+                            clearTimeout(timeout);
                             finish({ code });
                         } catch (err) {
-                            fail(err);
+                            codeRequested = false; // allow one retry
                         }
                     }
                 }
 
-                // ── Connection closed ──
                 if (connection === 'close') {
                     clearTimeout(timeout);
-                    fail(new Error('Connection closed before pairing could complete'));
+                    fail(new Error('Connection closed before pairing'));
                 }
             });
         });
 
-        // Cleanup
         try { tempSock.end(); } catch {}
         try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
 
-        // ── Send result ──
         if (result.code) {
-            reply(
-                `✅ *Pairing Code Ready*\n\n` +
-                `📞 *Number:* +${cleanNumber}\n` +
-                `🔢 *Code:* *${result.code}*\n\n` +
-                `⏱️ Expires in 60 seconds.\n` +
-                `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
-            );
+            reply(`✅ *Pairing Code Ready*\n\n📞 +${cleanNumber}\n🔢 *${result.code}*\n⏱️ Expires in 60s\n📱 WhatsApp → Linked devices → Link with phone number`);
         } else if (result.qr) {
             const qrBuf = await qrcode.toBuffer(result.qr, { type: 'png' });
-            await sock.sendMessage(m.chat, {
-                image: qrBuf,
-                caption: `📷 *QR Code for +${cleanNumber}*\n\nScan with WhatsApp to link the session.\n⏱️ Expires quickly.`
-            }, { quoted: m });
+            await sock.sendMessage(m.chat, { image: qrBuf, caption: `📷 QR for +${cleanNumber}\nScan to link.` }, { quoted: m });
         } else {
-            throw new Error('No pairing result obtained');
+            throw new Error('No pairing result');
         }
 
     } catch (err) {
         console.error('Pair error:', err);
-        // Cleanup on failure
         try { tempSock?.end(); } catch {}
         try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
         reply(`❌ Pairing failed: ${err.message || String(err)}`);
