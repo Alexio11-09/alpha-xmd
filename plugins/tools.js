@@ -1,10 +1,9 @@
-// © 2026 Alpha - TOOLS (WITH .img IMAGE SEARCH)
+// © 2026 Alpha - TOOLS (WITH .img IMAGE SEARCH – NO BROKEN IMPORTS)
 const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg'); ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 const { writeExif } = require('../library/exif'), webp = require('node-webpmux');
-const { imageSearch } = require('@mudbill/duckduckgo-images-api');
 const cleanup = (f) => setTimeout(() => { try { fs.unlinkSync(f); } catch {} }, 300000);
 const F = (a) => a[Math.floor(Math.random()*a.length)];
 const fail = ["👾 Oops! Try again?","💥 Failed!","😅 Something broke.","🤷‍♂️ Blame the gremlins."];
@@ -208,7 +207,7 @@ module.exports = [
     }
   },
 
-  // ==================== 18. .img (DUCKDUCKGO IMAGE SEARCH) ====================
+  // ==================== 18. .img (FREE IMAGE SEARCH – NO BROKEN IMPORTS) ====================
   {
     command: "img",
     aliases: ["image", "pic", "gimage"],
@@ -220,37 +219,42 @@ module.exports = [
       reply(`🔍 Searching images for *${query}*...`);
 
       try {
-        const results = await imageSearch({
-          query: query,
-          safe: false,
-          iterations: 1
+        // Free API – no key, no package, just axios
+        const res = await axios.get(`https://api.davidcyriltech.my.id/search/image?query=${encodeURIComponent(query)}`, {
+          timeout: 15000
         });
 
-        if (!results || results.length === 0) {
+        const images = res.data?.results || res.data?.data || res.data?.images || [];
+
+        if (!images || images.length === 0) {
           return reply(`❌ No images found for "${query}".`);
         }
 
-        // Pick up to 5 random results, avoiding duplicate or broken URLs
-        const shuffled = results
-          .filter(r => r.image && r.image.startsWith('http'))
+        // Pick up to 5 random valid URLs
+        const validImages = images
+          .map(img => typeof img === 'string' ? img : (img.url || img.image || img.link || img.src))
+          .filter(url => url && url.startsWith('http'))
           .sort(() => Math.random() - 0.5);
-        const selected = shuffled.slice(0, 5);
+
+        const selected = validImages.slice(0, 5);
 
         if (selected.length === 0) {
-          return reply(`❌ No valid image URLs found for "${query}".`);
+          return reply(`❌ No valid image URLs found for "${query}". Try a different search.`);
         }
 
-        // Send each image
+        // Send each image with a small delay
         for (let i = 0; i < selected.length; i++) {
+          const caption = i === 0 
+            ? `${ok.img}\n🔍 *${query}* (${i + 1}/${selected.length})`
+            : `🔍 *${query}* (${i + 1}/${selected.length})`;
+
           try {
             await s.sendMessage(m.chat, {
-              image: { url: selected[i].image },
-              caption: i === 0 ? `${ok.img}\n🔍 *${query}* (${i+1}/${selected.length})` : `🔍 *${query}* (${i+1}/${selected.length})`
+              image: { url: selected[i] },
+              caption
             }, { quoted: i === 0 ? m : undefined });
-            // Small delay between images
             if (i < selected.length - 1) await new Promise(r => setTimeout(r, 500));
           } catch (imgErr) {
-            // Skip broken image, try next
             console.log("Img send error:", imgErr.message);
           }
         }
