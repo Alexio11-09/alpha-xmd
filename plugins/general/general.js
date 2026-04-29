@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + ONE‑CLICK PAIR)
+// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + COMPREHENSIVE MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -38,7 +38,7 @@ const getCountry = (jid) => {
 };
 
 module.exports = [
-    // ==================== 1. MENU (ENHANCED – SEPARATE AUDIO TRY) ====================
+    // ==================== 1. MENU (ENHANCED – FULL FEATURE LIST) ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
@@ -60,7 +60,7 @@ module.exports = [
                 const menuSongUrl = (config.settings && config.settings.menuSongUrl)
                     || "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";
 
-                // ----- 📋 MENU TEMPLATE (same as always) -----
+                // ----- 📋 MENU TEMPLATE (COMPREHENSIVE) -----
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -109,6 +109,19 @@ module.exports = [
 │ • .delowner
 │ • .owners
 │ • .mode
+│ • .anticall
+│ • .autoreply
+│ • .autosticker
+│ • .autovoice
+│ • .dmblocker
+│ • .poststatus
+│ • .hack
+│ • .cleartmp
+│ • .clearsession
+│ • .bothosting
+│ • .webzip
+│ • .antispam
+│ • .sudo
 ╰────────────⬣
 
 ╭───〔 👥 GROUP 〕───⬣
@@ -138,15 +151,50 @@ module.exports = [
 │ • .antibadword
 │ • .antiforeign
 │ • .antibot
+│ • .setgname
+│ • .setgdesc
+│ • .setgpp
+│ • .warn
+│ • .warnings
+│ • .resetwarn
+│ • .tagnotadmin
+│ • .requestlist
+│ • .rejectall
+│ • .newgc
+│ • .creategc
+│ • .online
+│ • .whosonline
+│ • .chatbot
+│ • .clear
+│ • .staff
+│ • .myactivity
+│ • .rank
 ╰────────────⬣
 
 ╭───〔 📥 DOWNLOADER 〕───⬣
 │ • .play
+│ • .play2
+│ • .song
+│ • .music
+│ • .video
+│ • .spotify
 │ • .tiktok
-│ • .fb
+│ • .tt
+│ • .instagram
 │ • .ig
+│ • .facebook
+│ • .fb
+│ • .ytmp4
+│ • .ytmp3
+│ • .ytpost
+│ • .pindl
 │ • .mediafire
-│ • .twitter
+│ • .gdrive
+│ • .ringtone
+│ • .yts
+│ • .ytsearch
+│ • .lyrics
+│ • .lyrics2
 │ • .apk
 │ • .movie
 │ • .wallpaper
@@ -211,18 +259,112 @@ module.exports = [
 │ • .vv
 │ • .url
 │ • .img
+│ • .steal
+│ • .blur
+│ • .attp
+│ • .ttp
+│ • .ss
+│ • .stickertelegram
+│ • .imgscan
+│ • .tovideo
+│ • .toptt
+│ • .convert
+│ • .getimage
+│ • .topdf
+│ • .smeme
+│ • .wasted
 ╰────────────⬣
 
-╭───〔 🎮 GAMES 〕───⬣
+╭───〔 🎵 AUDIO EFFECTS 〕───⬣
+│ • .deep
+│ • .smooth
+│ • .fat
+│ • .blown
+│ • .radio
+│ • .robot
+│ • .chipmunk
+│ • .nightcore
+│ • .earrape
+│ • .bass
+│ • .reverse
+│ • .slow
+│ • .fast
+│ • .baby
+│ • .demon
+╰────────────⬣
+
+╭───〔 🎨 LOGO & TEXT MAKERS 〕───⬣
+│ • .hacker
+│ • .neon
+│ • .fire
+│ • .gold
+│ • .logo
+│ • .glitch
+│ • .avenger
+│ • .pubg
+│ • .naruto
+│ • .matrix
+│ • .graffiti
+│ • .1000d
+│ • .rainbow
+│ • .metallic
+│ • .ice
+│ • .snow
+│ • .purple
+│ • .thunder
+│ • .water
+│ • .underwater
+│ • .4d
+│ • .luxury
+│ • .silver
+│ • .foggyglass
+│ • .wetglass
+│ • .fancy
+╰────────────⬣
+
+╭───〔 🎮 GAMES & FUN 〕───⬣
 │ • .tictactoe
+│ • .ttt
+│ • .hangman
 │ • .guess
 │ • .quiz
-│ • .riddle
+│ • .trivia
+│ • .answer
 │ • .truth
 │ • .dare
+│ • .8ball
+│ • .compliment
+│ • .insult
+│ • .flirt
+│ • .shayari
+│ • .simp
+│ • .stupid
+│ • .goodnight
+│ • .meme
+│ • .squidgame
+│ • .konami
+│ • .lovetest
+│ • .aura
+│ • .dice
+│ • .roll
+│ • .joke
+│ • .quote
+│ • .fact
 ╰────────────⬣
 
-╭───〔 🎌 ANIME 〕───⬣
+╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
+│ • .happy
+│ • .heart
+│ • .angry
+│ • .sad
+│ • .shy
+│ • .moon
+│ • .confused
+│ • .hot
+│ • .nikal
+╰────────────⬣
+
+╭───〔 🎌 ANIME & REACTIONS 〕───⬣
 │ • .waifu
 │ • .neko
 │ • .shinobu
@@ -238,41 +380,52 @@ module.exports = [
 │ • .seasonal
 │ • .hentai 🔞
 │ • .hentaigif 🔞
-╰────────────⬣
-
-╭───〔 🤖 AI 〕───⬣
-│ • .ai
-│ • .imagine
-╰────────────⬣
-
-╭───〔 🎉 FUN 〕───⬣
-│ • .joke
-│ • .quote
-│ • .fact
-│ • .flip
-│ • .roll
-│ • .8ball
-│ • .rps
-│ • .ship
+│ • .nom
+│ • .poke
+│ • .cry
+│ • .kiss
+│ • .pat
+│ • .wink
+│ • .facepalm
 │ • .hug
-│ • .compliment
-│ • .emojimix
 ╰────────────⬣
 
-╭───〔 🎨 LOGO 〕───⬣
-│ • .hacker
-│ • .neon
-│ • .fire
-│ • .gold
-│ • .logo
-│ • .glitch
-│ • .avenger
-│ • .pubg
-│ • .naruto
-│ • .matrix
-│ • .graffiti
-│ • .1000d
-│ • .rainbow
+╭───〔 🌐 INFORMATION 〕───⬣
+│ • .news
+│ • .define
+│ • .check
+│ • .countryinfo
+│ • .topmembers
+│ • .tiktokstalk
+│ • .githubstalk
+│ • .inspect
+│ • .bible
+│ • .quran
+│ • .wiki
+│ • .webcrawl
+│ • .obfuscate
+│ • .series
+╰────────────⬣
+
+╭───〔 💰 FINANCE 〕───⬣
+│ • .currencylist
+│ • .rates
+│ • .exchange
+│ • .forex
+╰────────────⬣
+
+╭───〔 🔧 UTILITY 〕───⬣
+│ • .save
+│ • .delete
+│ • .del
+│ • .clear
+│ • .webzip
+│ • .bothosting
+│ • .hack
+│ • .antispam
+│ • .autovoice
+│ • .autoreply
+│ • .autosticker
 ╰────────────⬣
 
 ${config.settings.footer}
