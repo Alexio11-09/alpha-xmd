@@ -264,4 +264,77 @@ module.exports = [
       }
     }
   }
+
+// ==================== .take (SAVE STATUS MEDIA) ====================
+{
+  command: "take",
+  aliases: ["savestatus", "getstatus"],
+  category: "tools",
+  owner: true,   // only you can use it – remove this line if you want it public
+  execute: async (s, m, { args, reply }) => {
+    // Get the target – either mentioned, replied, or a number argument
+    let target;
+    if (m.mentionedJid && m.mentionedJid[0]) {
+      target = m.mentionedJid[0];
+    } else if (m.quoted && m.quoted.sender) {
+      target = m.quoted.sender;
+    } else if (args[0]) {
+      const num = args[0].replace(/[^0-9]/g, '');
+      if (num.length < 7) return reply("❌ Invalid number.");
+      target = num + '@s.whatsapp.net';
+    } else {
+      return reply("❌ Please mention a user, reply to their message, or provide a number!");
+    }
+
+    // Check cache for the latest status of that user
+    if (!global.statusCache || !global.statusCache.has(target)) {
+      return reply("❌ No cached status for that user. Make sure auto‑status is ON and they posted a status recently.");
+    }
+
+    const statusMsg = global.statusCache.get(target);
+    const msgType = Object.keys(statusMsg.message || {})[0];
+
+    // Only handle image / video / audio statuses
+    const allowedTypes = ['imageMessage', 'videoMessage', 'audioMessage'];
+    if (!allowedTypes.includes(msgType)) {
+      return reply("❌ The latest status from this user is not an image/video/audio (maybe text?).");
+    }
+
+    reply("⏳ Downloading the status...");
+    try {
+      const content = statusMsg.message[msgType];
+      const stream = await downloadContentFromMessage(content,
+        msgType === 'imageMessage' ? 'image' :
+        msgType === 'videoMessage' ? 'video' : 'audio'
+      );
+      let buffer = Buffer.from([]);
+      for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+      if (msgType === 'imageMessage') {
+        await s.sendMessage(m.chat, {
+          image: buffer,
+          caption: `📸 Status from @${target.split('@')[0]}`,
+          mentions: [target]
+        }, { quoted: m });
+      } else if (msgType === 'videoMessage') {
+        await s.sendMessage(m.chat, {
+          video: buffer,
+          caption: `🎥 Status from @${target.split('@')[0]}`,
+          mentions: [target],
+          gifPlayback: false
+        }, { quoted: m });
+      } else if (msgType === 'audioMessage') {
+        await s.sendMessage(m.chat, {
+          audio: buffer,
+          mimetype: 'audio/mpeg',
+          ptt: true
+        }, { quoted: m });
+        reply(`🎵 Voice status from @${target.split('@')[0]}`);
+      }
+    } catch (err) {
+      console.error("Take error:", err);
+      reply("❌ Failed to download status: " + (err.message || String(err)));
+    }
+  }
+}
 ];
