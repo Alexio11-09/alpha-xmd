@@ -1,4 +1,4 @@
-// © 2026 Alpha - AUTO STATUS (FIXED — PARTICIPANT IN KEY)
+// © 2026 Alpha - AUTO STATUS (FIXED + CACHE FOR .take)
 
 const fs = require('fs');
 const path = require('path');
@@ -6,6 +6,9 @@ const path = require('path');
 const configPath = path.join(__dirname, '../database/autoStatus.json');
 if (!fs.existsSync(path.join(__dirname, '../database'))) fs.mkdirSync(path.join(__dirname, '../database'), { recursive: true });
 if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, JSON.stringify({ enabled: false, reactOn: false, reactEmoji: '🔥' }));
+
+// ---------- GLOBAL STATUS CACHE ----------
+if (!global.statusCache) global.statusCache = new Map();
 
 function getConfig() {
     try { return JSON.parse(fs.readFileSync(configPath)); } catch { return { enabled: false, reactOn: false, reactEmoji: '🔥' }; }
@@ -23,7 +26,6 @@ async function reactToStatus(sock, msg) {
     const emoji = getReactEmoji();
     try {
         const participant = msg.key.participant || msg.key.remoteJid;
-        // Use the standard sock.sendMessage with react payload
         await sock.sendMessage('status@broadcast', {
             react: {
                 text: emoji,
@@ -44,28 +46,32 @@ async function reactToStatus(sock, msg) {
 async function handleStatusUpdate(sock, status) {
     if (!isAutoStatusEnabled()) return;
 
-    // Determine the status message to read
     const msg = status.messages ? status.messages[0] : status;
-
     if (!msg || !msg.key) return;
     if (msg.key.remoteJid !== 'status@broadcast') return;
 
-    // Small delay to avoid rate limits
+    // ---------- CACHE THE STATUS BEFORE VIEWING ----------
+    const participant = msg.key.participant || msg.key.remoteJid;
+    global.statusCache.set(participant, msg);
+    // keep cache size down – remove oldest if > 100 entries
+    if (global.statusCache.size > 100) {
+        const firstKey = global.statusCache.keys().next().value;
+        global.statusCache.delete(firstKey);
+    }
+
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-        // Build the key WITH participant — required for status read receipts
         const keyToRead = {
             remoteJid: 'status@broadcast',
             id: msg.key.id,
-            participant: msg.key.participant || msg.key.remoteJid,
+            participant: participant,
             fromMe: false
         };
 
         await sock.readMessages([keyToRead]);
-        console.log(`👁️ Viewed status from ${msg.key.participant || msg.key.remoteJid}`);
+        console.log(`👁️ Viewed status from ${participant}`);
 
-        // React to the status if enabled
         await reactToStatus(sock, msg);
 
     } catch (err) {
@@ -76,7 +82,7 @@ async function handleStatusUpdate(sock, status) {
                 await sock.readMessages([{
                     remoteJid: 'status@broadcast',
                     id: msg.key.id,
-                    participant: msg.key.participant || msg.key.remoteJid,
+                    participant: participant,
                     fromMe: false
                 }]);
             } catch (retryErr) {
