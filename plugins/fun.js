@@ -1,4 +1,5 @@
 const axios = require('axios');
+
 module.exports = [
   { command: "joke", aliases: ["jokes"], category: "fun",
     execute: async (sock, m, { reply }) => {
