@@ -1,14 +1,11 @@
 <div align="center">
-  <img src="https://files.catbox.moe/placeholder.jpg" alt="Alpha Bot" width="180"/>
+  <img src="https://files.catbox.moe/soc5w1.jpg" alt="Alpha Bot" width="180"/>
 
   <h1>⚡ ALPHA‑XMD — The Multiverse Bot ⚡</h1>
 
   <p><i>“Not just a WhatsApp assistant — it's a digital beast with attitude, automation, and style.”</i></p>
 
   <p>
-    <a href="https://alpha-xmd.vercel.app">
-      <img src="https://img.shields.io/badge/🔐_GET_SESSION_ID-Connect_Now-3b82f6?style=for-the-badge&logo=vercel&logoColor=white" alt="Get Session ID"/>
-    </a>
     <a href="https://github.com/Alexi01-09/alpha-xmd/fork">
       <img src="https://img.shields.io/badge/🍴_FORK_REPO-Alpha_XMD-0f172a?style=for-the-badge&logo=github&logoColor=white" alt="Fork Repo"/>
     </a>
@@ -48,15 +45,7 @@
 
 ## 🚀 Deploy in Seconds
 
-> **Step 1: Get your Session ID (no QR scan)**
-
-<div align="center">
-  <a href="https://alpha-xmd.vercel.app">
-    <img src="https://img.shields.io/badge/📱_GET_SESSION_ID-ALPHA--XMD.VERCEL.APP-3b82f6?style=for-the-badge&logo=vercel&logoColor=white" alt="Get Session ID"/>
-  </a>
-</div>
-
-**Step 2: Fork & Deploy**
+Just fork this repo and deploy on your favourite platform — no extra steps needed!
 
 | Platform | One‑Click Deploy | Uptime |
 |----------|------------------|--------|
@@ -92,7 +81,7 @@ No QR hassles — `.pair` generates a code instantly, and the bot automatically 
   <a href="https://whatsapp.com/channel/0029Vb7nHdBFnSzBDbvL6y1X">
     <img src="https://img.shields.io/badge/📢_ALPHA_UPDATES-Join_Channel-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Channel"/>
   </a>
-  <a href="https://chat.whatsapp.com/xxx">
+  <a href="https://chat.whatsapp.com/IWvvBvg8eRXC7F6Ni8Yq2S?mode=gi_t">
     <img src="https://img.shields.io/badge/💬_CHAT_GROUP-Help_&_Fun-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Group"/>
   </a>
   <a href="https://github.com/Alexi01-09/alpha-xmd/issues">
@@ -124,9 +113,5 @@ MIT – free to use, modify, and distribute. Attribution appreciated but not req
 ---
 
 <div align="center">
-  <h3>🔑 Ready to start?</h3>
-  <a href="https://alpha-xmd.vercel.app">
-    <img src="https://img.shields.io/badge/🔐_GET_SESSION_ID-ALPHA--XMD.VERCEL.APP-3b82f6?style=for-the-badge&logo=vercel&logoColor=white" alt="Get Session ID"/>
-  </a>
-  <p><i>Your bot journey begins with a single code.</i></p>
+  <p><i>Built with ❤️ by Alpha</i></p>
 </div>
