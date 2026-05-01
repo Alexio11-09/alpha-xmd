@@ -64,7 +64,7 @@ try {
 }
 
 let globalSettings = {
-    autoread: true, autotyping: false, autorecording: false, autoreact: false,
+    autoread: false, autotyping: false, autorecording: false, autoreact: false,
     antidelete: false, antiedit: false
 };
 
@@ -179,7 +179,7 @@ const clientstart = async () => {
           if (!ownerRaw) return console.log('⚠️ No owner number in config, skipping DM.');
           const ownerJid = ownerRaw.includes('@') ? ownerRaw : ownerRaw + '@s.whatsapp.net';
           const botName = config().settings?.title || 'Alpha Bot';
-          const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
+          const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
           const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
           const ownerContact = "wa.me/263786641436";
 
