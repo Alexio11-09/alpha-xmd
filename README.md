@@ -6,7 +6,7 @@
   <p><i>“Not just a WhatsApp assistant — it's a digital beast with attitude, automation, and style.”</i></p>
 
   <p>
-    <a href="https://github.com/Alexi01-09/alpha-xmd/fork">
+    <a href="https://github.com/Alexio11-09/alpha-xmd/fork">
       <img src="https://img.shields.io/badge/🍴_FORK_REPO-Alpha_XMD-0f172a?style=for-the-badge&logo=github&logoColor=white" alt="Fork Repo"/>
     </a>
     <a href="https://whatsapp.com/channel/0029Vb7nHdBFnSzBDbvL6y1X">
