@@ -1,5 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (STABLE ORIGINAL)
-
+// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -63,7 +62,7 @@ const setGlobalMode = (mode) => {
     setGlobalSettings(g);
 };
 
-// COMMANDS LOADER
+// COMMANDS
 const commands = [];
 const loadCommands = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -78,7 +77,7 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
-// Add mode command
+// Add mode command directly
 commands.push({
     command: "mode",
     aliases: ["botmode"],
@@ -154,7 +153,7 @@ commands.push({
     }
 });
 
-// GAMES STORAGE (if needed)
+// GAMES
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
 // SHORT DENIALS
@@ -178,18 +177,6 @@ module.exports = async (sock, m) => {
         const send = (data) => { try { return sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } catch { return sock.sendMessage(m.chat, data, { quoted: m }); } };
 
         if (!m.text) return;
-
-        // ----------- PAIR SESSION ---------------
-        const pairKey = m.chat + m.sender;
-        if (global.pairSessions && global.pairSessions[pairKey]) {
-            const num = global.pairSessions[pairKey];
-            const choice = m.text.trim();
-            if (choice === '1' || choice === '2') {
-                delete global.pairSessions[pairKey];
-                const method = choice === '1' ? 'qr' : 'code';
-                return module.exports.handlePairChoice(sock, m, num, method, reply, send);
-            }
-        }
 
         const prefix = config.prefix || ".";
         if (!m.text.startsWith(prefix)) {
