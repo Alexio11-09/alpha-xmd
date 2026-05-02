@@ -3,8 +3,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+// System ffmpeg is used (Termux has it globally, servers have it too)
 
 const tmpDir = os.tmpdir();
 const makeTmp = (ext) => path.join(tmpDir, `${crypto.randomBytes(6).toString('hex')}.${ext}`);
