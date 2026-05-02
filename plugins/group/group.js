@@ -1,333 +1,62 @@
-// © 2026 Alpha - GROUP COMMANDS (FULLY FIXED PERMISSIONS + FUNNY + ALL MISSING CMDS)
+const fs=require("fs");const{downloadContentFromMessage}=require('@whiskeysockets/baileys');
+let dbPath='./database/groupSettings.json';try{if(!fs.existsSync('./database'))fs.mkdirSync('./database',{recursive:true});fs.writeFileSync(dbPath,'{}',{flag:'a'})}catch{dbPath='/tmp/groupSettings.json'}
+const badWordsPath='./database/badwords.json';if(!fs.existsSync(badWordsPath))fs.writeFileSync(badWordsPath,'{}');
+const load=()=>{try{return JSON.parse(fs.readFileSync(dbPath))}catch{return{}}};
+const save=(d)=>{try{fs.writeFileSync(dbPath,JSON.stringify(d,null,2));return true}catch{return false}};
+const gs=(g)=>{const s=load();return s[g]||{welcome:false,welcomeMsg:"Welcome @user! 🎉",goodbye:false,goodbyeMsg:"Goodbye @user! 👋",antilink:false,antilinkAction:"delete",antilinkMode:"admins",blockedCountries:[],antiforeign:false,antibot:false}};
+const ss=(g,d)=>{const s=load();s[g]={...gs(g),...d};return save(s)};
+const bw=()=>{try{return JSON.parse(fs.readFileSync(badWordsPath))}catch{return{}}};
+const sbw=(d)=>fs.writeFileSync(badWordsPath,JSON.stringify(d,null,2));
+const R=(a)=>a[Math.floor(Math.random()*a.length)];
+const fail=["👾 Oops, circuits tangled. Retry?","💥 Failed! But I'm still cool.","😅 Something broke. Try again?"];
+const badmin=["🤖 I need admin powers. Promote me!","⚡ Admin required, I'm just a servant."];
+const guide=(c,u)=>R([`🧐 Use: *${u}*`,`🤔 Try: *${u}*`,`😜 Right: *${u}*`,`🙈 Type: *${u}*`]);
+const warnPath='./database/warnings.json';if(!fs.existsSync(warnPath))fs.writeFileSync(warnPath,'{}');
+const loadW=()=>{try{return JSON.parse(fs.readFileSync(warnPath))}catch{return{}}};
+const saveW=(d)=>fs.writeFileSync(warnPath,JSON.stringify(d,null,2));
+const addW=(g,u)=>{const d=loadW();if(!d[g])d[g]={};if(!d[g][u])d[g][u]=0;d[g][u]++;saveW(d);return d[g][u]};
+const getW=(g,u)=>{const d=loadW();return(d[g]&&d[g][u])?d[g][u]:0};
+const resetW=(g,u)=>{const d=loadW();if(d[g]&&d[g][u]){delete d[g][u];saveW(d)}};
 
-const fs = require("fs");
-
-let dbPath = './database/groupSettings.json';
-try {
-    if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
-    fs.writeFileSync(dbPath, '{}', { flag: 'a' });
-} catch {
-    dbPath = '/tmp/groupSettings.json';
-}
-
-const badWordsPath = './database/badwords.json';
-if (!fs.existsSync(badWordsPath)) fs.writeFileSync(badWordsPath, '{}');
-
-const load = () => { try { if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}'); return JSON.parse(fs.readFileSync(dbPath)); } catch { return {}; } };
-const save = (d) => { try { fs.writeFileSync(dbPath, JSON.stringify(d, null, 2)); return true; } catch { return false; } };
-const gs = (g) => { const s = load(); return s[g] || { welcome: false, welcomeMsg: "Welcome @user! 🎉", goodbye: false, goodbyeMsg: "Goodbye @user! 👋", antilink: false, antilinkAction: "delete", antilinkMode: "admins", blockedCountries: [], antiforeign: false, antibot: false }; };
-const ss = (g, d) => { const s = load(); s[g] = { ...gs(g), ...d }; return save(s); };
-const bw = () => { try { return JSON.parse(fs.readFileSync(badWordsPath)); } catch { return {}; } };
-const sbw = (d) => fs.writeFileSync(badWordsPath, JSON.stringify(d, null, 2));
-
-const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
-const fail = ["👾 Oops, circuits tangled. Retry?", "💥 Failed! But I'm still cool.", "😅 Something broke. Try again?"];
-const badmin = ["🤖 I need admin powers. Promote me!", "⚡ Admin required, I'm just a servant."];
-
-const guide = (cmd, usage) => R([
-    `🧐 You forgot something! Use: *${usage}*`,
-    `🤔 Hmm, that didn't work. Try: *${usage}*`,
-    `😜 Oops! The right way is: *${usage}*`,
-    `🙈 Without that, I'm lost. Type: *${usage}*`
-]);
-
-// ──────────────────────────────────────
-// WARNING SYSTEM (NEW)
-// ──────────────────────────────────────
-const warnPath = './database/warnings.json';
-if (!fs.existsSync(warnPath)) fs.writeFileSync(warnPath, '{}');
-const loadWarnings = () => { try { return JSON.parse(fs.readFileSync(warnPath)); } catch { return {}; } };
-const saveWarnings = (d) => fs.writeFileSync(warnPath, JSON.stringify(d, null, 2));
-
-const addWarning = (groupJid, userJid) => {
-    const data = loadWarnings();
-    if (!data[groupJid]) data[groupJid] = {};
-    if (!data[groupJid][userJid]) data[groupJid][userJid] = 0;
-    data[groupJid][userJid]++;
-    saveWarnings(data);
-    return data[groupJid][userJid];
-};
-
-const getWarnings = (groupJid, userJid) => {
-    const data = loadWarnings();
-    return (data[groupJid] && data[groupJid][userJid]) ? data[groupJid][userJid] : 0;
-};
-
-const resetWarnings = (groupJid, userJid) => {
-    const data = loadWarnings();
-    if (data[groupJid] && data[groupJid][userJid]) {
-        delete data[groupJid][userJid];
-        saveWarnings(data);
-    }
-};
-
-// ──────────────────────────────────────
-module.exports = [
-    // ==================== EXISTING COMMANDS (unchanged) ====================
-    // (tagall, kick, add, promote, demote, mute, unmute, hidetag, groupinfo,
-    //  grouplink, revokelink, listadmin, tagadmin, vcf, promoteall, demoteall,
-    //  poll, welcome, goodbye, antilink, approveall, kickinactive, antibadword,
-    //  antiforeign, antibot) -- all kept exactly as before
-    // ... [ keeping them in the file as they already are ] ...
-
-    // ==================== NEW GROUP COMMANDS ====================
-
-    // 1. setgname
-    {
-        command: "setgname",
-        aliases: ["setgroupname", "groupname"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { args, reply }) => {
-            if (!args[0]) return reply(guide("setgname", ".setgname My New Group"));
-            const newName = args.join(" ");
-            try {
-                await sock.groupUpdateSubject(m.chat, newName);
-                reply(`✅ Group name changed to *${newName}*`);
-            } catch (err) {
-                reply(`❌ Failed to set group name: ${err.message}`);
-            }
-        }
-    },
-
-    // 2. setgdesc
-    {
-        command: "setgdesc",
-        aliases: ["setgroupdesc", "groupdesc"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { args, reply }) => {
-            if (!args[0]) return reply(guide("setgdesc", ".setgdesc Welcome to the group!"));
-            const newDesc = args.join(" ");
-            try {
-                await sock.groupUpdateDescription(m.chat, newDesc);
-                reply(`✅ Group description updated!`);
-            } catch (err) {
-                reply(`❌ Failed to set description: ${err.message}`);
-            }
-        }
-    },
-
-    // 3. setgpp
-    {
-        command: "setgpp",
-        aliases: ["setgrouppp", "grouppp"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            if (!m.quoted || !m.quoted.message) return reply(guide("setgpp", ".setgpp (reply to an image)"));
-            const msgType = Object.keys(m.quoted.message)[0];
-            if (msgType !== 'imageMessage') return reply("❌ Reply to an image!");
-            try {
-                const buffer = await sock.downloadMediaMessage(m.quoted);
-                await sock.updateProfilePicture(m.chat, buffer);
-                reply(R(["🖼️ Group pic updated!", "📸 New group profile picture!"]));
-            } catch (err) {
-                reply(`❌ Failed to set group picture: ${err.message}`);
-            }
-        }
-    },
-
-    // 4. warn
-    {
-        command: "warn",
-        aliases: ["warning"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            let target;
-            if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
-            else if (m.quoted) target = m.quoted.sender;
-            else return reply(guide("warn", ".warn @user (or reply)"));
-            if (target === sock.user.id) return reply("😂 I'm a good bot, I don't need warnings.");
-            const count = addWarning(m.chat, target);
-            reply(`⚠️ @${target.split('@')[0]} has been warned! (${count}/3)${count >= 3 ? '\n🚫 Kicking...' : ''}`, { mentions: [target] });
-            if (count >= 3) {
-                try {
-                    await sock.groupParticipantsUpdate(m.chat, [target], "remove");
-                    reply(`👢 @${target.split('@')[0]} kicked after 3 warnings.`);
-                } catch { reply("❌ Failed to kick the user. Make sure I'm admin."); }
-                resetWarnings(m.chat, target);
-            }
-        }
-    },
-
-    // 5. warnings
-    {
-        command: "warnings",
-        aliases: ["listwarn", "checkwarn"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            let target;
-            if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
-            else if (m.quoted) target = m.quoted.sender;
-            else return reply(guide("warnings", ".warnings @user (or reply)"));
-            const count = getWarnings(m.chat, target);
-            reply(`⚠️ @${target.split('@')[0]} has ${count} warning(s).`, { mentions: [target] });
-        }
-    },
-
-    // 6. resetwarn
-    {
-        command: "resetwarn",
-        aliases: ["clearwarn"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            let target;
-            if (m.mentionedJid && m.mentionedJid[0]) target = m.mentionedJid[0];
-            else if (m.quoted) target = m.quoted.sender;
-            else return reply(guide("resetwarn", ".resetwarn @user (or reply)"));
-            resetWarnings(m.chat, target);
-            reply(`✅ Warnings reset for @${target.split('@')[0]}.`, { mentions: [target] });
-        }
-    },
-
-    // 7. tagnotadmin
-    {
-        command: "tagnotadmin",
-        aliases: ["tagna"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { args, reply }) => {
-            try {
-                const meta = await sock.groupMetadata(m.chat);
-                const nonAdmins = meta.participants.filter(p => !p.admin);
-                if (nonAdmins.length === 0) return reply("🎉 Everyone is an admin!");
-                let txt = `👥 *Non‑Admin Members (${nonAdmins.length})*\n` + (args.join(" ") || "📢 Attention!") + "\n";
-                for (const p of nonAdmins) txt += `@${p.id.split("@")[0]} `;
-                await sock.sendMessage(m.chat, { text: txt, mentions: nonAdmins.map(a => a.id) });
-            } catch { reply(R(fail)); }
-        }
-    },
-
-    // 8. requestlist
-    {
-        command: "requestlist",
-        aliases: ["joinrequests", "pending"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            try {
-                const meta = await sock.groupMetadata(m.chat);
-                const reqs = meta.joinRequests || [];
-                if (reqs.length === 0) return reply("📋 No pending join requests.");
-                let txt = `📋 *Pending Join Requests (${reqs.length})*\n\n`;
-                for (let i = 0; i < reqs.length; i++) {
-                    txt += `${i+1}. @${reqs[i].jid.split('@')[0]}\n`;
-                }
-                await sock.sendMessage(m.chat, { text: txt, mentions: reqs.map(r => r.jid) });
-            } catch { reply(R(fail)); }
-        }
-    },
-
-    // 9. rejectall
-    {
-        command: "rejectall",
-        aliases: ["rejectrequests", "denyall"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            try {
-                const meta = await sock.groupMetadata(m.chat);
-                const reqs = meta.joinRequests || [];
-                if (reqs.length === 0) return reply("📋 No pending join requests.");
-                let rejected = 0;
-                for (const r of reqs) {
-                    try { await sock.groupRequestApproval(m.chat, r.jid, 'reject'); rejected++; } catch {}
-                }
-                reply(`🚫 Rejected ${rejected}/${reqs.length} join requests.`);
-            } catch { reply(R(fail)); }
-        }
-    },
-
-    // 10. newgc / creategc
-    {
-        command: "newgc",
-        aliases: ["creategc", "creategroup"],
-        category: "group",
-        execute: async (sock, m, { args, reply }) => {
-            // This creates a new group with the mentioned users + the bot
-            const subject = args.join(" ") || "New Alpha Group";
-            let members = [];
-            if (m.mentionedJid && m.mentionedJid.length > 0) {
-                members = m.mentionedJid;
-            } else {
-                return reply(guide("newgc", ".newgc <group name> @user1 @user2 ..."));
-            }
-            members.push(sock.user.id); // include self
-            try {
-                const result = await sock.groupCreate(subject, members);
-                reply(`✅ Group *${subject}* created!\n\n🔗 https://chat.whatsapp.com/${result.id}`);
-            } catch (err) {
-                reply(`❌ Failed to create group: ${err.message}`);
-            }
-        }
-    },
-
-    // 11. online / whosonline (placeholder – Baileys can't reliably fetch online status)
-    {
-        command: "online",
-        aliases: ["whosonline", "onlinemembers"],
-        category: "group",
-        group: true,
-        execute: async (sock, m, { reply }) => {
-            // Baileys doesn't have a direct method to list online members in a group.
-            // We'll show a helpful message instead.
-            reply("⚠️ This feature is limited by WhatsApp's privacy. The bot can detect when someone is online only if they post a status or send a message. Use `.alive` to see the bot's uptime instead.");
-        }
-    },
-
-    // 12. clear (delete all bot messages in the chat – admin only)
-    {
-        command: "clear",
-        aliases: ["clearchat", "cleanchat"],
-        category: "group",
-        group: true,
-        admin: true,
-        execute: async (sock, m, { reply }) => {
-            // This is a placeholder – actual deletion of all messages is not possible without iterating over chat history.
-            // We'll just say it's an experimental feature.
-            reply("🧹 This command will delete all bot messages in the chat. It's currently under development. Use `.delete` to remove a specific message you replied to.");
-        }
-    },
-
-    // 13. staff (better admin list)
-    {
-        command: "staff",
-        aliases: ["admins"],
-        category: "group",
-        group: true,
-        execute: async (sock, m, { reply }) => {
-            try {
-                const meta = await sock.groupMetadata(m.chat);
-                const admins = meta.participants.filter(p => p.admin);
-                let txt = `👑 *Staff (${admins.length})*\n\n`;
-                for (const a of admins) txt += `• @${a.id.split('@')[0]}\n`;
-                await sock.sendMessage(m.chat, { text: txt, mentions: admins.map(a => a.id) });
-            } catch { reply(R(fail)); }
-        }
-    },
-
-    // 14. myactivity / rank (fun stats – simple placeholder)
-    {
-        command: "myactivity",
-        aliases: ["rank", "activity"],
-        category: "group",
-        group: true,
-        execute: async (sock, m, { reply }) => {
-            reply("📊 Activity stats coming soon! For now, check your warnings with `.warnings` or see the group info with `.groupinfo`.");
-        }
-    }
+module.exports=[
+{command:"tagall",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.isBotAdmin)return reply(R(badmin));try{const me=await s.groupMetadata(m.chat);const ms=me.participants;let t=R(["📢 Everyone!","📣 Squad!"])+"\n\n";for(let p of ms)t+=`@${p.id.split("@")[0]}\n`;await s.sendMessage(m.chat,{text:t,mentions:ms.map(a=>a.id)},{quoted:m})}catch{reply(R(fail))}}},
+{command:"kick",group:true,admin:true,execute:async(s,m,{reply})=>{let t=m.mentionedJid?.[0]||m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];if(!t)return reply(guide("kick",".kick @user"));if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupParticipantsUpdate(m.chat,[t],"remove");reply(R([`👢 @${t.split("@")[0]} kicked!`]),{mentions:[t]})}catch{reply(R(fail))}}},
+{command:"add",group:true,admin:true,execute:async(s,m,{args,reply})=>{if(!args[0])return reply(guide("add",".add 123456789"));let n=args[0].replace(/[^0-9]/g,"")+"@s.whatsapp.net";if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupParticipantsUpdate(m.chat,[n],"add");reply(R([`🚀 @${n.split("@")[0]} joined!`]),{mentions:[n]})}catch{reply(R(fail))}}},
+{command:"promote",group:true,admin:true,execute:async(s,m,{reply})=>{let t=m.mentionedJid?.[0]||m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];if(!t)return reply(guide("promote",".promote @user"));if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupParticipantsUpdate(m.chat,[t],"promote");reply(R([`👑 @${t.split("@")[0]} is admin.`]),{mentions:[t]})}catch{reply(R(fail))}}},
+{command:"demote",group:true,admin:true,execute:async(s,m,{reply})=>{let t=m.mentionedJid?.[0]||m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];if(!t)return reply(guide("demote",".demote @user"));if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupParticipantsUpdate(m.chat,[t],"demote");reply(R([`📉 @${t.split("@")[0]} demoted.`]),{mentions:[t]})}catch{reply(R(fail))}}},
+{command:"mute",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupSettingUpdate(m.chat,"announcement");reply(R(["🔇 Muted!","🤫 Silent."]))}catch{reply(R(fail))}}},
+{command:"unmute",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupSettingUpdate(m.chat,"not_announcement");reply(R(["🔊 Unmuted!","🗣️ Talk."]))}catch{reply(R(fail))}}},
+{command:"hidetag",group:true,admin:true,execute:async(s,m,{args,reply})=>{try{const me=await s.groupMetadata(m.chat);const t=args.join(" ")||"👀";await s.sendMessage(m.chat,{text:t,mentions:me.participants.map(p=>p.id)})}catch{reply(R(fail))}}},
+{command:"groupinfo",group:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);reply(`📌 *${me.subject}*\n👥 ${me.participants.length} members\n👮 ${me.participants.filter(p=>p.admin).length} admins`)}catch{reply(R(fail))}}},
+{command:"grouplink",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.isBotAdmin)return reply(R(badmin));try{const c=await s.groupInviteCode(m.chat);reply(`🔗 https://chat.whatsapp.com/${c}`)}catch{reply(R(fail))}}},
+{command:"revokelink",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.isBotAdmin)return reply(R(badmin));try{await s.groupRevokeInvite(m.chat);reply(R(["♻️ Link reset!"]))}catch{reply(R(fail))}}},
+{command:"listadmin",group:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const a=me.participants.filter(p=>p.admin);let t=`👑 *Admins (${a.length})*\n`;for(let x of a)t+=`• @${x.id.split("@")[0]}\n`;await s.sendMessage(m.chat,{text:t,mentions:a.map(x=>x.id)})}catch{reply(R(fail))}}},
+{command:"tagadmin",group:true,admin:true,execute:async(s,m,{args,reply})=>{try{const me=await s.groupMetadata(m.chat);const a=me.participants.filter(p=>p.admin);const txt=args.join(" ")||"Admin!";let t=`👑 *${txt}*\n`;for(let x of a)t+=`@${x.id.split("@")[0]} `;await s.sendMessage(m.chat,{text:t,mentions:a.map(x=>x.id)})}catch{reply(R(fail))}}},
+{command:"vcf",group:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);let v="";for(let p of me.participants){let n=p.id.split("@")[0];v+=`BEGIN:VCARD\nVERSION:3.0\nFN:${n}\nTEL:${n}\nEND:VCARD\n`}await s.sendMessage(m.chat,{document:Buffer.from(v),fileName:"contacts.vcf",mimetype:"text/vcard"})}catch{reply(R(fail))}}},
+{command:"promoteall",group:true,admin:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const n=me.participants.filter(p=>!p.admin);if(!n.length)return reply("👑 Already admins.");reply(`⏳ Promoting ${n.length}...`);for(let p of n){await s.groupParticipantsUpdate(m.chat,[p.id],"promote");await new Promise(r=>setTimeout(r,1000))}reply("✅ Done")}catch{reply(R(fail))}}},
+{command:"demoteall",group:true,admin:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const botId=s.user.id;const a=me.participants.filter(p=>p.admin&&p.id!==botId);if(!a.length)return reply("🤴 No one to demote.");reply(`⏳ Demoting ${a.length}...`);for(let p of a){await s.groupParticipantsUpdate(m.chat,[p.id],"demote");await new Promise(r=>setTimeout(r,1000))}reply("✅ Done")}catch{reply(R(fail))}}},
+{command:"poll",group:true,execute:async(s,m,{args,reply})=>{let t=args.join(" ");if(!t.includes("|"))return reply(guide("poll",".poll Question | Opt1 | Opt2"));let[q,...o]=t.split("|").map(x=>x.trim());if(o.length<2)return reply(guide("poll",".poll Question | Opt1 | Opt2"));try{await s.sendMessage(m.chat,{poll:{name:q,values:o,selectableCount:1}})}catch{reply(R(fail))}}},
+{command:"welcome",group:true,admin:true,execute:async(s,m,{args,reply})=>{const a=args[0]?.toLowerCase();const c=gs(m.chat);if(a==="on"){reply(ss(m.chat,{welcome:true})?R(["✅ Welcome ON!"]):R(fail))}else if(a==="off"){reply(ss(m.chat,{welcome:false})?R(["❌ Welcome off."]):R(fail))}else{reply(`📊 Welcome: ${c.welcome?"ON":"OFF"}\n.welcome on/off`)}}},
+{command:"goodbye",group:true,admin:true,execute:async(s,m,{args,reply})=>{const a=args[0]?.toLowerCase();const c=gs(m.chat);if(a==="on"){reply(ss(m.chat,{goodbye:true})?R(["👋 Goodbye ON!"]):R(fail))}else if(a==="off"){reply(ss(m.chat,{goodbye:false})?R(["❌ Goodbye off."]):R(fail))}else{reply(`📊 Goodbye: ${c.goodbye?"ON":"OFF"}\n.goodbye on/off`)}}},
+{command:"antilink",group:true,admin:true,execute:async(s,m,{args,reply})=>{const a=args[0]?.toLowerCase();const c=gs(m.chat);if(a==="delete"||a==="warn"||a==="kick"){reply(ss(m.chat,{antilink:true,antilinkAction:a})?R([`🛡️ ${a} mode!`]):R(fail))}else if(a==="mode"){const m2=args[1]?.toLowerCase();if(m2==="owner"||m2==="admins"){reply(ss(m.chat,{antilinkMode:m2})?R([`👑 Mode: ${m2}`]):R(fail))}else{reply(guide("antilink mode",".antilink mode owner/admins"))}}else if(a==="off"){reply(ss(m.chat,{antilink:false})?R(["❌ Anti-link off."]):R(fail))}else{const cur=c.antilinkAction||"delete",md=c.antilinkMode||"admins";reply(`🛡️ Anti-Link\nAction:${cur}\nMode:${md}\n.antilink delete/warn/kick\n.antilink mode owner/admins\n.antilink off`)}}},
+{command:"approveall",group:true,admin:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const r=me.joinRequests||[];if(!r.length)return reply("📋 No requests.");let ok=0;for(let x of r){try{await s.groupRequestApproval(m.chat,x.jid,'approve');ok++}catch{}}reply(`✅ ${ok}/${r.length} approved!`)}catch{reply(R(fail))}}},
+{command:"kickinactive",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.isBotAdmin)return reply(R(badmin));try{const me=await s.groupMetadata(m.chat);let k=0;for(let p of me.participants){if(p.admin)continue;try{await s.groupParticipantsUpdate(m.chat,[p.id],'remove');k++;await new Promise(r=>setTimeout(r,1000))}catch{}}reply(R([`✅ ${k} gone!`]))}catch{reply(R(fail))}}},
+{command:"antibadword",group:true,admin:true,execute:async(s,m,{args,reply})=>{const a=args[0]?.toLowerCase();const w=args.slice(1).join(" ");const b=bw();if(!b[m.chat])b[m.chat]={enabled:false,words:[]};if(a==="on"){b[m.chat].enabled=true;sbw(b);reply(R(["🛡️ Filter ON!"]))}else if(a==="off"){b[m.chat].enabled=false;sbw(b);reply(R(["❌ Filter off."]))}else if(a==="add"&&w){b[m.chat].words.push(w.toLowerCase());sbw(b);reply(R([`✅ "${w}" banned.`]))}else if(a==="remove"&&w){b[m.chat].words=b[m.chat].words.filter(x=>x!==w.toLowerCase());sbw(b);reply(R([`✅ "${w}" freed.`]))}else if(a==="list"){reply(b[m.chat].words.length?`🚫 Bad Words:\n${b[m.chat].words.map(x=>`• ${x}`).join('\n')}`:R(["📋 No bad words."]))}else{reply(`🛡️ Bad Words: ${b[m.chat].enabled?"ON":"OFF"}\n.antibadword on/off\n.antibadword add/remove [word]\n.antibadword list`)}}},
+{command:"antiforeign",group:true,admin:true,execute:async(s,m,{args,reply})=>{if(!m.isBotAdmin)return reply(R(badmin));const a=args[0]?.toLowerCase();const c=gs(m.chat);if(!c.blockedCountries)c.blockedCountries=[];if(!a){let t=`🌍 Anti-Foreign: ${c.antiforeign?"ON":"OFF"}\n`;if(c.blockedCountries.length){t+="\n🚫 Blocked:\n";c.blockedCountries.forEach(x=>t+=`• +${x}\n`)}return reply(t+`.antiforeign +263\n.antiforeign on/off`)}if(a==="on"){ss(m.chat,{antiforeign:true});return reply(R(["🌍 Border ON!"]))}if(a==="off"){ss(m.chat,{antiforeign:false,blockedCountries:[]});return reply(R(["❌ Open borders."]))}if(a==="list"){return reply(c.blockedCountries.length?`🚫 Blocked: ${c.blockedCountries.map(x=>`+${x}`).join(', ')}`:R(["📋 No countries blocked."]))}if(a.startsWith('+')){const code=a.replace(/[^0-9]/g,'');if(c.blockedCountries.includes(code)){c.blockedCountries=c.blockedCountries.filter(x=>x!==code);ss(m.chat,{blockedCountries:c.blockedCountries});return reply(R([`✅ +${code} removed.`]))}c.blockedCountries.push(code);ss(m.chat,{blockedCountries:c.blockedCountries,antiforeign:true});reply(`🔄 Blocking +${code}...`);try{const me=await s.groupMetadata(m.chat);let k=0;for(let p of me.participants){if(p.admin)continue;if(p.id.split('@')[0].startsWith(code)){try{await s.groupParticipantsUpdate(m.chat,[p.id],'remove');k++;await new Promise(r=>setTimeout(r,500))}catch{}}}reply(R([`✅ Kicked ${k} from +${code}.`]))}catch{reply(R([`✅ +${code} blocked.`]))}}else{reply(guide("antiforeign","Use: .antiforeign +263 or .antiforeign on/off/list"))}}},
+{command:"antibot",group:true,admin:true,execute:async(s,m,{args,reply})=>{if(!m.isBotAdmin)return reply(R(badmin));const a=args[0]?.toLowerCase();if(a==="on"){ss(m.chat,{antibot:true});reply(R(["🤖 Anti-bot ON!"]))}else if(a==="off"){ss(m.chat,{antibot:false});reply(R(["❌ Anti-bot off."]))}else{reply(R(["🔍 Scanning for bots..."]));try{const me=await s.groupMetadata(m.chat);let k=0;for(let p of me.participants){if(p.id===s.user.id)continue;const n=(p.name||"").toLowerCase();if(n.includes('bot')||n.includes('md')||n.includes('wa bot')){try{await s.groupParticipantsUpdate(m.chat,[p.id],'remove');k++;await new Promise(r=>setTimeout(r,500))}catch{}}}reply(k?R([`✅ Kicked ${k} bots.`]):R(["✅ No bots found!"]))}catch{reply(R(fail))}}}},
+// NEW GROUP COMMANDS (compact)
+{command:"setgname",group:true,admin:true,execute:async(s,m,{args,reply})=>{if(!args[0])return reply(guide("setgname",".setgname My Group"));try{await s.groupUpdateSubject(m.chat,args.join(" "));reply("✅ Group name updated!")}catch(e){reply("❌ Failed: "+e.message)}}},
+{command:"setgdesc",group:true,admin:true,execute:async(s,m,{args,reply})=>{if(!args[0])return reply(guide("setgdesc",".setgdesc Welcome!"));try{await s.groupUpdateDescription(m.chat,args.join(" "));reply("✅ Description updated!")}catch(e){reply("❌ Failed: "+e.message)}}},
+{command:"setgpp",group:true,admin:true,execute:async(s,m,{reply})=>{if(!m.quoted?.message)return reply(guide("setgpp",".setgpp (reply to image)"));if(Object.keys(m.quoted.message)[0]!=='imageMessage')return reply("❌ Reply to an image!");try{const st=await downloadContentFromMessage(m.quoted.message.imageMessage,'image');let b=Buffer.from([]);for await(const c of st)b=Buffer.concat([b,c]);await s.updateProfilePicture(m.chat,b);reply(R(["🖼️ Group pic updated!"]))}catch(e){reply("❌ Failed: "+e.message)}}},
+{command:"warn",group:true,admin:true,execute:async(s,m,{reply})=>{let t;if(m.mentionedJid?.[0])t=m.mentionedJid[0];else if(m.quoted)t=m.quoted.sender;else return reply(guide("warn",".warn @user"));if(t===s.user.id)return reply("😂 I'm good.");const c=addW(m.chat,t);reply(`⚠️ @${t.split('@')[0]} warned (${c}/3)${c>=3?'\n🚫 Kicking...':''}`,{mentions:[t]});if(c>=3){try{await s.groupParticipantsUpdate(m.chat,[t],"remove");reply(`👢 @${t.split('@')[0]} kicked.`)}catch{}resetW(m.chat,t)}}},
+{command:"warnings",group:true,admin:true,execute:async(s,m,{reply})=>{let t;if(m.mentionedJid?.[0])t=m.mentionedJid[0];else if(m.quoted)t=m.quoted.sender;else return reply(guide("warnings",".warnings @user"));const c=getW(m.chat,t);reply(`⚠️ @${t.split('@')[0]} has ${c} warning(s).`,{mentions:[t]})}},
+{command:"resetwarn",group:true,admin:true,execute:async(s,m,{reply})=>{let t;if(m.mentionedJid?.[0])t=m.mentionedJid[0];else if(m.quoted)t=m.quoted.sender;else return reply(guide("resetwarn",".resetwarn @user"));resetW(m.chat,t);reply(`✅ Warnings reset for @${t.split('@')[0]}.`,{mentions:[t]})}},
+{command:"tagnotadmin",group:true,admin:true,execute:async(s,m,{args,reply})=>{try{const me=await s.groupMetadata(m.chat);const n=me.participants.filter(p=>!p.admin);if(!n.length)return reply("🎉 All admins.");let t=(args.join(" ")||"📢")+"\n";for(let p of n)t+=`@${p.id.split("@")[0]} `;await s.sendMessage(m.chat,{text:t,mentions:n.map(x=>x.id)})}catch{reply(R(fail))}}},
+{command:"requestlist",group:true,admin:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const r=me.joinRequests||[];if(!r.length)return reply("📋 No requests.");let t=`📋 Pending (${r.length})\n\n`;for(let i=0;i<r.length;i++)t+=`${i+1}. @${r[i].jid.split('@')[0]}\n`;await s.sendMessage(m.chat,{text:t,mentions:r.map(x=>x.jid)})}catch{reply(R(fail))}}},
+{command:"rejectall",group:true,admin:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const r=me.joinRequests||[];if(!r.length)return reply("📋 No requests.");let k=0;for(let x of r){try{await s.groupRequestApproval(m.chat,x.jid,'reject');k++}catch{}}reply(`🚫 Rejected ${k}/${r.length}.`)}catch{reply(R(fail))}}},
+{command:"newgc",group:false,execute:async(s,m,{args,reply})=>{const sub=args.join(" ")||"New Alpha Group";let mb=[];if(m.mentionedJid?.length)mb=m.mentionedJid;else return reply(guide("newgc",".newgc <name> @user..."));mb.push(s.user.id);try{const r=await s.groupCreate(sub,mb);reply(`✅ Group *${sub}* created!\n🔗 https://chat.whatsapp.com/${r.id}`)}catch(e){reply("❌ Failed: "+e.message)}}},
+{command:"online",group:true,execute:async(s,m,{reply})=>{reply("⚠️ Limited by privacy. Use .alive / .status.")}},
+{command:"clear",group:true,admin:true,execute:async(s,m,{reply})=>{reply("🧹 Under development. Use .delete on a replied message.")}},
+{command:"staff",group:true,execute:async(s,m,{reply})=>{try{const me=await s.groupMetadata(m.chat);const a=me.participants.filter(p=>p.admin);let t=`👑 Staff (${a.length})\n\n`;for(let x of a)t+=`• @${x.id.split("@")[0]}\n`;await s.sendMessage(m.chat,{text:t,mentions:a.map(x=>x.id)})}catch{reply(R(fail))}}},
+{command:"myactivity",group:true,execute:async(s,m,{reply})=>{reply("📊 Coming soon! Check .warnings or .groupinfo.")}},
 ];
