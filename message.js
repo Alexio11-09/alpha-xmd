@@ -1,4 +1,5 @@
-// © 2026 Alpha - MESSAGE HANDLER (STABLE + ONE‑CLICK PAIR, PAIR SESSION REMOVED)
+// © 2026 Alpha - MESSAGE HANDLER (STABLE ORIGINAL)
+
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -62,7 +63,7 @@ const setGlobalMode = (mode) => {
     setGlobalSettings(g);
 };
 
-// COMMANDS
+// COMMANDS LOADER
 const commands = [];
 const loadCommands = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -153,7 +154,7 @@ commands.push({
     }
 });
 
-// GAMES
+// GAMES STORAGE (if needed)
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
 // SHORT DENIALS
@@ -178,7 +179,18 @@ module.exports = async (sock, m) => {
 
         if (!m.text) return;
 
-        // ================== NON-COMMAND MESSAGE FILTERS ==================
+        // ----------- PAIR SESSION ---------------
+        const pairKey = m.chat + m.sender;
+        if (global.pairSessions && global.pairSessions[pairKey]) {
+            const num = global.pairSessions[pairKey];
+            const choice = m.text.trim();
+            if (choice === '1' || choice === '2') {
+                delete global.pairSessions[pairKey];
+                const method = choice === '1' ? 'qr' : 'code';
+                return module.exports.handlePairChoice(sock, m, num, method, reply, send);
+            }
+        }
+
         const prefix = config.prefix || ".";
         if (!m.text.startsWith(prefix)) {
             // ANTIBADWORD
@@ -217,7 +229,7 @@ module.exports = async (sock, m) => {
             return;
         }
 
-        // ================== COMMAND PROCESSING ==================
+        // COMMAND
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const cmdName = args.shift().toLowerCase();
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
@@ -245,6 +257,82 @@ module.exports = async (sock, m) => {
     } catch (err) {
         console.log("🔥 HANDLER ERROR:", err);
         try { await sock.sendMessage(m.chat, { text: "🤖 Error. Try again later." }, { quoted: m }); } catch {}
+    }
+};
+
+// PAIR HANDLER
+module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
+    const baileys = await import('@whiskeysockets/baileys');
+    const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+    const pino = require('pino'), qrcode = require('qrcode'), os = require('os'), path = require('path'), fs = require('fs');
+
+    reply(`⏳ Generating ${method==='qr'?'QR code':'pairing code'} for +${number}...`);
+
+    const tempDir = path.join(os.tmpdir(), `p_${number}_${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    let tempSock;
+    try {
+        const { state } = await useMultiFileAuthState(tempDir);
+        const { version } = await fetchLatestBaileysVersion();
+
+        tempSock = makeWASocket({
+            auth: state,
+            version,
+            browser: Browsers.macOS('Chrome'),
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false
+        });
+
+        const result = await new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (data) => { if (settled) return; settled = true; resolve(data); };
+            const fail = (err) => { if (settled) return; settled = true; reject(err); };
+            const timeout = setTimeout(() => fail(new Error('Request timed out.')), 50000);
+
+            tempSock.ev.on('connection.update', async (up) => {
+                const { connection, qr } = up;
+                if (connection === 'open' && method === 'code') {
+                    try {
+                        const code = await tempSock.requestPairingCode(number);
+                        clearTimeout(timeout);
+                        finish({ code });
+                    } catch (err) {
+                        clearTimeout(timeout);
+                        fail(err);
+                    }
+                } else if (qr && method === 'qr') {
+                    clearTimeout(timeout);
+                    finish({ qr });
+                } else if (connection === 'close') {
+                    clearTimeout(timeout);
+                    fail(new Error('Connection closed'));
+                }
+            });
+        });
+
+        tempSock.end();
+        fs.rmSync(tempDir, { recursive: true, force: true });
+
+        if (result.code) {
+            reply(`✅ *Pairing Code Ready*\n📞 +${number}\n🔢 *${result.code}*\n⏱️ Expires in 60s\n📱 WhatsApp → Linked devices → Link with phone number`);
+            await sock.sendMessage(m.chat, {
+                text: `📢 *Stay connected!*\n\nJoin our official channel for updates, support, and news.\n\n🔗 https://whatsapp.com/channel/${config.newsletter.id}`,
+                contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } }
+            }, { quoted: m });
+        } else if (result.qr) {
+            const qrBuf = await qrcode.toBuffer(result.qr, { type: 'png' });
+            await sock.sendMessage(m.chat, { image: qrBuf, caption: `📷 QR for +${number}\nScan to link.` }, { quoted: m });
+            await sock.sendMessage(m.chat, {
+                text: `📢 *Stay connected!*\n\nJoin our official channel for updates, support, and news.\n\n🔗 https://whatsapp.com/channel/${config.newsletter.id}`,
+                contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } }
+            }, { quoted: m });
+        }
+    } catch (err) {
+        console.error('Pair error:', err);
+        try { tempSock?.end(); } catch {}
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+        reply(`❌ Pairing failed: ${err.message || err}`);
     }
 };
 
