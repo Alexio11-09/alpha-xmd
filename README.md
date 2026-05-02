@@ -125,6 +125,7 @@ Let’s build the ultimate bot together 🤝
 
 <div align="center">
   <img src="https://github-readme-stats.vercel.app/api/pin/?username=Alexio11-09&repo=alpha-xmd&theme=radical" alt="Repo Stats"/>
+</div>
 
 ---
 
