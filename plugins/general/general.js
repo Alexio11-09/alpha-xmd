@@ -594,21 +594,21 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 7. PAIR (ONE‑CLICK CODE – FIXED CONNECTION) ====================
-    {
-        command: "pair",
-        aliases: ["pairing", "session"],
-        category: "general",
-        execute: async (sock, m, { args, reply }) => {
-            if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
+    // ==================== 7. PAIR (FIXED TIMING) ====================
+{
+    command: "pair",
+    aliases: ["pairing", "session"],
+    category: "general",
+    execute: async (sock, m, { args, reply }) => {
+        if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
 
-            const rawNumber = args[0].replace(/[^0-9]/g, "");
-            if (rawNumber.length < 10) return reply("❌ Invalid phone number. Use full country code without '+'.");
+        const rawNumber = args[0].replace(/[^0-9]/g, "");
+        if (rawNumber.length < 10) return reply("❌ Invalid phone number. Use full country code without '+'.");
 
-            reply(`🔐 Requesting pairing code for +${rawNumber}...`);
+        reply(`🔐 Requesting pairing code for +${rawNumber}...`);
 
-            const baileys = await import('@whiskeysockets/baileys');
-            const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+        try {
+            const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = await import('@whiskeysockets/baileys');
             const pino = require('pino');
             const os = require('os');
             const path = require('path');
@@ -617,68 +617,54 @@ ${config.settings.footer}
             const tempDir = path.join(os.tmpdir(), `pair_${rawNumber}_${Date.now()}`);
             fs.mkdirSync(tempDir, { recursive: true });
 
-            let tempSock;
+            const { state } = await useMultiFileAuthState(tempDir);
+            const { version } = await fetchLatestBaileysVersion();
+
+            const tempSock = makeWASocket({
+                auth: state,
+                version,
+                browser: Browsers.macOS('Chrome'),   // ✅ required for pairing
+                logger: pino({ level: 'silent' }),
+                printQRInTerminal: false,
+                connectTimeoutMs: 30000
+            });
+
             let pairingCode = null;
+            let settled = false;
 
-            try {
-                const { state } = await useMultiFileAuthState(tempDir);
-                const { version } = await fetchLatestBaileysVersion();
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    if (!settled) { settled = true; reject(new Error("Connection timed out. Try again in a minute.")); }
+                }, 45000);
 
-                tempSock = makeWASocket({
-                    auth: state,
-                    version,
-                    browser: Browsers.macOS('Chrome'),
-                    logger: pino({ level: 'silent' }),
-                    printQRInTerminal: false,
-                    connectTimeoutMs: 60000
+                tempSock.ev.on('connection.update', async (update) => {
+                    const { connection } = update;
+                    console.log('🔌 Pair socket state:', connection);
+
+                    // The key fix: wait for 'connecting' (not 'open')
+                    if (connection === 'connecting' && !settled) {
+                        settled = true;
+                        clearTimeout(timeout);
+                        try {
+                            pairingCode = await tempSock.requestPairingCode(rawNumber);
+                            resolve();
+                        } catch (err) {
+                            reject(new Error("Failed to request pairing code: " + (err.message || String(err))));
+                        }
+                    }
+
+                    if (connection === 'close' && !settled) {
+                        settled = true;
+                        clearTimeout(timeout);
+                        reject(new Error("Connection closed before pairing code"));
+                    }
                 });
+            });
 
-                // Wait for ANY early connection event (connecting/qr/open)
-                await new Promise((resolve, reject) => {
-                    let settled = false;
-                    const finish = (code) => { if (settled) return; settled = true; resolve(code); };
-                    const fail = (err) => { if (settled) return; settled = true; reject(err); };
+            tempSock.end();
+            fs.rmSync(tempDir, { recursive: true, force: true });
 
-                    const timeout = setTimeout(() => {
-                        fail(new Error("Connection timed out. WhatsApp may be busy — try again in a minute."));
-                    }, 65000);
-
-                    tempSock.ev.on('connection.update', async (update) => {
-                        const { connection, qr } = update;
-
-                        if (connection === 'connecting' || connection === 'open') {
-                            try {
-                                const code = await tempSock.requestPairingCode(rawNumber);
-                                clearTimeout(timeout);
-                                finish(code);
-                            } catch (err) {
-                                // keep waiting
-                            }
-                        }
-
-                        if (qr) {
-                            clearTimeout(timeout);
-                            fail(new Error("QR code appeared instead of pairing code – try again"));
-                        }
-
-                        if (connection === 'close') {
-                            clearTimeout(timeout);
-                            fail(new Error("Connection closed before pairing code"));
-                        }
-                    });
-                }).then(code => { pairingCode = code; });
-
-            } catch (err) {
-                console.error('Pair error:', err);
-                return reply(`❌ Pairing failed: ${err.message || String(err)}`);
-            } finally {
-                if (tempSock) try { tempSock.end(); } catch {}
-                try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
-            }
-
-            if (!pairingCode) {
-                return reply("❌ Failed to obtain pairing code.");
-            }
+            if (!pairingCode) throw new Error("No pairing code obtained");
 
             reply(
                 `✅ *Pairing Code Ready*\n\n` +
@@ -687,6 +673,10 @@ ${config.settings.footer}
                 `⏱️ Expires in 60 seconds.\n` +
                 `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
             );
+
+        } catch (err) {
+            console.error('Pair error:', err);
+            reply(`❌ Pairing failed: ${err.message || String(err)}`);
         }
     }
-];
+}
