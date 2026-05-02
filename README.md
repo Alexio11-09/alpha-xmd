@@ -123,9 +123,8 @@ Let’s build the ultimate bot together 🤝
 
 📈 Stats
 
-<div align="center">
-  <img src="https://github-readme-stats.vercel.app/api/pin/?username=Alexio11-09&repo=alpha-xmd&theme=radical" alt="Repo Stats"/>
-</div>
+https://img.shields.io/github/stars/Alexio11-09/alpha-xmd?style=social
+https://img.shields.io/github/forks/Alexio11-09/alpha-xmd?style=social
 
 ---
 
