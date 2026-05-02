@@ -123,9 +123,12 @@ Let’s build the ultimate bot together 🤝
 
 📈 Stats
 
-https://img.shields.io/github/stars/Alexio11-09/alpha-xmd?style=social
-https://img.shields.io/github/forks/Alexio11-09/alpha-xmd?style=social
-
+<!-- Stats -->
+<p align="center">
+  <img src="https://img.shields.io/github/stars/Alexio11-09/alpha-xmd?style=flat-square&logo=github&color=yellow" alt="Stars" />
+  <img src="https://img.shields.io/github/forks/Alexio11-09/alpha-xmd?style=flat-square&logo=github&color=blue" alt="Forks" />
+  <img src="https://img.shields.io/github/watchers/Alexio11-09/alpha-xmd?style=flat-square&logo=github&color=green" alt="Watchers" />
+</p>
 ---
 
 📜 License
