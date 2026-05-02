@@ -1,4 +1,3 @@
-// © 2026 Alpha - EXIF BUILDER (TERMUX SAFE, NO node-webpmux)
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
