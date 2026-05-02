@@ -6,8 +6,8 @@ const { execSync } = require("child_process");
 const modules = [
   "pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios",
   "node-fetch","yt-search","form-data","file-type","moment-timezone",
-  "human-readable","jimp","fluent-ffmpeg","@ffmpeg-installer/ffmpeg",
-  "node-webpmux","crypto-js","adm-zip"
+  "human-readable","fluent-ffmpeg","@ffmpeg-installer/ffmpeg",
+  "crypto-js","adm-zip"
 ];
 
 modules.forEach(mod => {
@@ -86,35 +86,22 @@ const question = (text) => {
 // ==================== FUNNY DEFAULT MESSAGES ====================
 const funnyWelcomes = [
     "🌟 A new legend has arrived! Welcome @user! 🎉",
-    "👋 Look who decided to join us! Welcome @user! 🥳",
-    "🦸‍♂️ Hero @user just landed in the group. Welcome!",
-    "💫 Someone special just appeared. Hello @user!",
-    "🎊 The party is now better because @user is here!",
-    "🍾 Pop the champagne! @user joined the crew."
+    "👋 Look who decided to join us! Welcome @user! 🥳"
 ];
 
 const funnyGoodbyes = [
     "🚶‍♂️ @user has left the building. We'll miss the vibes.",
-    "😢 Another one bites the dust. Goodbye @user!",
-    "👋 @user just slipped out. The group got a little quieter.",
-    "🛸 @user has been abducted by aliens. Goodbye!",
-    "💨 And just like that, @user vanished. Farewell!"
+    "😢 Another one bites the dust. Goodbye @user!"
 ];
 
 const funnyDeleted = [
     "🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️",
-    "📝 Deleted message rescued:",
-    "🤫 Shh… a message disappeared, but not from me.",
-    "👀 I saw what you deleted! Here it is:",
-    "🗑️ Trash tried to eat this message, but I caught it."
+    "📝 Deleted message rescued:"
 ];
 
 const funnyEdited = [
     "✏️ A message was edited. Here's the original:",
-    "📝 Edit detected! Original version:",
-    "🕵️‍♀️ Someone changed their message. I caught the before:",
-    "🤔 Wait, that wasn't there before. Original:",
-    "✍️ Edit history brought to you by me."
+    "📝 Edit detected! Original version:"
 ];
 
 const clientstart = async () => {
