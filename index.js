@@ -276,6 +276,20 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
+        // 🔢 INCREMENT MESSAGE COUNT FOR RANK (GROUP LEADERBOARD)
+        const msgDbPath = './database/messageCount.json';
+        if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
+        if (!fs.existsSync(msgDbPath)) fs.writeFileSync(msgDbPath, '{}');
+        try {
+            const raw = fs.readFileSync(msgDbPath, 'utf-8');
+            const counts = JSON.parse(raw.length ? raw : '{}');
+            counts[m.chat] = counts[m.chat] || {};
+            counts[m.chat][m.sender] = (counts[m.chat][m.sender] || 0) + 1;
+            fs.writeFileSync(msgDbPath, JSON.stringify(counts, null, 2));
+        } catch (countErr) {
+            // silently ignore counting errors
+        }
+
         // ========== 📋 LIVE MESSAGE LOGGER (CONSOLE) ==========
         const msgType = Object.keys(mek.message || {})[0] || 'unknown';
         const senderJid = m.sender || mek.key.participant || mek.key.remoteJid;
