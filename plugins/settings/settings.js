@@ -59,6 +59,79 @@ module.exports = [
       }
     },
 
+    // ==================== AUTOVIEWSTATUS (NEW) ====================
+    { command: "autoviewstatus", aliases: ["autoviewstat"], category: "settings", owner: true,
+      execute: async (s, m, { args, reply }) => {
+          const a = args[0]?.toLowerCase();
+          if (a === "on") { setGlobal({ autoviewstatus: true }); reply(R(["👁️ Auto‑View Status ON! I'll watch all statuses.", "👀 Now I'll peep every status. Sneaky."])); }
+          else if (a === "off") { setGlobal({ autoviewstatus: false }); reply(R(["🙈 Auto‑View Status OFF. No more peeping.", "🚫 Status viewing stopped."])); }
+          else { const status = getGlobal().autoviewstatus ? "ON ✅" : "OFF ❌"; reply(`📊 *Auto‑View Status:* ${status}\nChange with: .autoviewstatus on/off`); }
+      }
+    },
+
+    // ==================== AUTOREACTSTATUS (NEW) ====================
+    { command: "autoreactstatus", aliases: ["autoreactstat"], category: "settings", owner: true,
+      execute: async (s, m, { args, reply }) => {
+          const a = args[0]?.toLowerCase();
+          if (a === "on") { setGlobal({ autoreactstatus: true }); reply(R(["❤️ Auto‑React Status ON! I'll react to statuses.", "😍 Now I'll send emojis to status updates."])); }
+          else if (a === "off") { setGlobal({ autoreactstatus: false }); reply(R(["😑 Auto‑React Status OFF. No more status reactions.", "🙅 Status reactions disabled."])); }
+          else { const status = getGlobal().autoreactstatus ? "ON ✅" : "OFF ❌"; reply(`📊 *Auto‑React Status:* ${status}\nChange with: .autoreactstatus on/off`); }
+      }
+    },
+
+    // ==================== AUTOSTATUS (NEW) ====================
+    { command: "autostatus", aliases: ["autostat", "setautostatus"], category: "settings", owner: true,
+      execute: async (s, m, { args, reply }) => {
+          const a = args[0]?.toLowerCase();
+          const cfg = getGlobal().autostatus || { enabled: false, messages: [], interval: 60 }; // minutes
+
+          if (!a) {
+              return reply(
+                  `🔄 *Auto‑Status Config*\n\n` +
+                  `🔹 Status: ${cfg.enabled ? '✅ ON' : '❌ OFF'}\n` +
+                  `🔹 Interval: ${cfg.interval} min\n` +
+                  `🔹 Messages: ${cfg.messages.length ? cfg.messages.join(' | ') : 'None'}\n\n` +
+                  `📌 Usage:\n` +
+                  `.autostatus on/off\n` +
+                  `.autostatus add <text>\n` +
+                  `.autostatus remove <index>\n` +
+                  `.autostatus interval <minutes>\n` +
+                  `.autostatus list`
+              );
+          }
+
+          if (a === 'on') {
+              cfg.enabled = true;
+          } else if (a === 'off') {
+              cfg.enabled = false;
+          } else if (a === 'add') {
+              const text = args.slice(1).join(' ');
+              if (!text) return reply("❌ Provide text to add.");
+              cfg.messages.push(text);
+              reply(`✅ Added: "${text}"`);
+          } else if (a === 'remove') {
+              const idx = parseInt(args[1]);
+              if (isNaN(idx) || idx < 1 || idx > cfg.messages.length) return reply("❌ Invalid index. Use .autostatus list to see indexes.");
+              const removed = cfg.messages.splice(idx - 1, 1);
+              reply(`✅ Removed: "${removed[0]}"`);
+          } else if (a === 'interval') {
+              const mins = parseInt(args[1]);
+              if (isNaN(mins) || mins < 1) return reply("❌ Provide a valid number of minutes.");
+              cfg.interval = mins;
+              reply(`⏱️ Interval set to ${mins} minutes.`);
+          } else if (a === 'list') {
+              if (!cfg.messages.length) return reply("📭 No auto‑status messages configured.");
+              let list = cfg.messages.map((msg, i) => `${i + 1}. ${msg}`).join('\n');
+              reply(`📋 *Auto‑Status Messages*\n\n${list}`);
+          } else {
+              return reply("❌ Unknown option. Use on/off, add, remove, interval, list");
+          }
+
+          setGlobal({ autostatus: cfg });
+          reply(`✅ Auto‑Status updated!\nStatus: ${cfg.enabled ? 'ON' : 'OFF'}, Interval: ${cfg.interval} min, Messages: ${cfg.messages.length}`);
+      }
+    },
+
     // ==================== ANTIDELETE (upgraded) ====================
     {
         command: "antidelete",
@@ -125,13 +198,23 @@ module.exports = [
       }
     },
 
-    // ==================== SET PREFIX ====================
+    // ==================== SET PREFIX (FIXED – works with message handler) ====================
     { command: "setprefix", aliases: ["prefix"], category: "settings", owner: true,
       execute: async (s, m, { args, reply }) => {
           if (!args[0]) return reply(guide("setprefix", ".setprefix !"));
           const p = args[0];
+          // Update global settings AND the actual config file so it persists across restarts
           setGlobal({ prefix: p });
-          reply(R([`✅ Prefix changed to *${p}*. Let's hope you remember it.`, `🔧 Now use *${p}* instead of .`]));
+          // Also update the config module's exported prefix (if it's a simple object)
+          try {
+              const config = require('./settings/config');
+              config.prefix = p;
+              // Force cache update for next require by other modules
+              delete require.cache[require.resolve('./settings/config')];
+              reply(R([`✅ Prefix changed to *${p}*. Active now.`, `🔧 Now use *${p}* instead of .`]));
+          } catch (err) {
+              reply(R([`✅ Prefix changed to *${p}* in settings. Restart to apply.`]));
+          }
       }
     },
 
@@ -139,7 +222,14 @@ module.exports = [
     { command: "resetprefix", aliases: ["defaultprefix"], category: "settings", owner: true,
       execute: async (s, m, { reply }) => {
           setGlobal({ prefix: '.' });
-          reply(R(["🔄 Prefix reset to the boring old dot. Everything's normal again.", "👌 Back to default. . commands are back."]));
+          try {
+              const config = require('./settings/config');
+              config.prefix = '.';
+              delete require.cache[require.resolve('./settings/config')];
+              reply(R(["🔄 Prefix reset to dot. Everything's normal again.", "👌 Back to default. . commands are back."]));
+          } catch (err) {
+              reply(R(["🔄 Prefix reset to dot in settings. Restart to apply."]));
+          }
       }
     },
 
@@ -186,11 +276,15 @@ module.exports = [
           const cfg = getGlobal();
           const ad = cfg.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
           const cr = cfg.chreact || { enabled: false, emojis: ['💬'] };
+          const as = cfg.autostatus || { enabled: false };
           let text = `⚙️ *Current Settings*\n\n`;
           text += `📖 Auto‑Read: ${cfg.autoread ? '✅' : '❌'}\n`;
           text += `⌨️ Auto‑Typing: ${cfg.autotyping ? '✅' : '❌'}\n`;
           text += `🎤 Auto‑Recording: ${cfg.autorecording ? '✅' : '❌'}\n`;
           text += `😍 Auto‑React: ${cfg.autoreact ? '✅' : '❌'}\n`;
+          text += `👁️ Auto‑View Status: ${cfg.autoviewstatus ? '✅' : '❌'}\n`;
+          text += `❤️ Auto‑React Status: ${cfg.autoreactstatus ? '✅' : '❌'}\n`;
+          text += `🔄 Auto‑Status: ${as.enabled ? '✅' : '❌'}\n`;
           text += `🛡️ Anti‑Delete: ${ad.enabled ? '✅' : '❌'}\n`;
           if (ad.enabled) {
               text += `   ├ Mode: ${ad.mode}\n`;
@@ -203,7 +297,7 @@ module.exports = [
           }
           text += `✏️ Anti‑Edit: ${cfg.antiedit ? '✅' : '❌'}\n`;
           text += `🔧 Prefix: ${cfg.prefix || '.'}\n\n`;
-          text += `💡 Use .chreact to configure channel auto‑reactions.`;
+          text += `💡 Use .chreact, .autostatus, .autoviewstatus, etc. to configure.`;
           reply(text);
       }
     },
