@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (ALL 7 + COMPREHENSIVE MENU)
+// © 2026 Alpha - GENERAL COMMANDS (FULL MENU – DUPLICATES FIXED, VERTICAL FORMAT)
 
 const fs = require('fs');
 const os = require('os');
@@ -7,7 +7,6 @@ const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ⏱️ RUNTIME
 function runtime(seconds) {
     seconds = Number(seconds);
     const d = Math.floor(seconds / (3600 * 24));
@@ -17,7 +16,6 @@ function runtime(seconds) {
     return `${d}d ${h}h ${m}m ${s}s`;
 }
 
-// 🌍 COUNTRY DETECTOR
 const getCountry = (jid) => {
     if (!jid) return "Unknown 🌍";
     try {
@@ -32,20 +30,19 @@ const getCountry = (jid) => {
             return `${country} ${flag}`;
         }
         return "Unknown 🌍";
-    } catch (err) {
+    } catch {
         return "Unknown 🌍";
     }
 };
 
 module.exports = [
-    // ==================== 1. MENU (ENHANCED – FULL FEATURE LIST) ====================
+    // ==================== 1. MENU ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
         category: "general",
         execute: async (sock, m, { send }) => {
             try {
-                // ----- 🎬 LIGHTNING LOADING EFFECT -----
                 const loadMsg = await sock.sendMessage(m.chat, {
                     text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
                 }, { quoted: m });
@@ -56,11 +53,10 @@ module.exports = [
                     edit: loadMsg.key
                 });
 
-                // ----- 🎵 SONG URL (from config, with fallback) -----
-                const menuSongUrl = (config.settings && config.settings.menuSongUrl)
-                    || "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";
+                // EVIL JORDAN INTRO – upload your own MP3 to catbox.moe and replace this link
+                const menuSongUrl = config.settings?.menuSongUrl ||
+                    "https://files.catbox.moe/YOUR_EVIL_JORDAN_LINK_HERE.mp3";
 
-                // ----- 📋 MENU TEMPLATE (COMPREHENSIVE) -----
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -122,6 +118,21 @@ module.exports = [
 │ • .webzip
 │ • .antispam
 │ • .sudo
+│ • .antiblock
+│ • .chatbot
+│ • .clear
+│ • .autobio
+│ • .deljunk
+│ • .disk
+│ • .vv2
+│ • .tostatus
+│ • .toviewonce
+│ • .autosavestatus
+│ • .lastseen
+│ • .ppprivacy
+│ • .readreceipts
+│ • .save
+│ • .delete / .del
 ╰────────────⬣
 
 ╭───〔 👥 GROUP 〕───⬣
@@ -161,14 +172,36 @@ module.exports = [
 │ • .requestlist
 │ • .rejectall
 │ • .newgc
-│ • .creategc
 │ • .online
-│ • .whosonline
-│ • .chatbot
-│ • .clear
 │ • .staff
 │ • .myactivity
 │ • .rank
+│ • .antidemote
+│ • .antisticker
+│ • .antitag
+│ • .invite
+│ • .listactive
+│ • .listinactive
+│ • .totalmembers
+│ • .mediatag
+│ • .getname
+│ • .getdeskgc
+│ • .getppgc
+│ • .svcontact
+│ • .opengroup
+│ • .closegroup
+│ • .approve
+│ • .reject
+│ • .disapproveall
+│ • .addcode
+│ • .delcode
+│ • .listcode
+│ • .allow
+│ • .delallowed
+│ • .listallowed
+│ • .editsettings
+│ • .removes
+│ • .gcstatus
 ╰────────────⬣
 
 ╭───〔 📥 DOWNLOADER 〕───⬣
@@ -200,6 +233,17 @@ module.exports = [
 │ • .wallpaper
 │ • .gitclone
 │ • .img
+│ • .shazam
+│ • .itunes
+│ • .playdoc
+│ • .videodoc
+│ • .tiktokaudio
+│ • .snackvideo
+│ • .soundcloud
+│ • .webdl
+│ • .savetube
+│ • .videy
+│ • .aiovideodl
 ╰────────────⬣
 
 ╭───〔 🖥️ CPANEL 〕───⬣
@@ -223,56 +267,321 @@ module.exports = [
 │ • .premiumlist
 ╰────────────⬣
 
+╭───〔 🤖 AI & IMAGE GEN 〕───⬣
+│ • .gpt
+│ • .gemini
+│ • .blackbox
+│ • .deepseek
+│ • .copilot
+│ • .claude
+│ • .perplexity
+│ • .venice
+│ • .dalle
+│ • .flux
+│ • .fluxpro
+│ • .imagine
+│ • .imagine3
+│ • .imagine4
+│ • .animagine
+│ • .dreamshaper
+│ • .sdxl
+│ • .pony
+│ • .pixar
+│ • .cartoon
+│ • .seedream
+│ • .toghibili
+│ • .removebg
+│ • .upscale
+│ • .restore
+│ • .enhance
+│ • .filter
+│ • .remini
+╰────────────⬣
+
+╭───〔 👁️ STALK 〕───⬣
+│ • .npmstalk
+│ • .wastalk
+│ • .igstalk
+│ • .tiktokstalk
+│ • .twitterstalk
+│ • .ytstalk
+│ • .tgstalk
+│ • .minecraftstalk
+│ • .xboxstalk
+│ • .steamstalk
+│ • .githubstalk
+╰────────────⬣
+
+╭───〔 ⚽ FOOTBALL 〕───⬣
+│ • .livescore
+│ • .competitions
+│ • .matches
+│ • .standings
+│ • .team
+│ • .head2head
+│ • .matchlist
+│ • .teamperson
+│ • .teammatches
+│ • .areas
+╰────────────⬣
+
+╭───〔 🔍 SEARCH 〕───⬣
+│ • .gsmarena
+│ • .google
+│ • .bing
+│ • .livewallpapers
+│ • .imdb
+│ • .define
+│ • .countryinfo
+│ • .news
+│ • .wiki
+╰────────────⬣
+
+╭───〔 🔧 UTILITIES 〕───⬣
+│ • .tinyurl
+│ • .fliptext
+│ • .genpass
+│ • .device
+│ • .browse
+│ • .fancy
+│ • .carbon
+│ • .obfuscate
+│ • .calc
+│ • .qr
+│ • .tts
+│ • .translate
+│ • .weather
+│ • .tozip
+│ • .styletext
+│ • .readmore
+│ • .ngldm
+╰────────────⬣
+
+╭───〔 📺 CHANNEL 〕───⬣
+│ • .createchannel
+│ • .followchannel
+│ • .unfollowchannel
+│ • .updatechannelname
+│ • .updatechannelpic
+│ • .updatechanneldesc
+│ • .mutechannel
+│ • .unmutechannel
+│ • .deletechannel
+╰────────────⬣
+
+╭───〔 🐙 GITHUB 〕───⬣
+│ • .ghlogin
+│ • .ghtoken
+│ • .ghcreate
+│ • .ghdelete
+│ • .ghpush
+│ • .ghpushall
+│ • .ghcommit
+│ • .ghfork
+│ • .ghlist
+│ • .ghbranches
+│ • .ghdeletefile
+│ • .ghcreatebranch
+│ • .ghlogout
+╰────────────⬣
+
+╭───〔 🎨 PHOTO EFFECTS 〕───⬣
+│ • .zombie
+│ • .figure
+│ • .figure2
+│ • .figure3
+│ • .underground
+│ • .oldage
+│ • .turky
+│ • .train
+│ • .streetwear
+│ • .tatoo
+│ • .satan
+│ • .sdm
+│ • .spirit
+│ • .toroblox
+│ • .mirror
+│ • .partner
+│ • .partner2
+│ • .bf
+│ • .gf
+│ • .polaroid
+│ • .punk
+│ • .piramid
+│ • .peci
+│ • .island
+│ • .mangu
+│ • .liquor
+│ • .mecca
+│ • .mayan
+│ • .maid
+│ • .glasses
+│ • .cambodia
+│ • .japan
+│ • .japanese
+│ • .hijab
+│ • .hitam
+│ • .vintage
+╰────────────⬣
+
+╭───〔 🎬 MOVIES / SERIES 〕───⬣
+│ • .selectmovie
+│ • .dlmovie
+│ • .dlseries
+│ • .selectseries
+│ • .seriesinfo
+╰────────────⬣
+
+╭───〔 📧 TEMP MAIL / NUMBER 〕───⬣
+│ • .tempmail
+│ • .tempinbox
+│ • .tempnumber
+│ • .checksms
+│ • .listcountries
+╰────────────⬣
+
+╭───〔 🎮 GAMES & FUN 〕───⬣
+│ • .tictactoe
+│ • .ttt
+│ • .hangman
+│ • .guess
+│ • .quiz
+│ • .trivia
+│ • .answer
+│ • .truth
+│ • .dare
+│ • .8ball
+│ • .compliment
+│ • .insult
+│ • .flirt
+│ • .shayari
+│ • .simp
+│ • .stupid
+│ • .goodnight
+│ • .meme
+│ • .squidgame
+│ • .konami
+│ • .lovetest
+│ • .aura
+│ • .dice
+│ • .roll
+│ • .joke
+│ • .quote
+│ • .fact
+│ • .flip
+│ • .rps
+│ • .ship
+│ • .hug
+│ • .emojimix
+│ • .wcg start
+│ • .wcg join
+│ • .wcg leave
+│ • .wcg status
+│ • .wcg stop
+│ • .wcg leaderboard
+╰────────────⬣
+
+╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
+│ • .happy
+│ • .heart
+│ • .angry
+│ • .sad
+│ • .shy
+│ • .moon
+│ • .confused
+│ • .hot
+│ • .nikal
+╰────────────⬣
+
+╭───〔 🎌 ANIME & REACTIONS 〕───⬣
+│ • .waifu
+│ • .neko
+│ • .shinobu
+│ • .megumin
+│ • .aizen
+│ • .animequote
+│ • .anime
+│ • .manga
+│ • .topanime
+│ • .topmanga
+│ • .character
+│ • .randomanime
+│ • .seasonal
+│ • .hentai 🔞
+│ • .hentaigif 🔞
+│ • .nom
+│ • .poke
+│ • .cry
+│ • .kiss
+│ • .pat
+│ • .wink
+│ • .facepalm
+│ • .slap
+│ • .bite
+╰────────────⬣
+
+╭───〔 🌐 INFORMATION 〕───⬣
+│ • .news
+│ • .define
+│ • .check
+│ • .countryinfo
+│ • .topmembers
+│ • .bible
+│ • .quran
+│ • .inspect
+│ • .series
+│ • .webcrawl
+╰────────────⬣
+
+╭───〔 💰 FINANCE 〕───⬣
+│ • .currencylist
+│ • .rates
+│ • .exchange
+│ • .forex
+╰────────────⬣
+
 ╭───〔 ⚙️ SETTINGS 〕───⬣
 │ • .autoread on/off
 │ • .autotyping on/off
 │ • .autorecording on/off
 │ • .autoreact on/off
-│ • .antidelete (mode/style/react)
-│ • .antiedit on/off
-│ • .autoviewstatus on/off
 │ • .autoreactstatus on/off
+│ • .autoviewstatus on/off
 │ • .autostatus
+│ • .antidelete
+│ • .antiedit on/off
 │ • .setpp
 │ • .setbio
 │ • .setname
 │ • .setprefix
 │ • .resetprefix
 │ • .chreact
-╰────────────⬣
-
-╭───〔 🛠️ TOOLS 〕───⬣
-│ • .calc
-│ • .qr
-│ • .tts
-│ • .time
-│ • .sticker
-│ • .toimg
-│ • .tomp3
-│ • .removebg
-│ • .getpp
-│ • .getid
-│ • .getlink
-│ • .translate
-│ • .weather
-│ • .lyrics
-│ • .vv
-│ • .url
-│ • .img
-│ • .steal
-│ • .blur
-│ • .attp
-│ • .ttp
-│ • .ss
-│ • .stickertelegram
-│ • .imgscan
-│ • .tovideo
-│ • .toptt
-│ • .convert
-│ • .getimage
-│ • .topdf
-│ • .smeme
-│ • .wasted
+│ • .alwaysonline
+│ • .antibug
+│ • .antiviewonce
+│ • .autobio
+│ • .autoblock
+│ • .setcontextlink
+│ • .setfont
+│ • .setmenu
+│ • .setmenuimage
+│ • .setownername
+│ • .setownernumber
+│ • .setstatusemoji
+│ • .setstickerauthor
+│ • .setstickerpackname
+│ • .settimezone
+│ • .setwarn
+│ • .setwatermark
+│ • .setwelcome
+│ • .setgoodbye
+│ • .showwelcome
+│ • .showgoodbye
+│ • .testwelcome
+│ • .testgoodbye
+│ • .statusdelay
+│ • .statussettings
+│ • .listwarn
 ╰────────────⬣
 
 ╭───〔 🎵 AUDIO EFFECTS 〕───⬣
@@ -320,124 +629,64 @@ module.exports = [
 │ • .foggyglass
 │ • .wetglass
 │ • .fancy
-╰────────────⬣
-
-╭───〔 🎮 GAMES & FUN 〕───⬣
-│ • .tictactoe
-│ • .ttt
-│ • .hangman
-│ • .guess
-│ • .quiz
-│ • .trivia
-│ • .answer
-│ • .truth
-│ • .dare
-│ • .8ball
-│ • .compliment
-│ • .insult
-│ • .flirt
-│ • .shayari
-│ • .simp
-│ • .stupid
-│ • .goodnight
-│ • .meme
-│ • .squidgame
-│ • .konami
-│ • .lovetest
-│ • .aura
-│ • .dice
-│ • .roll
-│ • .joke
-│ • .quote
-│ • .fact
-╰────────────⬣
-
-╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
-│ • .happy
-│ • .heart
-│ • .angry
-│ • .sad
-│ • .shy
-│ • .moon
-│ • .confused
-│ • .hot
-│ • .nikal
-╰────────────⬣
-
-╭───〔 🎌 ANIME & REACTIONS 〕───⬣
-│ • .waifu
-│ • .neko
-│ • .shinobu
-│ • .megumin
-│ • .aizen
-│ • .animequote
-│ • .anime
-│ • .manga
-│ • .topanime
-│ • .topmanga
-│ • .character
-│ • .randomanime
-│ • .seasonal
-│ • .hentai 🔞
-│ • .hentaigif 🔞
-│ • .nom
-│ • .poke
-│ • .cry
-│ • .kiss
-│ • .pat
-│ • .wink
-│ • .facepalm
-│ • .hug
-╰────────────⬣
-
-╭───〔 🌐 INFORMATION 〕───⬣
-│ • .news
-│ • .define
-│ • .check
-│ • .countryinfo
-│ • .topmembers
-│ • .tiktokstalk
-│ • .githubstalk
-│ • .inspect
-│ • .bible
-│ • .quran
-│ • .wiki
-│ • .webcrawl
-│ • .obfuscate
-│ • .series
-╰────────────⬣
-
-╭───〔 💰 FINANCE 〕───⬣
-│ • .currencylist
-│ • .rates
-│ • .exchange
-│ • .forex
-╰────────────⬣
-
-╭───〔 🔧 UTILITY 〕───⬣
-│ • .save
-│ • .delete
-│ • .del
-│ • .clear
-│ • .webzip
-│ • .bothosting
-│ • .hack
-│ • .antispam
-│ • .autovoice
-│ • .autoreply
-│ • .autosticker
+│ • .candy
+│ • .christmas
+│ • .3dchristmas
+│ • .sparklechristmas
+│ • .deepsea
+│ • .scifi
+│ • .waterpipe
+│ • .spooky
+│ • .pencil
+│ • .circuit
+│ • .discovery
+│ • .fiction
+│ • .demon
+│ • .transformer
+│ • .berry
+│ • .magma
+│ • .3dstone
+│ • .neonlight
+│ • .harrypotter
+│ • .brokenglass
+│ • .papercut
+│ • .watercolor
+│ • .multicolor
+│ • .neondevil
+│ • .graffitibike
+│ • .cloud
+│ • .honey
+│ • .fruitjuice
+│ • .biscuit
+│ • .wood
+│ • .chocolate
+│ • .strawberry
+│ • .blood
+│ • .dropwater
+│ • .toxic
+│ • .lava
+│ • .rock
+│ • .bloodglass
+│ • .halloween
+│ • .darkgold
+│ • .joker
+│ • .wicker
+│ • .firework
+│ • .skeleton
+│ • .sand
+│ • .glue
+│ • .1917
+│ • .leaves
 ╰────────────⬣
 
 ${config.settings.footer}
 `;
 
-                // ----- 🖼️ SEND MENU IMAGE + CAPTION -----
                 await send({
                     image: { url: config.thumbUrl },
                     caption: menu
                 });
 
-                // ----- 🎵 SEND SONG – do NOT break the menu if this fails -----
                 try {
                     await sock.sendMessage(m.chat, {
                         audio: { url: menuSongUrl },
@@ -511,27 +760,9 @@ ${config.settings.footer}
             const ownerJid = owner.includes('@') ? owner : owner + '@s.whatsapp.net';
 
             const infos = [
-                `📊 *${botName} Info*\n\n` +
-                `⏳ Uptime: ${uptime}\n` +
-                `🧠 Memory: ${memory} MB\n` +
-                `💻 Platform: ${platform}\n` +
-                `🖥️ Host: ${hostname}\n` +
-                `🔧 Node.js: ${nodeVersion}\n` +
-                `👑 Owner: @${owner}`,
-
-                `🤖 *Bot Status*\n\n` +
-                `🟢 Status: Online\n` +
-                `⏱️ Running: ${uptime}\n` +
-                `📡 Ping: Fast\n` +
-                `🧠 RAM: ${memory}MB\n` +
-                `👤 Owner: @${owner}`,
-
-                `📋 *Technical Info*\n\n` +
-                `⚡ Uptime: ${uptime}\n` +
-                `💾 Memory: ${memory}MB\n` +
-                `🖥️ OS: ${platform}\n` +
-                `🔢 Node: ${nodeVersion}\n` +
-                `👑 @${owner}`
+                `📊 *${botName} Info*\n\n⏳ Uptime: ${uptime}\n🧠 Memory: ${memory} MB\n💻 Platform: ${platform}\n🖥️ Host: ${hostname}\n🔧 Node.js: ${nodeVersion}\n👑 Owner: @${owner}`,
+                `🤖 *Bot Status*\n\n🟢 Status: Online\n⏱️ Running: ${uptime}\n📡 Ping: Fast\n🧠 RAM: ${memory}MB\n👤 Owner: @${owner}`,
+                `📋 *Technical Info*\n\n⚡ Uptime: ${uptime}\n💾 Memory: ${memory}MB\n🖥️ OS: ${platform}\n🔢 Node: ${nodeVersion}\n👑 @${owner}`
             ];
 
             reply(R(infos), { mentions: [ownerJid] });
@@ -549,10 +780,10 @@ ${config.settings.footer}
             const ownerJid = ownerNumber.includes('@') ? ownerNumber : ownerNumber + '@s.whatsapp.net';
 
             const messages = [
-                `👑 *Owner:* @${ownerNumber}\n👤 *Name:* ${ownerName}\n\n💬 Tap the mention to send a DM. I'm happy to help!`,
-                `🤴 *The Boss*\n📞 @${ownerNumber}\n👤 ${ownerName}\n\nMessage me directly for business or support!`,
-                `🫅 *Contact the King*\n👤 ${ownerName}\n📱 @${ownerNumber}\n\nSlide into my DMs anytime.`,
-                `👤 *Bot Creator*\n${ownerName}\n📞 @${ownerNumber}\n\nReach out for collaborations or issues.`
+                `👑 *Owner:* @${ownerNumber}\n👤 *Name:* ${ownerName}\n\n💬 DM anytime.`,
+                `🤴 *The Boss*\n📞 @${ownerNumber}\n👤 ${ownerName}\n\nMessage for business/support.`,
+                `🫅 *Contact*\n👤 ${ownerName}\n📱 @${ownerNumber}\n\nDMs open.`,
+                `👤 *Bot Creator*\n${ownerName}\n📞 @${ownerNumber}\n\nReach out anytime.`
             ];
 
             reply(R(messages), { mentions: [ownerJid] });
@@ -571,49 +802,30 @@ ${config.settings.footer}
             const botName = config.settings?.title || "Alpha Bot";
 
             const texts = [
-                `📂 *${botName} – Source Code*\n\n` +
-                `🔗 *Repo:* ${repoLink}\n` +
-                `👤 *Owner:* ${ownerName}\n` +
-                `📞 *Contact:* ${ownerContact}\n\n` +
-                `⭐ Star the project & fork freely!`,
-
-                `🧬 *Open Source Bot*\n\n` +
-                `💻 *Repo:* ${repoLink}\n` +
-                `👑 *Dev:* ${ownerName}\n` +
-                `📱 *WhatsApp:* ${ownerContact}\n\n` +
-                `🤖 Build your own version with this code.`,
-
-                `⚡ *Alpha XMD Repository*\n\n` +
-                `🔗 ${repoLink}\n` +
-                `👤 *Maintainer:* ${ownerName}\n` +
-                `📞 ${ownerContact}\n\n` +
-                `📥 Clone, modify, deploy.`
+                `📂 *${botName} – Source Code*\n\n🔗 *Repo:* ${repoLink}\n👤 *Owner:* ${ownerName}\n📞 *Contact:* ${ownerContact}\n\n⭐ Star & fork freely!`,
+                `🧬 *Open Source Bot*\n\n💻 *Repo:* ${repoLink}\n👑 *Dev:* ${ownerName}\n📱 *WhatsApp:* ${ownerContact}\n\n🤖 Build your own version.`,
+                `⚡ *Alpha XMD Repository*\n\n🔗 ${repoLink}\n👤 *Maintainer:* ${ownerName}\n📞 ${ownerContact}\n\n📥 Clone, modify, deploy.`
             ];
 
             reply(texts[Math.floor(Math.random() * texts.length)]);
         }
     },
 
-    // ==================== 7. PAIR (FIXED TIMING – RELIABLE) ====================
+    // ==================== 7. PAIR ====================
     {
         command: "pair",
         aliases: ["pairing", "session"],
         category: "general",
         execute: async (sock, m, { args, reply }) => {
             if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
-
             const rawNumber = args[0].replace(/[^0-9]/g, "");
-            if (rawNumber.length < 10) return reply("❌ Invalid phone number. Use full country code without '+'.");
+            if (rawNumber.length < 10) return reply("❌ Invalid phone number.");
 
             reply(`🔐 Requesting pairing code for +${rawNumber}...`);
 
             try {
                 const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = await import('@whiskeysockets/baileys');
                 const pino = require('pino');
-                const os = require('os');
-                const path = require('path');
-                const fs = require('fs');
-
                 const tempDir = path.join(os.tmpdir(), `pair_${rawNumber}_${Date.now()}`);
                 fs.mkdirSync(tempDir, { recursive: true });
 
@@ -621,58 +833,27 @@ ${config.settings.footer}
                 const { version } = await fetchLatestBaileysVersion();
 
                 const tempSock = makeWASocket({
-                    auth: state,
-                    version,
-                    browser: Browsers.macOS('Chrome'),
-                    logger: pino({ level: 'silent' }),
-                    printQRInTerminal: false,
-                    connectTimeoutMs: 30000
+                    auth: state, version, browser: Browsers.macOS('Chrome'),
+                    logger: pino({ level: 'silent' }), printQRInTerminal: false, connectTimeoutMs: 30000
                 });
 
-                let pairingCode = null;
-                let settled = false;
-
+                let pairingCode = null, settled = false;
                 await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        if (!settled) { settled = true; reject(new Error("Connection timed out. Try again in a minute.")); }
-                    }, 45000);
-
+                    const timeout = setTimeout(() => { if (!settled) { settled = true; reject(new Error("Timeout")); } }, 45000);
                     tempSock.ev.on('connection.update', async (update) => {
                         const { connection } = update;
-                        console.log('🔌 Pair socket state:', connection);
-
                         if (connection === 'connecting' && !settled) {
-                            settled = true;
-                            clearTimeout(timeout);
-                            try {
-                                pairingCode = await tempSock.requestPairingCode(rawNumber);
-                                resolve();
-                            } catch (err) {
-                                reject(new Error("Failed to request pairing code: " + (err.message || String(err))));
-                            }
+                            settled = true; clearTimeout(timeout);
+                            try { pairingCode = await tempSock.requestPairingCode(rawNumber); resolve(); } catch (err) { reject(err); }
                         }
-
-                        if (connection === 'close' && !settled) {
-                            settled = true;
-                            clearTimeout(timeout);
-                            reject(new Error("Connection closed before pairing code"));
-                        }
+                        if (connection === 'close' && !settled) { settled = true; clearTimeout(timeout); reject(new Error("Closed")); }
                     });
                 });
 
-                tempSock.end();
-                fs.rmSync(tempDir, { recursive: true, force: true });
+                tempSock.end(); fs.rmSync(tempDir, { recursive: true, force: true });
+                if (!pairingCode) throw new Error("No code");
 
-                if (!pairingCode) throw new Error("No pairing code obtained");
-
-                reply(
-                    `✅ *Pairing Code Ready*\n\n` +
-                    `📞 *Number:* +${rawNumber}\n` +
-                    `🔢 *Code:* *${pairingCode}*\n\n` +
-                    `⏱️ Expires in 60 seconds.\n` +
-                    `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
-                );
-
+                reply(`✅ *Pairing Code Ready*\n\n📞 *Number:* +${rawNumber}\n🔢 *Code:* *${pairingCode}*\n\n⏱️ Expires in 60s.\n📱 WhatsApp → Linked devices → Link with phone number.`);
             } catch (err) {
                 console.error('Pair error:', err);
                 reply(`❌ Pairing failed: ${err.message || String(err)}`);

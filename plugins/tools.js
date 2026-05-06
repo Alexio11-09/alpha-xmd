@@ -1,230 +1,34 @@
-const fs = require('fs'), path = require('path'), axios = require('axios'), QRCode = require('qrcode');
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-const moment = require('moment-timezone'), ffmpeg = require('fluent-ffmpeg');
-// System ffmpeg is used (no @ffmpeg-installer)
-const { writeExif } = require('../library/exif');
-const cleanup = (f) => setTimeout(() => { try { fs.unlinkSync(f); } catch {} }, 300000);
-const F = (a) => a[Math.floor(Math.random()*a.length)];
-const fail = ["👾 Oops! Try again?","💥 Failed!","😅 Something broke.","🤷‍♂️ Blame the gremlins."];
-const guide = (c,u) => F([`🧐 Use: *${u}*`,`🤔 Try: *${u}*`,`😜 Right: *${u}*`,`🙈 Type: *${u}*`]);
-const ok = {
-  calc: (e,r) => F([`🧮 ${e}=${r}`,`🤓 ${r}`,`💡 ${e}? ${r}.`]),
-  qr: F(["📱 QR ready!","🎯 Scan!","🔳 Done."]),
-  tts: F(["🗣️ Speaking!","🔊 Listen!","🎙️ TTS done."]),
-  time: F(["🕐 Time:","⏰ Clock:","⌛ Now:"]),
-  sticker: F(["🖼️ Sticker created!","🤳 Ready!","✨ Ta-da!"]),
-  toimg: F(["🖼️ Image extracted!","📸 Done!","✨ Reversed!"]),
-  getpp: (n) => F([`📸 ${n}'s pic`,`👀 Found`,`🖼️ PP of ${n}`]),
-  getid: (i) => F([`🆔 ${i}`,`🔢 ${i}`,`👤 ${i}`]),
-  getlink: F(["🔗 Link!","📎 Here!","🔗 Group link."]),
-  translate: (l,t) => F([`🌐 ${l}: ${t}`,`🗣️ ${t}`,`📖 ${l}: ${t}`]),
-  weather: (c,d) => F([`🌤️ ${c}: ${d}`,`🌡️ ${d}`,`☁️ ${c}: ${d}`]),
-  lyrics: F(["🎵 Lyrics!","🎤 Sing!","📝 Words."]),
-  removebg: F(["✨ No bg!","🪄 Magic!","🎨 Done."]),
-  tomp3: F(["⏳ Converting...","🎧 MP3 ready!","🔊 Done!"]),
-  url: F(["🌐 Uploaded!","📤 Link:","🔗 Online:"]),
-  img: F(["🖼️ Images found!","📸 Here you go:","🔍 Search result:"]),
-  vv: {
-    img: F(["👀 Saved!","📸 Snapped!","🖼️ Bypass."]),
-    vid: F(["🎥 Rescued!","📹 Saved!","🎬 Bypass."]),
-    aud: F(["🎵 Saved!","🔊 Voicenote.","🎤 Bypass."])
-  }
-};
-async function uploadImage(buf,fname='image.png') {
-  const fd = new (require('form-data'))();
-  fd.append('reqtype','fileupload');
-  fd.append('fileToUpload',buf,{filename:fname,contentType:'image/png'});
-  const r = await axios.post('https://catbox.moe/user/api.php',fd,{headers:{...fd.getHeaders(),'User-Agent':'AlphaBot/1.0'},timeout:15000});
-  if(typeof r.data==='string'&&r.data.startsWith('http'))return r.data;
-  throw new Error('Catbox: '+r.data);
-}
-module.exports = [
-  { command: "calc", aliases: ["calculator","math"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply(guide("calc", ".calc 2+2"));
-      try { reply(ok.calc(args.join(" ").replace(/[^0-9+\-*/()%. ]/g, ""), eval(args.join(" ").replace(/[^0-9+\-*/()%. ]/g, "")))); } catch { reply(F(fail)); }
-    }
-  },
-  { command: "qr", aliases: ["qrcode"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply(guide("qr", ".qr text"));
-      try { const b = await QRCode.toBuffer(args.join(" "), { type: 'png' }); await s.sendMessage(m.chat, { image: b, caption: ok.qr }, { quoted: m }); } catch { reply(F(fail)); }
-    }
-  },
-  { command: "tts", aliases: ["speak","say"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply(guide("tts", ".tts text"));
-      try { const t = encodeURIComponent(args.join(" ")); await s.sendMessage(m.chat, { audio: { url: `https://translate.google.com/translate_tts?ie=UTF-8&q=${t}&tl=en&client=tw-ob` }, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply(ok.tts); } catch { reply(F(fail)); }
-    }
-  },
-  { command: "time", aliases: ["clock","date"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      try { const n = moment(); reply(`${ok.time}\n📅 ${n.format("dddd, MMMM Do YYYY")}\n⏰ ${n.format("hh:mm:ss A")}\n🌍 SA: ${moment().tz("Africa/Johannesburg").format("hh:mm A")}`); } catch { reply(F(fail)); }
-    }
-  },
-  { command: "sticker", aliases: ["s","st"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      if (!m.quoted?.message) return reply("❌ Reply to image/video!");
-      const q = m.quoted, t = Object.keys(q.message)[0];
-      if (t !== 'imageMessage' && t !== 'videoMessage') return reply("❌ Must be image or video!");
-      reply("⏳ Cooking...");
-      try {
-        const c = q.message[t];
-        const st = await downloadContentFromMessage(c, t === 'imageMessage' ? 'image' : 'video');
-        let b = Buffer.from([]); for await (const ch of st) b = Buffer.concat([b, ch]);
-        const sb = await writeExif({ data: b, mimetype: t === 'imageMessage' ? 'image/jpeg' : 'video/mp4' }, { packname: 'Alpha Bot', author: 'Sticker Maker', categories: ['🤖'] });
-        await s.sendMessage(m.chat, { sticker: sb }, { quoted: m }); reply(ok.sticker);
-      } catch (e) { console.error("Sticker:", e); reply("❌ " + (e.message || "Failed")); }
-    }
-  },
-  { command: "toimg", aliases: ["stickertoimg","simg"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      if (!m.quoted?.message) return reply("❌ Reply to sticker!");
-      const q = m.quoted;
-      if (Object.keys(q.message)[0] !== 'stickerMessage') return reply("❌ Must be sticker!");
-      reply("⏳ Converting...");
-      const tmp = path.join(__dirname, '../temp');
-      if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true });
-      const webpPath = path.join(tmp, `sticker_${Date.now()}.webp`);
-      const pngPath = path.join(tmp, `output_${Date.now()}.png`);
-      try {
-        let webpBuffer = Buffer.from([]);
-        const stream = await downloadContentFromMessage(q.message.stickerMessage, 'image');
-        for await (const chunk of stream) webpBuffer = Buffer.concat([webpBuffer, chunk]);
-        fs.writeFileSync(webpPath, webpBuffer);
-        await new Promise((resolve, reject) => {
-          ffmpeg(webpPath).output(pngPath).outputOptions('-vframes 1').on('end', resolve).on('error', reject).run();
-        });
-        if (fs.existsSync(pngPath)) {
-          const pngBuffer = fs.readFileSync(pngPath);
-          await s.sendMessage(m.chat, { image: pngBuffer, caption: ok.toimg }, { quoted: m });
-        } else throw new Error("Conversion failed");
-      } catch (e) { console.error("Toimg:", e); reply("❌ Failed. The sticker may be animated."); }
-      finally { cleanup(webpPath); cleanup(pngPath); }
-    }
-  },
-  { command: "getpp", aliases: ["getprofile","pp"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      let t = m.mentionedJid?.[0] || (m.quoted?.sender) || m.sender;
-      try { const u = await s.profilePictureUrl(t, 'image'); await s.sendMessage(m.chat, { image: { url: u }, caption: ok.getpp(t.split('@')[0]), mentions: [t] }, { quoted: m }); } catch { reply("👤 No PP."); }
-    }
-  },
-  { command: "getid", aliases: ["id","userid"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      let t = m.mentionedJid?.[0] || (m.quoted?.sender) || m.sender; reply(ok.getid(t.split('@')[0]));
-    }
-  },
-  { command: "getlink", aliases: ["grouplink","invitelink"], category: "tools", group: true, admin: true,
-    execute: async (s, m, { reply }) => {
-      try { const c = await s.groupInviteCode(m.chat); reply(`${ok.getlink}\nhttps://chat.whatsapp.com/${c}`); } catch { reply("❌ Need admin."); }
-    }
-  },
-  { command: "translate", aliases: ["tr"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply(guide("translate", ".translate en Hello"));
-      const l = args[0].toLowerCase(), t = args.slice(1).join(" "); if (!t) return reply("❌ Text missing.");
-      try { const r = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${l}&dt=t&q=${encodeURIComponent(t)}`, { timeout: 10000 }); reply(ok.translate(l, r.data[0][0][0])); } catch { reply(F(fail)); }
-    }
-  },
-  { command: "weather", aliases: ["forecast"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply(guide("weather", ".weather Harare"));
-      try { const r = await axios.get(`https://wttr.in/${encodeURIComponent(args.join(" "))}?format=%C+%t+%w+%h`, { timeout: 10000 }); reply(ok.weather(args.join(" "), r.data)); } catch { reply(F(fail)); }
-    }
-  },
-  { command: "lyrics", aliases: ["lyric"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply(guide("lyrics", ".lyrics Song"));
-      try { const r = await axios.get(`https://api.davidcyriltech.my.id/lyrics?title=${encodeURIComponent(args.join(" "))}`, { timeout: 10000 }); const l = r.data?.lyrics || r.data?.result?.lyrics; if (!l) return reply("❌ Not found."); reply(`${ok.lyrics}\n\n${l.substring(0, 3900)}`); } catch { reply("❌ Service down."); }
-    }
-  },
-  { command: "removebg", aliases: ["rbg","nobg"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!m.quoted) return reply(guide("removebg", ".removebg (reply image)")); if (!args[0]) return reply("❌ API key needed.");
-      if (!(Object.keys(m.quoted.message || {})[0] || '').includes('image')) return reply("❌ Reply to image!");
-      reply("⏳ Removing...");
-      try {
-        const b = await s.downloadMediaMessage(m.quoted); const fd = new (require('form-data'))(); fd.append('image', b, 'image.jpg');
-        const r = await axios.post('https://api.remove.bg/v1.0/removebg', fd, { headers: { 'X-Api-Key': args[0], ...fd.getHeaders() }, responseType: 'arraybuffer', timeout: 30000 });
-        await s.sendMessage(m.chat, { image: Buffer.from(r.data), caption: ok.removebg }, { quoted: m });
-      } catch { reply("❌ Failed."); }
-    }
-  },
-  { command: "tomp3", aliases: ["toaudio","video2mp3"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      if (!m.quoted) return reply(guide("tomp3", ".tomp3 (reply video)"));
-      if (!(Object.keys(m.quoted.message || {})[0] || '').includes('video')) return reply("❌ Reply to video!");
-      reply(ok.tomp3); const tmp = path.join(__dirname, '../temp'); if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true });
-      const vid = path.join(tmp, `v_${Date.now()}.mp4`), aud = path.join(tmp, `a_${Date.now()}.mp3`);
-      try {
-        const b = await s.downloadMediaMessage(m.quoted); fs.writeFileSync(vid, b);
-        await new Promise((res, rej) => { ffmpeg(vid).output(aud).audioCodec('libmp3lame').audioBitrate('128k').format('mp3').on('end', res).on('error', rej).run(); });
-        if (fs.existsSync(aud)) { const ab = fs.readFileSync(aud); await s.sendMessage(m.chat, { audio: ab, mimetype: "audio/mpeg", ptt: false }, { quoted: m }); }
-        else throw new Error("No audio");
-      } catch (e) { console.log("tomp3:", e); reply("❌ Failed."); }
-      finally { cleanup(vid); cleanup(aud); }
-    }
-  },
-  { command: "vv", aliases: ["viewonce","saveview","antiselfdestruct","unlock"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      if (!m.quoted) return reply(guide("vv", ".vv (reply view-once)")); const q = m.quoted, mime = q.mtype || "";
-      const isVO = q.message?.imageMessage?.viewOnce || q.message?.videoMessage?.viewOnce || q.message?.audioMessage?.viewOnce;
-      if (!isVO) return reply("👀 Not view-once!");
-      try {
-        const c = q.message.imageMessage || q.message.videoMessage || q.message.audioMessage;
-        const st = await downloadContentFromMessage(c, mime.includes('image') ? 'image' : mime.includes('video') ? 'video' : 'audio');
-        let b = Buffer.from([]); for await (const ch of st) b = Buffer.concat([b, ch]);
-        if (mime.includes('image')) await s.sendMessage(m.chat, { image: b, caption: ok.vv.img }, { quoted: m });
-        else if (mime.includes('video')) await s.sendMessage(m.chat, { video: b, caption: ok.vv.vid, gifPlayback: q.message?.videoMessage?.gifPlayback || false }, { quoted: m });
-        else if (mime.includes('audio')) { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply(ok.vv.aud); }
-      } catch (e) { console.log("VV:", e.message); reply("❌ Bypass failed."); }
-    }
-  },
-  { command: "url", aliases: ["upload","imageurl"], category: "tools",
-    execute: async (s, m, { reply }) => {
-      if (!m.quoted?.message) return reply("❌ Reply to image/sticker!"); const q = m.quoted, t = Object.keys(q.message)[0];
-      const im = t === 'imageMessage', st = t === 'stickerMessage'; if (!im && !st) return reply("❌ Must be image or sticker!");
-      reply("⏳ Uploading..."); const tmp = path.join(__dirname, '../temp'); if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true }); let buf;
-      if (im) { const s = await downloadContentFromMessage(q.message.imageMessage, 'image'); buf = Buffer.from([]); for await (const c of s) buf = Buffer.concat([buf, c]); }
-      else {
-        const wpath = path.join(tmp, `upsticker_${Date.now()}.webp`), ppath = path.join(tmp, `upsticker_${Date.now()}.png`);
-        try {
-          const ss = await downloadContentFromMessage(q.message.stickerMessage, 'image'); let wb = Buffer.from([]); for await (const c of ss) wb = Buffer.concat([wb, c]);
-          fs.writeFileSync(wpath, wb); await new Promise((res, rej) => { ffmpeg(wpath).output(ppath).outputOptions('-vframes 1').on('end', res).on('error', rej).run(); });
-          buf = fs.readFileSync(ppath);
-        } finally { cleanup(wpath); cleanup(ppath); }
-      }
-      try { const url = await uploadImage(buf, im ? 'image.jpg' : 'sticker.png'); reply(`${ok.url}\n\n🔗 ${url}`); } catch (e) { console.error("Upload:", e); reply("❌ " + (e.message || "Failed")); }
-    }
-  },
-  { command: "img", aliases: ["image","pic","gimage"], category: "tools",
-    execute: async (s, m, { args, reply }) => {
-      if (!args[0]) return reply("❌ Usage: .img <search query>"); const query = args.join(" "); reply(`🔍 Searching images for *${query}*...`);
-      try {
-        const res = await axios.get(`https://api.davidcyriltech.my.id/search/image?query=${encodeURIComponent(query)}`, { timeout: 15000 });
-        const images = res.data?.results || res.data?.data || res.data?.images || []; if (!images || images.length === 0) return reply(`❌ No images found for "${query}".`);
-        const validImages = images.map(img => typeof img === 'string' ? img : (img.url || img.image || img.link || img.src)).filter(url => url?.startsWith('http')).sort(() => Math.random() - 0.5);
-        const selected = validImages.slice(0, 5); if (selected.length === 0) return reply("❌ No valid image URLs found.");
-        for (let i = 0; i < selected.length; i++) {
-          await s.sendMessage(m.chat, { image: { url: selected[i] }, caption: i === 0 ? `${ok.img}\n🔍 *${query}*` : `🔍 *${query}* (${i+1}/${selected.length})` }, { quoted: i === 0 ? m : undefined });
-          if (i < selected.length - 1) await new Promise(r => setTimeout(r, 500));
-        }
-      } catch (err) { console.error("Img search error:", err); reply(`❌ Image search failed: ${err.message}`); }
-    }
-  },
-  { command: "take", aliases: ["savestatus","getstatus"], category: "tools", owner: true,
-    execute: async (s, m, { args, reply }) => {
-      let target; if (m.mentionedJid?.[0]) target = m.mentionedJid[0]; else if (m.quoted?.sender) target = m.quoted.sender;
-      else if (args[0]) target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net'; else return reply("❌ Mention a user or provide a number!");
-      if (!global.statusCache || !global.statusCache.has(target)) return reply("❌ No cached status for that user.");
-      const statusMsg = global.statusCache.get(target); const msgType = Object.keys(statusMsg.message || {})[0];
-      const allowed = ['imageMessage','videoMessage','audioMessage']; if (!allowed.includes(msgType)) return reply("❌ Latest status is not an image/video/audio.");
-      reply("⏳ Downloading status..."); const content = statusMsg.message[msgType];
-      const stream = await downloadContentFromMessage(content, msgType === 'imageMessage' ? 'image' : msgType === 'videoMessage' ? 'video' : 'audio');
-      let buf = Buffer.from([]); for await (const chunk of stream) buf = Buffer.concat([buf, chunk]);
-      if (msgType === 'imageMessage') await s.sendMessage(m.chat, { image: buf, caption: `📸 Status from @${target.split('@')[0]}`, mentions: [target] }, { quoted: m });
-      else if (msgType === 'videoMessage') await s.sendMessage(m.chat, { video: buf, caption: `🎥 Status from @${target.split('@')[0]}`, mentions: [target], gifPlayback: false }, { quoted: m });
-      else if (msgType === 'audioMessage') { await s.sendMessage(m.chat, { audio: buf, mimetype: 'audio/mpeg', ptt: true }, { quoted: m }); reply(`🎵 Voice status from @${target.split('@')[0]}`); }
-    }
-  }
+const fs=require('fs'),path=require('path'),axios=require('axios'),QR=require('qrcode'),{downloadContentFromMessage}=require('@whiskeysockets/baileys'),moment=require('moment-timezone'),ffmpeg=require('fluent-ffmpeg'),{writeExif}=require('../library/exif'),clean=f=>setTimeout(()=>{try{fs.unlinkSync(f)}catch{}},3e5),upload=async(b,f='img.png')=>{const fd=new(require('form-data'))();fd.append('reqtype','fileupload');fd.append('fileToUpload',b,{filename:f,contentType:'image/png'});const r=await axios.post('https://catbox.moe/user/api.php',fd,{headers:{...fd.getHeaders(),'User-Agent':'AlphaBot/1.0'},timeout:15e3});if(typeof r.data==='string'&&r.data.startsWith('http'))return r.data;throw new Error(r.data)};
+module.exports=[
+{command:"calc",aliases:["calculator","math"],category:"tools",execute:(s,m,{args,reply})=>{if(!args[0])return reply("❌ .calc 2+2");try{reply("✅ "+eval(args.join("").replace(/[^0-9+\-*/()%. ]/g,"")))}catch{reply("❌ Failed")}}},
+{command:"qr",category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .qr text");const b=await QR.toBuffer(args.join(" "),{type:'png'});await s.sendMessage(m.chat,{image:b,caption:"✅ QR ready"},{quoted:m})}},
+{command:"tts",aliases:["speak","say"],category:"tools",execute:(s,m,{args,reply})=>{if(!args[0])return reply("❌ .tts text");s.sendMessage(m.chat,{audio:{url:`https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(args.join(" "))}&tl=en&client=tw-ob`},mimetype:"audio/mpeg",ptt:!0},{quoted:m})}},
+{command:"time",category:"tools",execute:(s,m,{reply})=>{const n=moment();reply(`🕐 ${n.format("dddd, MMMM Do YYYY")}\n⏰ ${n.format("hh:mm:ss A")}\n🌍 SA: ${moment().tz("Africa/Johannesburg").format("hh:mm A")}`)}},
+{command:"sticker",aliases:["s","st"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message)return reply("❌ Reply to image/video");const t=Object.keys(q.message)[0];if(t!=='imageMessage'&&t!=='videoMessage')return reply("❌ Image/video only");try{const st=await downloadContentFromMessage(q.message[t],t==='imageMessage'?'image':'video');let b=Buffer.from([]);for await(const c of st)b=Buffer.concat([b,c]);const sb=await writeExif({data:b,mimetype:t==='imageMessage'?'image/jpeg':'video/mp4'},{packname:'Alpha',author:'Sticker',categories:['🤖']});await s.sendMessage(m.chat,{sticker:sb},{quoted:m})}catch{reply("❌ Failed")}}},
+{command:"toimg",aliases:["stickertoimg","simg","getimage"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='stickerMessage')return reply("❌ Reply sticker");const w=`tmp/st_${Date.now()}.webp`,p=`tmp/o_${Date.now()}.png`;try{let b=Buffer.from([]);const st=await downloadContentFromMessage(q.message.stickerMessage,'image');for await(const c of st)b=Buffer.concat([b,c]);fs.mkdirSync('tmp',{recursive:1});fs.writeFileSync(w,b);await new Promise((res,rej)=>ffmpeg(w).output(p).outputOptions('-vframes 1').on('end',res).on('error',rej).run());if(fs.existsSync(p))await s.sendMessage(m.chat,{image:fs.readFileSync(p),caption:"✅ Done"},{quoted:m})}catch{reply("❌ Failed")}finally{clean(w);clean(p)}}},
+{command:"getpp",aliases:["getprofile","pp"],category:"tools",execute:async(s,m,{reply})=>{let t=m.mentionedJid?.[0]||m.quoted?.sender||m.sender;try{const u=await s.profilePictureUrl(t,'image');await s.sendMessage(m.chat,{image:{url:u},caption:`📸 @${t.split('@')[0]}`,mentions:[t]},{quoted:m})}catch{reply("❌ No PP")}}},
+{command:"getid",aliases:["id","userid"],category:"tools",execute:(s,m,{reply})=>{let t=m.mentionedJid?.[0]||m.quoted?.sender||m.sender;reply(`🆔 ${t.split('@')[0]}`)}},
+{command:"getlink",aliases:["grouplink","invitelink"],category:"tools",group:!0,admin:!0,execute:async(s,m,{reply})=>{try{const c=await s.groupInviteCode(m.chat);reply(`🔗 https://chat.whatsapp.com/${c}`)}catch{reply("❌ Need admin")}}},
+{command:"translate",aliases:["tr"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .translate en Hello");const l=args[0].toLowerCase(),t=args.slice(1).join(" ");if(!t)return reply("❌ Text?");const r=await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${l}&dt=t&q=${encodeURIComponent(t)}`);reply(`🌐 ${l}: ${r.data[0][0][0]}`)}},
+{command:"weather",category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .weather Harare");const r=await axios.get(`https://wttr.in/${encodeURIComponent(args.join(" "))}?format=%C+%t+%w+%h`);reply(`🌤️ ${args.join(" ")}: ${r.data}`)}},
+{command:"lyrics",aliases:["lyric"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .lyrics Song");const r=await axios.get(`https://api.davidcyriltech.my.id/lyrics?title=${encodeURIComponent(args.join(" "))}`);const l=r.data?.lyrics||r.data?.result?.lyrics;reply(l?`🎵 ${l.substring(0,3900)}`:"❌ Not found")}},
+{command:"removebg",aliases:["rbg","nobg"],category:"tools",execute:async(s,m,{args,reply})=>{if(!m.quoted)return reply("❌ Reply image");if(!args[0])return reply("❌ API key");const q=m.quoted;if(!(Object.keys(q.message||{})[0]||'').includes('image'))return reply("❌ Image only");const b=await s.downloadMediaMessage(q);const fd=new(require('form-data'))();fd.append('image',b,'img.jpg');const r=await axios.post('https://api.remove.bg/v1.0/removebg',fd,{headers:{'X-Api-Key':args[0],...fd.getHeaders()},responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ No bg"},{quoted:m})}},
+{command:"tomp3",aliases:["toaudio","video2mp3"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q||!(Object.keys(q.message||{})[0]||'').includes('video'))return reply("❌ Reply video");const v=`tmp/v_${Date.now()}.mp4`,a=`tmp/a_${Date.now()}.mp3`;try{const b=await s.downloadMediaMessage(q);fs.mkdirSync('tmp',{recursive:1});fs.writeFileSync(v,b);await new Promise((res,rej)=>ffmpeg(v).output(a).audioCodec('libmp3lame').audioBitrate('128k').format('mp3').on('end',res).on('error',rej).run());if(fs.existsSync(a))await s.sendMessage(m.chat,{audio:fs.readFileSync(a),mimetype:"audio/mpeg",ptt:!1},{quoted:m})}catch{reply("❌ Failed")}finally{clean(v);clean(a)}}},
+{command:"vv",aliases:["viewonce","saveview","antiselfdestruct","unlock"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q)return reply("❌ Reply view-once");const t=Object.keys(q.message||{})[0],c=q.message[t];if(!c?.viewOnce)return reply("❌ Not view-once");const st=await downloadContentFromMessage(c,t.includes('image')?'image':t.includes('video')?'video':'audio');let b=Buffer.from([]);for await(const ch of st)b=Buffer.concat([b,ch]);if(t.includes('image'))await s.sendMessage(m.chat,{image:b,caption:"✅ Unlocked"},{quoted:m});else if(t.includes('video'))await s.sendMessage(m.chat,{video:b,caption:"✅ Unlocked"},{quoted:m});else{await s.sendMessage(m.chat,{audio:b,mimetype:"audio/mpeg",ptt:!0},{quoted:m});reply("✅ Voice saved")}}},
+{command:"url",aliases:["upload","imageurl"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message)return reply("❌ Reply media");const t=Object.keys(q.message)[0];if(!['imageMessage','stickerMessage'].includes(t))return reply("❌ Image/sticker");let buf;if(t==='imageMessage'){const st=await downloadContentFromMessage(q.message.imageMessage,'image');buf=Buffer.from([]);for await(const c of st)buf=Buffer.concat([buf,c])}else{const w=`tmp/u_${Date.now()}.webp`,p=`tmp/u_${Date.now()}.png`;try{const st=await downloadContentFromMessage(q.message.stickerMessage,'image');let wb=Buffer.from([]);for await(const c of st)wb=Buffer.concat([wb,c]);fs.mkdirSync('tmp',{recursive:1});fs.writeFileSync(w,wb);await new Promise((res,rej)=>ffmpeg(w).output(p).outputOptions('-vframes 1').on('end',res).on('error',rej).run());buf=fs.readFileSync(p)}finally{clean(w);clean(p)}}try{const u=await upload(buf,t==='imageMessage'?'img.jpg':'sticker.png');reply(`🔗 ${u}`)}catch{reply("❌ Failed")}}},
+{command:"img",aliases:["image","pic","gimage"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .img query");const q=args.join(" ");reply(`🔍 ${q}`);const res=await axios.get(`https://api.davidcyriltech.my.id/search/image?query=${encodeURIComponent(q)}`);const imgs=res.data?.results||res.data?.data||res.data?.images||[];if(!imgs.length)return reply("❌ No images");const urls=imgs.map(i=>typeof i==='string'?i:(i.url||i.image||i.link||i.src)).filter(u=>u?.startsWith('http')).slice(0,5);if(!urls.length)return reply("❌ No URLs");for(let i=0;i<urls.length;i++){await s.sendMessage(m.chat,{image:{url:urls[i]},caption:`📸 ${q} (${i+1}/${urls.length})`},{quoted:i===0?m:undefined})}}},
+{command:"take",aliases:["savestatus","getstatus"],category:"tools",owner:!0,execute:async(s,m,{args,reply})=>{let t;if(m.mentionedJid?.[0])t=m.mentionedJid[0];else if(m.quoted?.sender)t=m.quoted.sender;else if(args[0])t=args[0].replace(/[^0-9]/g,'')+'@s.whatsapp.net';else return reply("❌ Mention/number");const st=global.statusCache?.get(t);if(!st)return reply("❌ No cached status");const type=Object.keys(st.message)[0];if(!['imageMessage','videoMessage','audioMessage'].includes(type))return reply("❌ Not media");const c=st.message[type];const stream=await downloadContentFromMessage(c,type==='imageMessage'?'image':type==='videoMessage'?'video':'audio');let b=Buffer.from([]);for await(const ch of stream)b=Buffer.concat([b,ch]);if(type==='imageMessage')await s.sendMessage(m.chat,{image:b,caption:`📸 @${t.split('@')[0]}`,mentions:[t]},{quoted:m});else if(type==='videoMessage')await s.sendMessage(m.chat,{video:b,caption:`🎥 @${t.split('@')[0]}`,mentions:[t]},{quoted:m});else{await s.sendMessage(m.chat,{audio:b,mimetype:'audio/mpeg',ptt:!0},{quoted:m});reply(`🎵 Voice from @${t.split('@')[0]}`)}}},
+// New tools
+{command:"steal",aliases:["stealpp","savepp"],category:"tools",execute:async(s,m,{reply})=>{let t=m.mentionedJid?.[0]||m.quoted?.sender||m.sender;try{const u=await s.profilePictureUrl(t,'image');await s.sendMessage(m.chat,{image:{url:u},caption:`📸 @${t.split('@')[0]}`},{quoted:m})}catch{reply("❌ No PP")}}},
+{command:"blur",category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='imageMessage')return reply("❌ Reply image");try{const c=q.message.imageMessage;const st=await downloadContentFromMessage(c,'image');let b=Buffer.from([]);for await(const ch of st)b=Buffer.concat([b,ch]);const url=await upload(b,'blur.jpg');const r=await axios.get(`https://api.popcat.xyz/blur?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Blurred"},{quoted:m})}catch{reply("❌ Failed")}}},
+{command:"attp",aliases:["texttosticker"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .attp text");const r=await axios.get(`https://api.lolhuman.xyz/api/attp?apikey=GataDios&text=${encodeURIComponent(args.join(" "))}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{sticker:Buffer.from(r.data)},{quoted:m})}},
+{command:"ttp",category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .ttp text");const r=await axios.get(`https://api.popcat.xyz/ttp?text=${encodeURIComponent(args.join(" "))}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ TTP"},{quoted:m})}},
+{command:"ss",aliases:["screenshot","webss"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .ss url");const r=await axios.get(`https://api.popcat.xyz/screenshot?url=${encodeURIComponent(args[0])}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Screenshot"},{quoted:m})}},
+{command:"stickertelegram",aliases:["telesticker","tstick"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .stickertelegram url");const r=await axios.get(`https://api.davidcyriltech.my.id/download/telesticker?url=${encodeURIComponent(args[0])}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{sticker:Buffer.from(r.data)},{quoted:m})}},
+{command:"imgscan",aliases:["ocr","readimage"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='imageMessage')return reply("❌ Reply image");try{const c=q.message.imageMessage;const st=await downloadContentFromMessage(c,'image');let b=Buffer.from([]);for await(const ch of st)b=Buffer.concat([b,ch]);const url=await upload(b,'scan.jpg');const r=await axios.get(`https://api.popcat.xyz/ocr?image=${encodeURIComponent(url)}`);reply(r.data?.text?`📝 ${r.data.text}`:"❌ No text")}catch{reply("❌ Failed")}}},
+{command:"tovideo",aliases:["stickertovid","gif2mp4"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='stickerMessage')return reply("❌ Reply sticker");const stk=q.message.stickerMessage;if(!stk.isAnimated)return reply("❌ Not animated");const i=`tmp/tv_${Date.now()}.webp`,o=`tmp/tv_${Date.now()}.mp4`;try{let b=Buffer.from([]);const st=await downloadContentFromMessage(stk,'image');for await(const c of st)b=Buffer.concat([b,c]);fs.mkdirSync('tmp',{recursive:1});fs.writeFileSync(i,b);await new Promise((res,rej)=>ffmpeg(i).output(o).outputOptions('-movflags faststart','-pix_fmt yuv420p').on('end',res).on('error',rej).run());if(fs.existsSync(o))await s.sendMessage(m.chat,{video:fs.readFileSync(o),caption:"✅ Video"},{quoted:m})}catch{reply("❌ Failed")}finally{clean(i);clean(o)}}},
+{command:"toptt",aliases:["tovn","tovoice"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message)return reply("❌ Reply audio/video");const t=Object.keys(q.message)[0];if(!['audioMessage','voiceMessage','videoMessage'].includes(t))return reply("❌ Audio/voice/video");let b=Buffer.from([]);const st=await downloadContentFromMessage(q.message[t],t==='videoMessage'?'video':'audio');for await(const c of st)b=Buffer.concat([b,c]);if(t==='videoMessage'){const v=`tmp/pttv_${Date.now()}.mp4`,a=`tmp/ptta_${Date.now()}.mp3`;fs.mkdirSync('tmp',{recursive:1});fs.writeFileSync(v,b);await new Promise((res,rej)=>ffmpeg(v).output(a).audioCodec('libmp3lame').format('mp3').on('end',res).on('error',rej).run());b=fs.readFileSync(a);clean(v);clean(a)}await s.sendMessage(m.chat,{audio:b,mimetype:'audio/mpeg',ptt:!0},{quoted:m});reply("✅ Voice sent")}},
+{command:"topdf",aliases:["img2pdf"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='imageMessage')return reply("❌ Reply image");try{const c=q.message.imageMessage;const st=await downloadContentFromMessage(c,'image');let b=Buffer.from([]);for await(const ch of st)b=Buffer.concat([b,ch]);const url=await upload(b,'pdf.jpg');const r=await axios.get(`https://api.popcat.xyz/imgtopdf?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{document:Buffer.from(r.data),fileName:'doc.pdf',mimetype:'application/pdf'},{quoted:m})}catch{reply("❌ Failed")}}},
+{command:"smeme",aliases:["makememe"],category:"tools",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .smeme top|bottom (reply img)");const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='imageMessage')return reply("❌ Reply image");const txt=args.join(" ").split("|").map(s=>s.trim());if(txt.length<2)return reply("❌ Need top | bottom");try{const c=q.message.imageMessage;const st=await downloadContentFromMessage(c,'image');let b=Buffer.from([]);for await(const ch of st)b=Buffer.concat([b,ch]);const url=await upload(b,'meme.jpg');const r=await axios.get(`https://api.popcat.xyz/meme?image=${encodeURIComponent(url)}&top=${encodeURIComponent(txt[0])}&bottom=${encodeURIComponent(txt[1]||'')}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Meme"},{quoted:m})}catch{reply("❌ Failed")}}},
+{command:"wasted",aliases:["gtawasted"],category:"tools",execute:async(s,m,{reply})=>{const q=m.quoted;if(!q?.message||Object.keys(q.message)[0]!=='imageMessage')return reply("❌ Reply image");try{const c=q.message.imageMessage;const st=await downloadContentFromMessage(c,'image');let b=Buffer.from([]);for await(const ch of st)b=Buffer.concat([b,ch]);const url=await upload(b,'wasted.jpg');const r=await axios.get(`https://api.popcat.xyz/wasted?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"💀 WASTED"},{quoted:m})}catch{reply("❌ Failed")}}}
 ];
