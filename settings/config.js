@@ -5,9 +5,9 @@ const fs = require('fs')
 const config = {
 
     // 🔥 OWNER (PRIMARY)
-    owner: ["263786641436"], // your number
+    owner: ["263784969735"], // your number
 
-    botNumber: "263786641436",
+    botNumber: "263784969735",
 
     // 🔐 PAIR NAME
     setPair: "ALPHA-XMD",
