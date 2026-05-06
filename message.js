@@ -162,7 +162,9 @@ const deny = {
     admin: "🚫 Only admins can use this.",
     group: "👥 This only works in groups.",
     botAdmin: "🤖 I need admin powers.",
-    banned: "🚫 You're banned from using the bot."
+    banned: "🚫 You're banned from using the bot.",
+    private: "🔒 This command only works in private chat.",
+    ownerPrivateReminder: "⚠️ For security, owner commands are best used in private chat."  // new
 };
 
 // REACTIONS
@@ -222,7 +224,8 @@ module.exports = async (sock, m) => {
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
 
-        const botNum = clean(sock.user.id);
+        // FIX: proper bot number (without device ID)
+        const botNum = clean(sock.user.id.split('@')[0].split(':')[0]);
         const senderNum = clean(m.sender);
         const isOwner = config.owner.includes(senderNum) || senderNum === botNum || isTempOwner(m.sender);
 
@@ -236,9 +239,28 @@ module.exports = async (sock, m) => {
 
         const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: m.isAdmin, isBotAdmin: m.isBotAdmin, config, prefix };
 
+        // ---- PERMISSION CHECKS ----
+
+        // 1) Owner‑only commands
         if (command.owner && !isOwner) return reply(deny.owner);
+
+        // 2) If it's an owner command AND the owner is using it in a group → friendly reminder
+        if (command.owner && isOwner && m.isGroup) {
+            await reply(deny.ownerPrivateReminder);
+            // Continue executing – just a reminder, not a block
+        }
+
+        // 3) Private‑only commands (group: false)
+        if (command.group === false && m.isGroup) return reply(deny.private);
+
+        // 4) Group‑only commands
         if (command.group && !m.isGroup) return reply(deny.group);
-        if (command.admin && !m.isAdmin) return reply(deny.admin);
+
+        // 5) Admin commands
+        if (command.admin) {
+            if (!m.isAdmin) return reply(deny.admin);          // user is not admin
+            if (!m.isBotAdmin) return reply(deny.botAdmin);    // bot is not admin
+        }
 
         await command.execute(sock, m, ctx);
     } catch (err) {
@@ -247,7 +269,7 @@ module.exports = async (sock, m) => {
     }
 };
 
-// PAIR HANDLER
+// PAIR HANDLER (unchanged)
 module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
     const baileys = await import('@whiskeysockets/baileys');
     const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
