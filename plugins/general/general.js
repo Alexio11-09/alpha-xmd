@@ -55,7 +55,7 @@ module.exports = [
 
                 // EVIL JORDAN INTRO – upload your own MP3 to catbox.moe and replace this link
                 const menuSongUrl = config.settings?.menuSongUrl ||
-                    "https://files.catbox.moe/YOUR_EVIL_JORDAN_LINK_HERE.mp3";
+                    "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";
 
                 const now = new Date();
                 const time = now.toLocaleTimeString();
