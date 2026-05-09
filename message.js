@@ -14,14 +14,16 @@ const isUserBanned = (sender) => {
     } catch { return false; }
 };
 
-// TEMP OWNER
-const isTempOwner = (sender) => {
+// TEMP OWNER (base number, no device ID)
+function isTempOwnerBase(sender) {
     try {
         const op = './database/owners.json';
-        if (!fs.existsSync(op)) { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(op, JSON.stringify({ tempOwners: [] }, null, 2)); }
-        const o = JSON.parse(fs.readFileSync(op)); return o.tempOwners?.includes(clean(sender));
+        if (!fs.existsSync(op)) return false;
+        const o = JSON.parse(fs.readFileSync(op));
+        const senderBase = clean(sender.split('@')[0].split(':')[0]);
+        return o.tempOwners?.includes(senderBase);
     } catch { return false; }
-};
+}
 
 // BADWORDS
 const bwPath = './database/badwords.json', gbwPath = './database/badwords_global.json';
@@ -164,7 +166,7 @@ const deny = {
     botAdmin: "🤖 I need admin powers.",
     banned: "🚫 You're banned from using the bot.",
     private: "🔒 This command only works in private chat.",
-    ownerPrivateReminder: "⚠️ For security, owner commands are best used in private chat."  // new
+    ownerPrivateReminder: "⚠️ For security, owner commands are best used in private chat."
 };
 
 // REACTIONS
@@ -224,10 +226,10 @@ module.exports = async (sock, m) => {
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
 
-        // FIX: proper bot number (without device ID)
+        // ⭐ PERMANENT OWNER FIX – strip device IDs from both bot and sender
         const botNum = clean(sock.user.id.split('@')[0].split(':')[0]);
-        const senderNum = clean(m.sender);
-        const isOwner = config.owner.includes(senderNum) || senderNum === botNum || isTempOwner(m.sender);
+        const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
+        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender);
 
         // MODE CHECK
         if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) return;
@@ -240,26 +242,13 @@ module.exports = async (sock, m) => {
         const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: m.isAdmin, isBotAdmin: m.isBotAdmin, config, prefix };
 
         // ---- PERMISSION CHECKS ----
-
-        // 1) Owner‑only commands
         if (command.owner && !isOwner) return reply(deny.owner);
-
-        // 2) If it's an owner command AND the owner is using it in a group → friendly reminder
-        if (command.owner && isOwner && m.isGroup) {
-            await reply(deny.ownerPrivateReminder);
-            // Continue executing – just a reminder, not a block
-        }
-
-        // 3) Private‑only commands (group: false)
+        if (command.owner && isOwner && m.isGroup) await reply(deny.ownerPrivateReminder);
         if (command.group === false && m.isGroup) return reply(deny.private);
-
-        // 4) Group‑only commands
         if (command.group && !m.isGroup) return reply(deny.group);
-
-        // 5) Admin commands
         if (command.admin) {
-            if (!m.isAdmin) return reply(deny.admin);          // user is not admin
-            if (!m.isBotAdmin) return reply(deny.botAdmin);    // bot is not admin
+            if (!m.isAdmin) return reply(deny.admin);
+            if (!m.isBotAdmin) return reply(deny.botAdmin);
         }
 
         await command.execute(sock, m, ctx);
