@@ -158,13 +158,11 @@ const clientstart = async () => {
       };
       followChannel();
 
-      // ---- SEND CONNECTION DM TO OWNER ----
+      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER (NOT THE DEV) ----
       const sendConnectionDM = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 4000));
-          const ownerRaw = config().owner?.[0];
-          if (!ownerRaw) return console.log('⚠️ No owner number in config, skipping DM.');
-          const ownerJid = ownerRaw.includes('@') ? ownerRaw : ownerRaw + '@s.whatsapp.net';
+          const botJid = sock.user.id;   // ✅ bot's own number, no dev exposure
           const botName = config().settings?.title || 'Alpha Bot';
           const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
           const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
@@ -178,7 +176,7 @@ const clientstart = async () => {
             `📢 *Channel:* ${channelLink}\n\n` +
             `🔥 Ready to use.`;
 
-          await sock.sendMessage(ownerJid, {
+          await sock.sendMessage(botJid, {
             text: message,
             contextInfo: {
               forwardingScore: 999,
@@ -189,7 +187,7 @@ const clientstart = async () => {
               }
             }
           });
-          console.log('✅ Connection DM sent to owner');
+          console.log('✅ Connection DM sent to bot');
         } catch (err) {
           console.error('❌ Failed to send connection DM:', err.message);
         }
