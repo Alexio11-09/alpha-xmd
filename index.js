@@ -104,20 +104,25 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
-// ==================== ALWAYSONLINE INTERVAL ====================
+// ==================== ALWAYSONLINE (FIXED) ====================
 let alwaysOnlineInterval = null;
 
-const startAlwaysOnline = (sock) => {
-    if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-    alwaysOnlineInterval = setInterval(async () => {
-        try {
-            const cfg = JSON.parse(fs.readFileSync(settingsPath));
-            const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
-            if (alwaysOn) {
+const applyAlwaysOnline = async (sock) => {
+    try {
+        const cfg = JSON.parse(fs.readFileSync(settingsPath));
+        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
+        if (alwaysOn) {
+            if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
+            alwaysOnlineInterval = setInterval(async () => {
                 await sock.sendPresenceUpdate('available');
-            }
-        } catch {}
-    }, 30000); // every 30 seconds
+            }, 30000);
+            // send immediately so it's online right away
+            await sock.sendPresenceUpdate('available');
+        } else {
+            if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
+            await sock.sendPresenceUpdate('unavailable');   // 🔴 go offline immediately
+        }
+    } catch {}
 };
 
 const clientstart = async () => {
@@ -165,9 +170,11 @@ const clientstart = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 3000));
           const newsletterJid = config().newsletter.id + '@newsletter';
+          console.log('🔄 Following channel:', newsletterJid);
           await sock.newsletterFollow(newsletterJid);
+          console.log('✅ Followed channel:', config().newsletter.name);
         } catch (err) {
-          // Silent
+          console.error('❌ Channel follow error:', err.message);
         }
       };
       followChannel();
@@ -176,7 +183,7 @@ const clientstart = async () => {
       const sendConnectionDM = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 4000));
-          const botJid = sock.user.id;
+          const botJid = sock.user.id;   // ✅ bot's own number
           const botName = config().settings?.title || 'Alpha Bot';
           const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
           const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
@@ -201,12 +208,15 @@ const clientstart = async () => {
               }
             }
           });
-        } catch (err) {}
+          console.log('✅ Connection DM sent to bot');
+        } catch (err) {
+          console.error('❌ Failed to send connection DM:', err.message);
+        }
       };
       sendConnectionDM();
 
-      // ---- START ALWAYSONLINE ----
-      startAlwaysOnline(sock);
+      // ---- APPLY ALWAYSONLINE STATE ----
+      applyAlwaysOnline(sock);
     }
     if (connection === 'close') {
       if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
@@ -219,7 +229,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS ==========
+  // ========== STATUS EVENTS (reliable single listener) ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
@@ -230,7 +240,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== CHANNEL AUTO‑REACT ==========
+  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
   const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
@@ -259,7 +269,9 @@ const clientstart = async () => {
           }, {});
         }
         await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (err) {}
+      } catch (err) {
+        console.log('chreact error:', err.message);
+      }
     }
   });
 
@@ -268,6 +280,11 @@ const clientstart = async () => {
     try {
       const messages = chatUpdate.messages;
       if (!messages?.length) return;
+
+      try {
+        const saved = JSON.parse(fs.readFileSync(settingsPath));
+        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
+      } catch (err) {}
 
       for (let mek of messages) {
         if (!mek.message) continue;
@@ -282,7 +299,7 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔢 INCREMENT MESSAGE COUNT FOR RANK
+        // 🔢 INCREMENT MESSAGE COUNT FOR RANK (GROUP LEADERBOARD)
         const msgDbPath = './database/messageCount.json';
         if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
         if (!fs.existsSync(msgDbPath)) fs.writeFileSync(msgDbPath, '{}');
@@ -292,9 +309,29 @@ const clientstart = async () => {
             counts[m.chat] = counts[m.chat] || {};
             counts[m.chat][m.sender] = (counts[m.chat][m.sender] || 0) + 1;
             fs.writeFileSync(msgDbPath, JSON.stringify(counts, null, 2));
-        } catch (countErr) {}
+        } catch (countErr) {
+            // silently ignore counting errors
+        }
 
-        // Store message for antidelete
+        // ========== 📋 LIVE MESSAGE LOGGER (CONSOLE) ==========
+        const msgType = Object.keys(mek.message || {})[0] || 'unknown';
+        const senderJid = m.sender || mek.key.participant || mek.key.remoteJid;
+        const senderClean = senderJid.split('@')[0];
+        const pushName = m.pushName || 'N/A';
+        const chatJidLog = m.chat || mek.key.remoteJid;
+        const msgText = m.text || '[N/A]';
+        const msgTime = new Date().toLocaleTimeString();
+
+        console.log(`\n${'─'.repeat(40)}`);
+        console.log(`📨 *Message Type:* ${msgType}`);
+        console.log(`🕒 *Time:* ${msgTime}`);
+        console.log(`👤 *Sender:* ${senderClean}`);
+        console.log(`🏷️ *Name:* ${pushName}`);
+        console.log(`💬 *Chat ID:* ${chatJidLog}`);
+        console.log(`📝 *Message:* ${msgText.substring(0, 200)}`);
+        // =====================================================
+
+        // Store message with sender and pushName for antidelete
         store.set(mek.key.id, {
             text: m.text || "",
             message: mek.message,
@@ -321,7 +358,7 @@ const clientstart = async () => {
         if (globalSettings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
         if (globalSettings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
 
-        // ---- AUTOREACT ----
+        // ---- AUTOREACT (skip commands) ----
         if (globalSettings.autoreact) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) {
@@ -331,11 +368,12 @@ const clientstart = async () => {
         }
 
         await messageHandler(sock, m);
+        await new Promise(r => setTimeout(r, 200));
       }
     } catch (err) {}
   });
 
-  // ANTIDELETE + ANTIEDIT
+  // ANTIDELETE (UPGRADED + SMART SENDER DISPLAY) + ANTIEDIT
   sock.ev.on('messages.update', async (updates) => {
     try {
       try {
@@ -350,6 +388,7 @@ const clientstart = async () => {
         const oldMsg = store.get(update.key.id);
         if (!oldMsg) continue;
 
+        // ----- ANTIDELETE -----
         if (update.update.message === null) {
           if (!adConfig.enabled) continue;
 
@@ -422,6 +461,7 @@ const clientstart = async () => {
           }
         }
 
+        // ----- ANTIEDIT (unchanged) -----
         if (globalSettings.antiedit && update.update?.message) {
           let newText = "";
           try {
@@ -435,10 +475,12 @@ const clientstart = async () => {
           }
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.log("Antidelete/antiedit error:", err);
+    }
   });
 
-  // WELCOME & GOODBYE
+  // WELCOME & GOODBYE (funny)
   sock.ev.on('group-participants.update', async (update) => {
     try {
       const { id, participants, action } = update;
