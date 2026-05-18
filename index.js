@@ -104,27 +104,6 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
-// ==================== ALWAYSONLINE (FIXED) ====================
-let alwaysOnlineInterval = null;
-
-const applyAlwaysOnline = async (sock) => {
-    try {
-        const cfg = JSON.parse(fs.readFileSync(settingsPath));
-        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
-        if (alwaysOn) {
-            if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-            alwaysOnlineInterval = setInterval(async () => {
-                await sock.sendPresenceUpdate('available');
-            }, 30000);
-            // send immediately so it's online right away
-            await sock.sendPresenceUpdate('available');
-        } else {
-            if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-            await sock.sendPresenceUpdate('unavailable');   // 🔴 go offline immediately
-        }
-    } catch {}
-};
-
 const clientstart = async () => {
   await loadBaileys();
   const sessionPath = `./${config().session}`;
@@ -179,11 +158,11 @@ const clientstart = async () => {
       };
       followChannel();
 
-      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER ----
+      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER (NOT THE DEV) ----
       const sendConnectionDM = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 4000));
-          const botJid = sock.user.id;   // ✅ bot's own number
+          const botJid = sock.user.id;   // ✅ bot's own number, no dev exposure
           const botName = config().settings?.title || 'Alpha Bot';
           const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
           const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
@@ -214,12 +193,8 @@ const clientstart = async () => {
         }
       };
       sendConnectionDM();
-
-      // ---- APPLY ALWAYSONLINE STATE ----
-      applyAlwaysOnline(sock);
     }
     if (connection === 'close') {
-      if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
       if (!isRestarting) {
