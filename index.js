@@ -1,1 +1,454 @@
-const fs=require("fs"),{execSync}=require("child_process"),modules=["pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios","node-fetch","yt-search","form-data","file-type","moment-timezone","human-readable","fluent-ffmpeg","@ffmpeg-installer/ffmpeg","crypto-js","adm-zip"];modules.forEach(m=>{try{require.resolve(m)}catch{execSync(`npm install ${m} --force`,{stdio:"inherit"})}});console.clear();const config=()=>require('./settings/config');process.on("uncaughtException",()=>{});let makeWASocket,Browsers,useMultiFileAuthState,DisconnectReason,fetchLatestBaileysVersion,jidDecode;const loadBaileys=async()=>{const b=await import('@whiskeysockets/baileys');makeWASocket=b.default,Browsers=b.Browsers,useMultiFileAuthState=b.useMultiFileAuthState,DisconnectReason=b.DisconnectReason,fetchLatestBaileysVersion=b.fetchLatestBaileysVersion,jidDecode=b.jidDecode},pino=require('pino'),readline=require("readline"),chalk=require("chalk"),{Boom}=require('@hapi/boom'),{smsgs}=require('./library/serialize'),clean=j=>j?j.toString().replace(/[^0-9]/g,""):"";let dbPath='./database/groupSettings.json',settingsPath='./database/settings.json';try{fs.existsSync('./database')||fs.mkdirSync('./database',{recursive:!0}),fs.writeFileSync(dbPath,'{}',{flag:'a'}),fs.existsSync(settingsPath)||fs.writeFileSync(settingsPath,'{}')}catch{dbPath='/tmp/groupSettings.json',settingsPath='/tmp/settings.json'}let globalSettings={autoread:!1,autotyping:!1,autorecording:!1,autoreact:!1,antidelete:!1,antiedit:!1};try{const s=JSON.parse(fs.readFileSync(settingsPath));s.global&&(globalSettings={...globalSettings,...s.global})}catch{}let messageHandler;try{messageHandler=require("./message")}catch{messageHandler=async()=>{}}let isRestarting=!1;const question=t=>{const rl=readline.createInterface({input:process.stdin,output:process.stdout});return new Promise(res=>rl.question(chalk.yellow(t),ans=>{res(ans),rl.close()}))},FW=["🌟 Welcome @user! 🎉","👋 @user joined!"],FG=["🚶‍♂️ @user left.","😢 @user gone."],FD=["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"],FE=["✏️ Original:","📝 Edit detected!"];let alwaysOnlineInterval=null;const applyAlwaysOnline=async(sock)=>{try{const cfg=JSON.parse(fs.readFileSync(settingsPath)),alwaysOn=(cfg.global&&cfg.global.alwaysonline)?cfg.global.alwaysonline:!1,fakeSeen=(cfg.global&&cfg.global.fakelastseen)?cfg.global.fakelastseen:!1;alwaysOnlineInterval&&clearInterval(alwaysOnlineInterval);if(fakeSeen)await sock.sendPresenceUpdate('unavailable');else if(alwaysOn){alwaysOnlineInterval=setInterval(async()=>{await sock.sendPresenceUpdate('available')},30000);await sock.sendPresenceUpdate('available')}else await sock.sendPresenceUpdate('unavailable')}catch{}};const clientstart=async()=>{await loadBaileys();const p=`./${config().session}`,{state,saveCreds}=await useMultiFileAuthState(p),{version}=await fetchLatestBaileysVersion(),s=makeWASocket({logger:pino({level:"silent"}),printQRInTerminal:!config().status.terminal,auth:state,version,browser:Browsers.macOS('Chrome'),syncFullHistory:!0,markOnlineOnConnect:!1});s.decodeJid=j=>{if(!j)return j;if(/:\d+@/gi.test(j)){let d=jidDecode(j)||{};return d.user&&d.server?d.user+'@'+d.server:j}return j};const store=new Map;if(config().status.terminal&&!s.authState.creds.registered){const n=await question('📱 Number:\n'),c=await s.requestPairingCode(n);console.log(chalk.green(`🔥 CODE: ${c}`))}s.ev.on('creds.update',saveCreds),s.ev.on('connection.update',async u=>{const{connection:co,lastDisconnect:ld}=u;if(co==='open'){console.log('✅ Connected!');try{await new Promise(r=>setTimeout(r,3000));await s.newsletterFollow(config().newsletter.id+'@newsletter')}catch{}try{await new Promise(r=>setTimeout(r,4000));const bj=s.user.id,bn=config().settings?.title||'Alpha',rl="https://github.com/Alexio11-09/alpha-xmd",cl=`https://whatsapp.com/channel/${config().newsletter.id}`,oc="wa.me/263786641436",msg=`╭───〔 🤖 *${bn}* 〕───⬣\n\n✅ *Online*\n👑 *Owner:* Alpha\n📞 ${oc}\n📂 ${rl}\n📢 ${cl}\n\n🔥 Ready.`;await s.sendMessage(bj,{text:msg,contextInfo:{forwardingScore:999,isForwarded:!0,forwardedNewsletterMessageInfo:{newsletterJid:config().newsletter.id+"@newsletter",newsletterName:config().newsletter.name}}})}catch{}applyAlwaysOnline(s)}if(co==='close'){alwaysOnlineInterval&&clearInterval(alwaysOnlineInterval);if(new Boom(ld?.error)?.output?.statusCode===DisconnectReason.loggedOut)process.exit(0);isRestarting||(isRestarting=!0,setTimeout(()=>{clientstart(),isRestarting=!1},5000))}}}),s.ev.on('messages.upsert',async({messages})=>{if(!messages||!messages[0])return;const m=messages[0];if(m.key?.remoteJid==='status@broadcast'){const h=require("./plugins/autostatus").handleStatusUpdate;h&&await h(s,{messages:[m]})}});const cj=config().newsletter.id+'@newsletter';s.ev.on('messages.upsert',async({messages})=>{if(!messages||!messages[0])return;const m=messages[0];if(m.key?.remoteJid!==cj)return;try{const sv=JSON.parse(fs.readFileSync(settingsPath));sv.global&&(globalSettings={...globalSettings,...sv.global})}catch{}const cr=globalSettings.chreact||{enabled:!1,emojis:['💬']};if(!cr.enabled)return;for(const e of cr.emojis){try{s.newsletterReact?await s.newsletterReact(cj,m.key.id,e):await s.relayMessage(cj,{reactionMessage:{key:{remoteJid:cj,id:m.key.id,fromMe:!1},text:e,senderTimestampMs:Date.now()}},{});await new Promise(r=>setTimeout(r,1000))}catch{}}}),s.ev.on('messages.upsert',async cu=>{try{const ms=cu.messages;if(!ms?.length)return;for(let mk of ms){if(!mk.message)continue;if(mk.key.fromMe){const tx=mk.message?.conversation||mk.message?.extendedTextMessage?.text||"";if(!tx.startsWith("."))continue}if(mk.key?.remoteJid==="status@broadcast"||mk.key?.remoteJid===cj)continue;const m=await smsgs(s,mk),md='./database/messageCount.json';fs.existsSync('./database')||fs.mkdirSync('./database',{recursive:!0}),fs.existsSync(md)||fs.writeFileSync(md,'{}');try{const r=fs.readFileSync(md,'utf-8'),c=JSON.parse(r.length?r:'{}');c[m.chat]=c[m.chat]||{},c[m.chat][m.sender]=(c[m.chat][m.sender]||0)+1,fs.writeFileSync(md,JSON.stringify(c,null,2))}catch{}store.set(mk.key.id,{text:m.text||"",message:mk.message,sender:m.sender,pushName:m.pushName||null});if(m.isGroup){try{const g=await s.groupMetadata(m.chat),ps=g.participants,sd=s.decodeJid(m.sender),sn=sd.split('@')[0].replace(/[^0-9]/g,'');m.isAdmin=ps.some(p=>{const pj=s.decodeJid(p.id),pn=pj.split('@')[0].replace(/[^0-9]/g,'');return pn===sn&&(p.admin==='admin'||p.admin===!0)}),m.isBotAdmin=!0}catch{m.isAdmin=!1,m.isBotAdmin=!0}}globalSettings.autoread&&await s.readMessages([mk.key]),globalSettings.autotyping&&await s.sendPresenceUpdate('composing',m.chat),globalSettings.autorecording&&await s.sendPresenceUpdate('recording',m.chat);if(globalSettings.autoreact){const tx=mk.message?.conversation||mk.message?.extendedTextMessage?.text||"";if(!tx.startsWith(".")){const em=["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];await s.sendMessage(m.chat,{react:{text:em[Math.floor(Math.random()*em.length)],key:mk.key}})}}await messageHandler(s,m)}}catch{}}),s.ev.on('messages.update',async us=>{try{try{const sv=JSON.parse(fs.readFileSync(settingsPath));sv.global&&(globalSettings={...globalSettings,...sv.global})}catch{}const ad=globalSettings.antidelete||{enabled:!1,mode:'chat',style:'fancy',react:!0},oj=(config().owner?.[0]||'').replace(/[^0-9]/g,'')+'@s.whatsapp.net';for(let u of us){const om=store.get(u.key.id);if(!om)continue;if(u.update.message===null){if(!ad.enabled)continue;const cd=u.key.remoteJid,ig=cd.endsWith('@g.us'),sj=om.sender||u.key.participant||cd,sn=sj.split('@')[0],sp=om.pushName&&om.pushName.trim()!==''?om.pushName:sn;let cn='Private';if(ig)try{const gm=await s.groupMetadata(cd);cn=gm.subject}catch{cn='Group'}const n=new Date,ti=n.toLocaleTimeString(),da=n.toLocaleDateString();let tx;if(ad.style==='fancy'){if(ig)tx=`╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${sn}\n│ 📍 ${cn}\n│ 🕒 ${ti}\n│ 📅 ${da}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(om.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;else tx=`╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${sp}\n│ 📍 Private\n│ 🕒 ${ti}\n│ 📅 ${da}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(om.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`}else tx=FD[Math.floor(Math.random()*FD.length)]+`\n\n${om.text||'Media'}`;const mn=ig&&ad.style==='fancy'&&sj!==s.user.id?[sj]:[],ds=[];(ad.mode==='chat'||ad.mode==='both')&&ds.push(cd),(ad.mode==='owner'||ad.mode==='both')&&oj&&ds.push(oj);for(const d of ds){const op={};mn.length>0&&d===cd&&(op.mentions=mn),ad.style==='fancy'?await s.sendMessage(d,{text:tx,contextInfo:{forwardingScore:999,isForwarded:!0,forwardedNewsletterMessageInfo:{newsletterJid:config().newsletter.id+"@newsletter",newsletterName:config().newsletter.name}},...op}):await s.sendMessage(d,{text:tx,...op}),ad.react&&d===cd&&(try{await s.sendMessage(d,{react:{text:'👀',key:u.key}})}catch{})}}if(globalSettings.antiedit&&u.update?.message){let nt="";try{const mg=u.update.message,ty=Object.keys(mg)[0];nt=mg[ty]?.text||mg[ty]?.caption||""}catch{}om?.text&&nt&&om.text!==nt&&await s.sendMessage(u.key.remoteJid,{text:`${FE[Math.floor(Math.random()*FE.length)]}\n\n📌 Old: ${om.text}\n🆕 New: ${nt}`})}}}catch{}}),s.ev.on('group-participants.update',async u=>{try{const{id,participants,action}=u;let gs={welcome:!1,welcomeMsg:FW[Math.floor(Math.random()*FW.length)],goodbye:!1,goodbyeMsg:FG[Math.floor(Math.random()*FG.length)]};try{const a=JSON.parse(fs.readFileSync(dbPath));gs=a[id]||gs}catch{}if(action==='add'&&gs.welcome)for(let u of participants){const m=gs.welcomeMsg.replace(/@user/g,`@${u.split("@")[0]}`);await s.sendMessage(id,{text:m,mentions:[u]})}if(action==='remove'&&gs.goodbye)for(let u of participants){const m=gs.goodbyeMsg.replace(/@user/g,`@${u.split("@")[0]}`);await s.sendMessage(id,{text:m,mentions:[u]})}}catch{}}),s.public=!0};clientstart();
+// © 2026 Alpha. All Rights Reserved.
+
+const fs = require("fs");
+const { execSync } = require("child_process");
+
+const modules = [
+  "pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios",
+  "node-fetch","yt-search","form-data","file-type","moment-timezone",
+  "human-readable","fluent-ffmpeg","@ffmpeg-installer/ffmpeg",
+  "crypto-js","adm-zip"
+];
+
+modules.forEach(mod => {
+  try { require.resolve(mod); } catch {
+    execSync(`npm install ${mod} --force`, { stdio: "inherit" });
+  }
+});
+
+console.clear();
+
+const config = () => require('./settings/config');
+process.on("uncaughtException", () => {});
+
+let makeWASocket, Browsers, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, jidDecode;
+
+const loadBaileys = async () => {
+  const baileys = await import('@whiskeysockets/baileys');
+  makeWASocket = baileys.default;
+  Browsers = baileys.Browsers;
+  useMultiFileAuthState = baileys.useMultiFileAuthState;
+  DisconnectReason = baileys.DisconnectReason;
+  fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
+  jidDecode = baileys.jidDecode;
+};
+
+const pino = require('pino');
+const readline = require("readline");
+const chalk = require("chalk");
+const { Boom } = require('@hapi/boom');
+const { smsg } = require('./library/serialize');
+
+// Import the reliable auto‑status handler
+let autoStatusHandler;
+try {
+    autoStatusHandler = require("./plugins/autostatus");
+} catch {
+    autoStatusHandler = { handleStatusUpdate: () => {} };
+}
+
+const clean = (jid) => {
+    if (!jid) return "";
+    try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; }
+};
+
+let dbPath = './database/groupSettings.json';
+let settingsPath = './database/settings.json';
+try {
+    if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
+    fs.writeFileSync(dbPath, '{}', { flag: 'a' });
+    if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}');
+} catch {
+    dbPath = '/tmp/groupSettings.json';
+    settingsPath = '/tmp/settings.json';
+}
+
+let globalSettings = {
+    autoread: false, autotyping: false, autorecording: false, autoreact: false,
+    antidelete: false, antiedit: false
+};
+
+try {
+    const saved = JSON.parse(fs.readFileSync(settingsPath));
+    if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
+} catch (err) {}
+
+let messageHandler;
+try { messageHandler = require("./message"); } catch { messageHandler = async () => {}; }
+
+let isRestarting = false;
+
+const question = (text) => {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
+};
+
+// ==================== FUNNY DEFAULT MESSAGES ====================
+const funnyWelcomes = [
+    "🌟 A new legend has arrived! Welcome @user! 🎉",
+    "👋 Look who decided to join us! Welcome @user! 🥳"
+];
+
+const funnyGoodbyes = [
+    "🚶‍♂️ @user has left the building. We'll miss the vibes.",
+    "😢 Another one bites the dust. Goodbye @user!"
+];
+
+const funnyDeleted = [
+    "🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️",
+    "📝 Deleted message rescued:"
+];
+
+const funnyEdited = [
+    "✏️ A message was edited. Here's the original:",
+    "📝 Edit detected! Original version:"
+];
+
+// ==================== ALWAYSONLINE + FAKELASTSEEN ====================
+let alwaysOnlineInterval = null;
+
+const applyAlwaysOnline = async (sock) => {
+    try {
+        const cfg = JSON.parse(fs.readFileSync(settingsPath));
+        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
+        const fakeSeen = (cfg.global && cfg.global.fakelastseen) ? cfg.global.fakelastseen : false;
+
+        if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
+
+        if (fakeSeen) {
+            await sock.sendPresenceUpdate('unavailable');
+        } else if (alwaysOn) {
+            alwaysOnlineInterval = setInterval(async () => {
+                await sock.sendPresenceUpdate('available');
+            }, 30000);
+            await sock.sendPresenceUpdate('available');
+        } else {
+            await sock.sendPresenceUpdate('unavailable');
+        }
+    } catch {}
+};
+
+const clientstart = async () => {
+  await loadBaileys();
+  const sessionPath = `./${config().session}`;
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+  const { version } = await fetchLatestBaileysVersion();
+
+  const sock = makeWASocket({
+    logger: pino({ level: "silent" }),
+    printQRInTerminal: !config().status.terminal,
+    auth: state,
+    version,
+    browser: Browsers.macOS('Chrome'),
+    syncFullHistory: true,
+    markOnlineOnConnect: false
+  });
+
+  sock.decodeJid = (jid) => {
+    if (!jid) return jid;
+    if (/:\d+@/gi.test(jid)) {
+      let d = jidDecode(jid) || {};
+      return d.user && d.server ? d.user + '@' + d.server : jid;
+    }
+    return jid;
+  };
+
+  const store = new Map();
+
+  if (config().status.terminal && !sock.authState.creds.registered) {
+    const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
+    const code = await sock.requestPairingCode(phoneNumber);
+    console.log(chalk.green(`🔥 CODE: ${code}`));
+  }
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'open') {
+      console.log('✅ Bot Connected!');
+
+      // ---- AUTO FOLLOW CHANNEL ----
+      const followChannel = async () => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          const newsletterJid = config().newsletter.id + '@newsletter';
+          await sock.newsletterFollow(newsletterJid);
+        } catch (err) {}
+      };
+      followChannel();
+
+      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER ----
+      const sendConnectionDM = async () => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 4000));
+          const botJid = sock.user.id;
+          const botName = config().settings?.title || 'Alpha Bot';
+          const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
+          const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
+          const ownerContact = "wa.me/263786641436";
+
+          const message = `╭───〔  🤖 *${botName}*  〕───⬣\n\n` +
+            `✅ *Bot Online*\n` +
+            `👑 *Owner:* Alpha\n` +
+            `📞 *Contact:* ${ownerContact}\n` +
+            `📂 *Repo:* ${repoLink}\n` +
+            `📢 *Channel:* ${channelLink}\n\n` +
+            `🔥 Ready to use.`;
+
+          await sock.sendMessage(botJid, {
+            text: message,
+            contextInfo: {
+              forwardingScore: 999,
+              isForwarded: true,
+              forwardedNewsletterMessageInfo: {
+                newsletterJid: config().newsletter.id + "@newsletter",
+                newsletterName: config().newsletter.name
+              }
+            }
+          });
+        } catch (err) {}
+      };
+      sendConnectionDM();
+
+      // ---- APPLY ALWAYSONLINE / FAKELASTSEEN ----
+      applyAlwaysOnline(sock);
+    }
+    if (connection === 'close') {
+      if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
+      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      if (statusCode === DisconnectReason.loggedOut) process.exit(0);
+      if (!isRestarting) {
+        isRestarting = true;
+        setTimeout(() => { clientstart(); isRestarting = false; }, 5000);
+      }
+    }
+  });
+
+  // ========== STATUS EVENTS (FIXED) ==========
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    if (!messages || !messages[0]) return;
+    const msg = messages[0];
+    if (msg.key?.remoteJid === 'status@broadcast') {
+      try {
+        const handler = require("./plugins/autostatus").handleStatusUpdate;
+        if (handler) await handler(sock, { messages: [msg] });
+      } catch {}
+    }
+  });
+
+  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
+  const channelJid = config().newsletter.id + '@newsletter';
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    if (!messages || !messages[0]) return;
+    const msg = messages[0];
+    if (msg.key?.remoteJid !== channelJid) return;
+
+    try {
+        const saved = JSON.parse(fs.readFileSync(settingsPath));
+        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
+    } catch {}
+
+    const crConfig = globalSettings.chreact || { enabled: false, emojis: ['💬'] };
+    if (!crConfig.enabled) return;
+
+    for (const emoji of crConfig.emojis) {
+      try {
+        if (sock.newsletterReact) {
+          await sock.newsletterReact(channelJid, msg.key.id, emoji);
+        } else {
+          await sock.relayMessage(channelJid, {
+            reactionMessage: {
+              key: { remoteJid: channelJid, id: msg.key.id, fromMe: false },
+              text: emoji,
+              senderTimestampMs: Date.now()
+            }
+          }, {});
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (err) {}
+    }
+  });
+
+  // ========== MAIN MESSAGE HANDLER ==========
+  sock.ev.on('messages.upsert', async (chatUpdate) => {
+    try {
+      const messages = chatUpdate.messages;
+      if (!messages?.length) return;
+
+      try {
+        const saved = JSON.parse(fs.readFileSync(settingsPath));
+        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
+      } catch (err) {}
+
+      for (let mek of messages) {
+        if (!mek.message) continue;
+
+        if (mek.key.fromMe) {
+            const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+            if (!txt.startsWith(".")) continue;
+        }
+
+        if (mek.key?.remoteJid === "status@broadcast") continue;
+        if (mek.key?.remoteJid === channelJid) continue;
+
+        const m = await smsg(sock, mek);
+
+        // 🔢 INCREMENT MESSAGE COUNT FOR RANK
+        const msgDbPath = './database/messageCount.json';
+        if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
+        if (!fs.existsSync(msgDbPath)) fs.writeFileSync(msgDbPath, '{}');
+        try {
+            const raw = fs.readFileSync(msgDbPath, 'utf-8');
+            const counts = JSON.parse(raw.length ? raw : '{}');
+            counts[m.chat] = counts[m.chat] || {};
+            counts[m.chat][m.sender] = (counts[m.chat][m.sender] || 0) + 1;
+            fs.writeFileSync(msgDbPath, JSON.stringify(counts, null, 2));
+        } catch (countErr) {}
+
+        // Store message for antidelete
+        store.set(mek.key.id, {
+            text: m.text || "",
+            message: mek.message,
+            sender: m.sender,
+            pushName: m.pushName || null
+        });
+
+        if (m.isGroup) {
+          try {
+            const metadata = await sock.groupMetadata(m.chat);
+            const participants = metadata.participants;
+            const senderJidDecoded = sock.decodeJid(m.sender);
+            const senderNumber = senderJidDecoded.split('@')[0].replace(/[^0-9]/g, '');
+            m.isAdmin = participants.some(p => {
+              const pJid = sock.decodeJid(p.id);
+              const pNumber = pJid.split('@')[0].replace(/[^0-9]/g, '');
+              return pNumber === senderNumber && (p.admin === 'admin' || p.admin === true);
+            });
+            m.isBotAdmin = true;
+          } catch (err) { m.isAdmin = false; m.isBotAdmin = true; }
+        }
+
+        if (globalSettings.autoread) await sock.readMessages([mek.key]);
+        if (globalSettings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
+        if (globalSettings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
+
+        // ---- AUTOREACT ----
+        if (globalSettings.autoreact) {
+          const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+          if (!txt.startsWith(".")) {
+            const emojis = ["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
+            await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: mek.key } });
+          }
+        }
+
+        await messageHandler(sock, m);
+        await new Promise(r => setTimeout(r, 200));
+      }
+    } catch (err) {}
+  });
+
+  // ANTIDELETE + ANTIEDIT
+  sock.ev.on('messages.update', async (updates) => {
+    try {
+      try {
+        const saved = JSON.parse(fs.readFileSync(settingsPath));
+        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
+      } catch {}
+
+      const adConfig = globalSettings.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+      const ownerJid = (config().owner?.[0] || '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+      for (let update of updates) {
+        const oldMsg = store.get(update.key.id);
+        if (!oldMsg) continue;
+
+        if (update.update.message === null) {
+          if (!adConfig.enabled) continue;
+
+          const chatJidDel = update.key.remoteJid;
+          const isGroup = chatJidDel.endsWith('@g.us');
+          const senderJidDel = oldMsg.sender || update.key.participant || chatJidDel;
+          const senderNumber = senderJidDel.split('@')[0];
+          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== ''
+            ? oldMsg.pushName
+            : senderNumber;
+
+          let chatName = 'Private Chat';
+          if (isGroup) {
+            try {
+              const gm = await sock.groupMetadata(chatJidDel);
+              chatName = gm.subject;
+            } catch { chatName = 'Group'; }
+          }
+
+          const now = new Date();
+          const time = now.toLocaleTimeString();
+          const date = now.toLocaleDateString();
+
+          let text;
+          if (adConfig.style === 'fancy') {
+            if (isGroup) {
+              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+            } else {
+              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+            }
+          } else {
+            const funny = ["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"];
+            text = funny[0] + `\n\n${oldMsg.text || 'Media'}`;
+          }
+
+          const mentions = isGroup && adConfig.style === 'fancy' && senderJidDel !== sock.user.id ? [senderJidDel] : [];
+          const destinations = [];
+          if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJidDel);
+          if ((adConfig.mode === 'owner' || adConfig.mode === 'both') && ownerJid) destinations.push(ownerJid);
+
+          for (const dest of destinations) {
+            const opts = {};
+            if (mentions.length > 0 && dest === chatJidDel) opts.mentions = mentions;
+            if (adConfig.style === 'fancy') {
+              await sock.sendMessage(dest, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config().newsletter.id + "@newsletter", newsletterName: config().newsletter.name } }, ...opts });
+            } else {
+              await sock.sendMessage(dest, { text, ...opts });
+            }
+            if (adConfig.react && dest === chatJidDel) { try { await sock.sendMessage(dest, { react: { text: '👀', key: update.key } }); } catch {} }
+          }
+        }
+
+        if (globalSettings.antiedit && update.update?.message) {
+          let newText = "";
+          try { const msg = update.update.message; const type = Object.keys(msg)[0]; newText = msg[type]?.text || msg[type]?.caption || ""; } catch {}
+          if (oldMsg?.text && newText && oldMsg.text !== newText) {
+            await sock.sendMessage(update.key.remoteJid, { text: `✏️ Edited.\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}` });
+          }
+        }
+      }
+    } catch (err) {}
+  });
+
+  // WELCOME & GOODBYE
+  sock.ev.on('group-participants.update', async (update) => {
+    try {
+      const { id, participants, action } = update;
+      let gs = { welcome: false, welcomeMsg: funnyWelcomes[Math.floor(Math.random() * funnyWelcomes.length)], goodbye: false, goodbyeMsg: funnyGoodbyes[Math.floor(Math.random() * funnyGoodbyes.length)] };
+      try { const all = JSON.parse(fs.readFileSync(dbPath)); gs = all[id] || gs; } catch {}
+
+      if (action === 'add' && gs.welcome) {
+        for (let user of participants) {
+          const msg = gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
+          await sock.sendMessage(id, { text: msg, mentions: [user] });
+        }
+      }
+      if (action === 'remove' && gs.goodbye) {
+        for (let user of participants) {
+          const msg = gs.goodbyeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
+          await sock.sendMessage(id, { text: msg, mentions: [user] });
+        }
+      }
+    } catch (err) {}
+  });
+
+  sock.public = true;
+};
+
+clientstart();
