@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (FULL MENU – DUPLICATES FIXED, VERTICAL FORMAT)
+// © 2026 Alpha - GENERAL COMMANDS (FULL UPDATED MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -36,7 +36,7 @@ const getCountry = (jid) => {
 };
 
 module.exports = [
-    // ==================== 1. MENU ====================
+    // ==================== 1. MENU (COMPLETE) ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
@@ -53,7 +53,6 @@ module.exports = [
                     edit: loadMsg.key
                 });
 
-                // EVIL JORDAN INTRO – upload your own MP3 to catbox.moe and replace this link
                 const menuSongUrl = config.settings?.menuSongUrl ||
                     "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";
 
@@ -251,15 +250,7 @@ module.exports = [
 │ • .delserver
 │ • .listservers
 │ • .sendpanel
-│ • .1gb
-│ • .2gb
-│ • .3gb
-│ • .4gb
-│ • .5gb
-│ • .6gb
-│ • .7gb
-│ • .8gb
-│ • .9gb
+│ • .1gb…9gb
 │ • .unli
 │ • .admin
 │ • .addprem
@@ -344,6 +335,7 @@ module.exports = [
 │ • .device
 │ • .browse
 │ • .fancy
+│ • .font
 │ • .carbon
 │ • .obfuscate
 │ • .calc
@@ -387,9 +379,7 @@ module.exports = [
 
 ╭───〔 🎨 PHOTO EFFECTS 〕───⬣
 │ • .zombie
-│ • .figure
-│ • .figure2
-│ • .figure3
+│ • .figure / .figure2 / .figure3
 │ • .underground
 │ • .oldage
 │ • .turky
@@ -401,10 +391,8 @@ module.exports = [
 │ • .spirit
 │ • .toroblox
 │ • .mirror
-│ • .partner
-│ • .partner2
-│ • .bf
-│ • .gf
+│ • .partner / .partner2
+│ • .bf / .gf
 │ • .polaroid
 │ • .punk
 │ • .piramid
@@ -417,8 +405,7 @@ module.exports = [
 │ • .maid
 │ • .glasses
 │ • .cambodia
-│ • .japan
-│ • .japanese
+│ • .japan / .japanese
 │ • .hijab
 │ • .hitam
 │ • .vintage
@@ -473,12 +460,7 @@ module.exports = [
 │ • .ship
 │ • .hug
 │ • .emojimix
-│ • .wcg start
-│ • .wcg join
-│ • .wcg leave
-│ • .wcg status
-│ • .wcg stop
-│ • .wcg leaderboard
+│ • .wcg start / join / leave / status / stop / leaderboard
 ╰────────────⬣
 
 ╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
@@ -811,7 +793,7 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 7. PAIR ====================
+    // ==================== 7. PAIR (UPDATED – uses shared library) ====================
     {
         command: "pair",
         aliases: ["pairing", "session"],
@@ -826,6 +808,10 @@ ${config.settings.footer}
             try {
                 const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = await import('@whiskeysockets/baileys');
                 const pino = require('pino');
+                const os = require('os');
+                const path = require('path');
+                const fs = require('fs');
+
                 const tempDir = path.join(os.tmpdir(), `pair_${rawNumber}_${Date.now()}`);
                 fs.mkdirSync(tempDir, { recursive: true });
 
@@ -833,27 +819,53 @@ ${config.settings.footer}
                 const { version } = await fetchLatestBaileysVersion();
 
                 const tempSock = makeWASocket({
-                    auth: state, version, browser: Browsers.macOS('Chrome'),
-                    logger: pino({ level: 'silent' }), printQRInTerminal: false, connectTimeoutMs: 30000
+                    auth: state,
+                    version,
+                    browser: Browsers.macOS('Chrome'),
+                    logger: pino({ level: 'silent' }),
+                    printQRInTerminal: false,
+                    connectTimeoutMs: 30000
                 });
 
-                let pairingCode = null, settled = false;
+                let pairingCode = null;
+                let settled = false;
+
                 await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => { if (!settled) { settled = true; reject(new Error("Timeout")); } }, 45000);
+                    const timeout = setTimeout(() => {
+                        if (!settled) { settled = true; reject(new Error("Pairing timed out.")); }
+                    }, 45000);
+
                     tempSock.ev.on('connection.update', async (update) => {
                         const { connection } = update;
                         if (connection === 'connecting' && !settled) {
-                            settled = true; clearTimeout(timeout);
-                            try { pairingCode = await tempSock.requestPairingCode(rawNumber); resolve(); } catch (err) { reject(err); }
+                            settled = true;
+                            clearTimeout(timeout);
+                            try {
+                                pairingCode = await tempSock.requestPairingCode(rawNumber);
+                                resolve();
+                            } catch (err) { reject(err); }
                         }
-                        if (connection === 'close' && !settled) { settled = true; clearTimeout(timeout); reject(new Error("Closed")); }
+                        if (connection === 'close' && !settled) {
+                            settled = true;
+                            clearTimeout(timeout);
+                            reject(new Error("Connection closed"));
+                        }
                     });
                 });
 
-                tempSock.end(); fs.rmSync(tempDir, { recursive: true, force: true });
-                if (!pairingCode) throw new Error("No code");
+                tempSock.end();
+                fs.rmSync(tempDir, { recursive: true, force: true });
 
-                reply(`✅ *Pairing Code Ready*\n\n📞 *Number:* +${rawNumber}\n🔢 *Code:* *${pairingCode}*\n\n⏱️ Expires in 60s.\n📱 WhatsApp → Linked devices → Link with phone number.`);
+                if (!pairingCode) throw new Error("No pairing code obtained");
+
+                reply(
+                    `✅ *Pairing Code Ready*\n\n` +
+                    `📞 *Number:* +${rawNumber}\n` +
+                    `🔢 *Code:* *${pairingCode}*\n\n` +
+                    `⏱️ Expires in 60 seconds.\n` +
+                    `📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+                );
+
             } catch (err) {
                 console.error('Pair error:', err);
                 reply(`❌ Pairing failed: ${err.message || String(err)}`);
