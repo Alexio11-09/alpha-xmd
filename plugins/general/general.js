@@ -36,7 +36,6 @@ const getCountry = (jid) => {
 };
 
 module.exports = [
-    // ==================== 1. MENU (COMPLETE) ====================
     {
         command: "menu",
         aliases: ["help", "commands"],
@@ -539,6 +538,7 @@ module.exports = [
 │ • .resetprefix
 │ • .chreact
 │ • .alwaysonline
+│ • .fakelastseen on/off
 │ • .antibug
 │ • .antiviewonce
 │ • .autobio
@@ -686,7 +686,6 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 2. PING ====================
     {
         command: "ping",
         aliases: ["p"],
@@ -704,7 +703,6 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 3. ALIVE ====================
     {
         command: "alive",
         aliases: ["online", "test"],
@@ -726,7 +724,6 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 4. BOT INFO ====================
     {
         command: "info",
         aliases: ["botinfo", "status"],
@@ -751,7 +748,6 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 5. OWNER CONTACT ====================
     {
         command: "owner",
         aliases: ["creator", "dev"],
@@ -772,7 +768,6 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 6. REPO ====================
     {
         command: "repo",
         aliases: ["source", "github", "sc"],
@@ -793,7 +788,6 @@ ${config.settings.footer}
         }
     },
 
-    // ==================== 7. PAIR (UPDATED – uses shared library) ====================
     {
         command: "pair",
         aliases: ["pairing", "session"],
