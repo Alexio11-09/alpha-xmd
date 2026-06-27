@@ -104,6 +104,31 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
+// ==================== ALWAYSONLINE + FAKELASTSEEN ====================
+let alwaysOnlineInterval = null;
+
+const applyAlwaysOnline = async (sock) => {
+    try {
+        const cfg = JSON.parse(fs.readFileSync(settingsPath));
+        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
+        const fakeSeen = (cfg.global && cfg.global.fakelastseen) ? cfg.global.fakelastseen : false;
+
+        if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
+
+        if (fakeSeen) {
+            // Fake last seen ON – go unavailable so WhatsApp shows old timestamp
+            await sock.sendPresenceUpdate('unavailable');
+        } else if (alwaysOn) {
+            alwaysOnlineInterval = setInterval(async () => {
+                await sock.sendPresenceUpdate('available');
+            }, 30000);
+            await sock.sendPresenceUpdate('available');
+        } else {
+            await sock.sendPresenceUpdate('unavailable');
+        }
+    } catch {}
+};
+
 const clientstart = async () => {
   await loadBaileys();
   const sessionPath = `./${config().session}`;
@@ -158,11 +183,11 @@ const clientstart = async () => {
       };
       followChannel();
 
-      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER (NOT THE DEV) ----
+      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER ----
       const sendConnectionDM = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 4000));
-          const botJid = sock.user.id;   // ✅ bot's own number, no dev exposure
+          const botJid = sock.user.id;
           const botName = config().settings?.title || 'Alpha Bot';
           const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
           const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
@@ -193,8 +218,12 @@ const clientstart = async () => {
         }
       };
       sendConnectionDM();
+
+      // ---- APPLY ALWAYSONLINE / FAKELASTSEEN ----
+      applyAlwaysOnline(sock);
     }
     if (connection === 'close') {
+      if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
       if (!isRestarting) {
