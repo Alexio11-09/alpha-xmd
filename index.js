@@ -39,14 +39,6 @@ const chalk = require("chalk");
 const { Boom } = require('@hapi/boom');
 const { smsg } = require('./library/serialize');
 
-// Import the reliable auto‑status handler
-let autoStatusHandler;
-try {
-    autoStatusHandler = require("./plugins/autostatus");
-} catch {
-    autoStatusHandler = { handleStatusUpdate: () => {} };
-}
-
 const clean = (jid) => {
     if (!jid) return "";
     try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; }
@@ -83,28 +75,11 @@ const question = (text) => {
   return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
 };
 
-// ==================== FUNNY DEFAULT MESSAGES ====================
-const funnyWelcomes = [
-    "🌟 A new legend has arrived! Welcome @user! 🎉",
-    "👋 Look who decided to join us! Welcome @user! 🥳"
-];
+const funnyWelcomes = ["🌟 A new legend has arrived! Welcome @user! 🎉","👋 Look who decided to join us! Welcome @user! 🥳"];
+const funnyGoodbyes = ["🚶‍♂️ @user has left the building. We'll miss the vibes.","😢 Another one bites the dust. Goodbye @user!"];
+const funnyDeleted = ["🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️","📝 Deleted message rescued:"];
+const funnyEdited = ["✏️ A message was edited. Here's the original:","📝 Edit detected! Original version:"];
 
-const funnyGoodbyes = [
-    "🚶‍♂️ @user has left the building. We'll miss the vibes.",
-    "😢 Another one bites the dust. Goodbye @user!"
-];
-
-const funnyDeleted = [
-    "🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️",
-    "📝 Deleted message rescued:"
-];
-
-const funnyEdited = [
-    "✏️ A message was edited. Here's the original:",
-    "📝 Edit detected! Original version:"
-];
-
-// ==================== ALWAYSONLINE + FAKELASTSEEN ====================
 let alwaysOnlineInterval = null;
 
 const applyAlwaysOnline = async (sock) => {
@@ -168,7 +143,6 @@ const clientstart = async () => {
     if (connection === 'open') {
       console.log('✅ Bot Connected!');
 
-      // ---- AUTO FOLLOW CHANNEL ----
       const followChannel = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 3000));
@@ -178,7 +152,6 @@ const clientstart = async () => {
       };
       followChannel();
 
-      // ---- SEND CONNECTION DM TO BOT'S OWN NUMBER ----
       const sendConnectionDM = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 4000));
@@ -211,7 +184,6 @@ const clientstart = async () => {
       };
       sendConnectionDM();
 
-      // ---- APPLY ALWAYSONLINE / FAKELASTSEEN ----
       applyAlwaysOnline(sock);
     }
     if (connection === 'close') {
@@ -225,7 +197,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS (FIXED – direct require) ==========
+  // ========== STATUS EVENTS ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
@@ -237,7 +209,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
+  // ========== CHANNEL AUTO‑REACT ==========
   const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
@@ -276,11 +248,6 @@ const clientstart = async () => {
       const messages = chatUpdate.messages;
       if (!messages?.length) return;
 
-      try {
-        const saved = JSON.parse(fs.readFileSync(settingsPath));
-        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
-      } catch (err) {}
-
       for (let mek of messages) {
         if (!mek.message) continue;
 
@@ -294,7 +261,6 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔢 INCREMENT MESSAGE COUNT FOR RANK
         const msgDbPath = './database/messageCount.json';
         if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
         if (!fs.existsSync(msgDbPath)) fs.writeFileSync(msgDbPath, '{}');
@@ -332,7 +298,6 @@ const clientstart = async () => {
         if (globalSettings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
         if (globalSettings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
 
-        // ---- AUTOREACT ----
         if (globalSettings.autoreact) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) {
@@ -342,7 +307,6 @@ const clientstart = async () => {
         }
 
         await messageHandler(sock, m);
-        await new Promise(r => setTimeout(r, 200));
       }
     } catch (err) {}
   });
@@ -369,17 +333,10 @@ const clientstart = async () => {
           const isGroup = chatJidDel.endsWith('@g.us');
           const senderJidDel = oldMsg.sender || update.key.participant || chatJidDel;
           const senderNumber = senderJidDel.split('@')[0];
-          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== ''
-            ? oldMsg.pushName
-            : senderNumber;
+          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== '' ? oldMsg.pushName : senderNumber;
 
           let chatName = 'Private Chat';
-          if (isGroup) {
-            try {
-              const gm = await sock.groupMetadata(chatJidDel);
-              chatName = gm.subject;
-            } catch { chatName = 'Group'; }
-          }
+          if (isGroup) { try { const gm = await sock.groupMetadata(chatJidDel); chatName = gm.subject; } catch { chatName = 'Group'; } }
 
           const now = new Date();
           const time = now.toLocaleTimeString();
@@ -387,15 +344,9 @@ const clientstart = async () => {
 
           let text;
           if (adConfig.style === 'fancy') {
-            if (isGroup) {
-              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-            } else {
-              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-            }
-          } else {
-            const funny = ["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"];
-            text = funny[0] + `\n\n${oldMsg.text || 'Media'}`;
-          }
+            if (isGroup) text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+            else text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+          } else text = funnyDeleted[0] + `\n\n${oldMsg.text||'Media'}`;
 
           const mentions = isGroup && adConfig.style === 'fancy' && senderJidDel !== sock.user.id ? [senderJidDel] : [];
           const destinations = [];
