@@ -225,7 +225,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS (FIXED) ==========
+  // ========== STATUS EVENTS (FIXED – direct require) ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
@@ -306,7 +306,6 @@ const clientstart = async () => {
             fs.writeFileSync(msgDbPath, JSON.stringify(counts, null, 2));
         } catch (countErr) {}
 
-        // Store message for antidelete
         store.set(mek.key.id, {
             text: m.text || "",
             message: mek.message,
