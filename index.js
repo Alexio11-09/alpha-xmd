@@ -197,15 +197,27 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS ==========
+  // ========== STATUS EVENTS (BUILT‑IN VIEWER) ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
     if (msg.key?.remoteJid === 'status@broadcast') {
       try {
-        const handler = require("./plugins/autostatus").handleStatusUpdate;
-        if (handler) await handler(sock, { messages: [msg] });
-      } catch {}
+        // Read autostatus config
+        const cfg = JSON.parse(fs.readFileSync('./database/autoStatus.json'));
+        if (cfg && cfg.enabled) {
+          const participant = msg.key.participant || msg.key.remoteJid;
+          await sock.readMessages([{
+            remoteJid: 'status@broadcast',
+            id: msg.key.id,
+            participant,
+            fromMe: false
+          }]);
+          console.log('👁️ Viewed status from ' + participant.split('@')[0]);
+        }
+      } catch (e) {
+        // Silent — autostatus is off or config missing
+      }
     }
   });
 
