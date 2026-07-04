@@ -80,29 +80,6 @@ const funnyGoodbyes = ["🚶‍♂️ @user left.","😢 @user gone."];
 const funnyDeleted = ["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"];
 const funnyEdited = ["✏️ Original:","📝 Edit detected!"];
 
-let alwaysOnlineInterval = null;
-
-const applyAlwaysOnline = async (sock) => {
-    try {
-        const cfg = JSON.parse(fs.readFileSync(settingsPath));
-        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
-        const fakeSeen = (cfg.global && cfg.global.fakelastseen) ? cfg.global.fakelastseen : false;
-
-        if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-
-        if (fakeSeen) {
-            await sock.sendPresenceUpdate('unavailable');
-        } else if (alwaysOn) {
-            alwaysOnlineInterval = setInterval(async () => {
-                await sock.sendPresenceUpdate('available');
-            }, 30000);
-            await sock.sendPresenceUpdate('available');
-        } else {
-            await sock.sendPresenceUpdate('unavailable');
-        }
-    } catch {}
-};
-
 const clientstart = async () => {
   await loadBaileys();
   const sessionPath = `./${config().session}`;
@@ -183,11 +160,8 @@ const clientstart = async () => {
         } catch (err) {}
       };
       sendConnectionDM();
-
-      applyAlwaysOnline(sock);
     }
     if (connection === 'close') {
-      if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
       if (!isRestarting) {
@@ -197,19 +171,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS ==========
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    if (!messages || !messages[0]) return;
-    const msg = messages[0];
-    if (msg.key?.remoteJid === 'status@broadcast') {
-      try {
-        const handler = require("./plugins/autostatus").handleStatusUpdate;
-        if (handler) await handler(sock, { messages: [msg] });
-      } catch {}
-    }
-  });
-
-  // ========== CHANNEL AUTO‑REACT ==========
+  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
   const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
