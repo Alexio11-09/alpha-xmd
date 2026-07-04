@@ -75,10 +75,10 @@ const question = (text) => {
   return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
 };
 
-const funnyWelcomes = ["🌟 A new legend has arrived! Welcome @user! 🎉","👋 Look who decided to join us! Welcome @user! 🥳"];
-const funnyGoodbyes = ["🚶‍♂️ @user has left the building. We'll miss the vibes.","😢 Another one bites the dust. Goodbye @user!"];
-const funnyDeleted = ["🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️","📝 Deleted message rescued:"];
-const funnyEdited = ["✏️ A message was edited. Here's the original:","📝 Edit detected! Original version:"];
+const funnyWelcomes = ["🌟 Welcome @user! 🎉","👋 @user joined!"];
+const funnyGoodbyes = ["🚶‍♂️ @user left.","😢 @user gone."];
+const funnyDeleted = ["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"];
+const funnyEdited = ["✏️ Original:","📝 Edit detected!"];
 
 let alwaysOnlineInterval = null;
 
@@ -197,27 +197,15 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS (BUILT‑IN VIEWER) ==========
+  // ========== STATUS EVENTS ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
     if (msg.key?.remoteJid === 'status@broadcast') {
       try {
-        // Read autostatus config
-        const cfg = JSON.parse(fs.readFileSync('./database/autoStatus.json'));
-        if (cfg && cfg.enabled) {
-          const participant = msg.key.participant || msg.key.remoteJid;
-          await sock.readMessages([{
-            remoteJid: 'status@broadcast',
-            id: msg.key.id,
-            participant,
-            fromMe: false
-          }]);
-          console.log('👁️ Viewed status from ' + participant.split('@')[0]);
-        }
-      } catch (e) {
-        // Silent — autostatus is off or config missing
-      }
+        const handler = require("./plugins/autostatus").handleStatusUpdate;
+        if (handler) await handler(sock, { messages: [msg] });
+      } catch {}
     }
   });
 
