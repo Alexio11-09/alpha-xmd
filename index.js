@@ -70,11 +70,6 @@ try { messageHandler = require("./message"); } catch { messageHandler = async ()
 
 let isRestarting = false;
 
-const question = (text) => {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
-};
-
 const funnyWelcomes = ["🌟 Welcome @user! 🎉","👋 @user joined!"];
 const funnyGoodbyes = ["🚶‍♂️ @user left.","😢 @user gone."];
 const funnyDeleted = ["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"];
@@ -107,10 +102,16 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  if (config().status.terminal && !sock.authState.creds.registered) {
-    const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
-    const code = await sock.requestPairingCode(phoneNumber);
-    console.log(chalk.green(`🔥 CODE: ${code}`));
+  // ========== AUTO PAIRING CODE (ALWAYS WORKS) ==========
+  if (!sock.authState.creds.registered) {
+    const ownerNumber = config().owner?.[0] || '263786641436';
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log(chalk.yellow('📱 Requesting pairing code...'));
+    const code = await sock.requestPairingCode(ownerNumber);
+    console.log(chalk.green(`🔥 YOUR PAIRING CODE: ${code}`));
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log(chalk.white('📲 Open WhatsApp → Linked Devices → Link a Device'));
+    console.log(chalk.white('🔢 Enter the code shown above'));
   }
 
   sock.ev.on('creds.update', saveCreds);
@@ -171,7 +172,7 @@ const clientstart = async () => {
     }
   });
 
-  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
+  // ========== CHANNEL AUTO‑REACT ==========
   const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
