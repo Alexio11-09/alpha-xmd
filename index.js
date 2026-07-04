@@ -1,5 +1,3 @@
-
-
 // © 2026 Alpha - AUTO STATUS (FIXED + CACHE FOR .take)
 
 const fs = require('fs');
