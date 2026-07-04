@@ -1,404 +1,140 @@
-// © 2026 Alpha. All Rights Reserved.
 
-const fs = require("fs");
-const { execSync } = require("child_process");
 
-const modules = [
-  "pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios",
-  "node-fetch","yt-search","form-data","file-type","moment-timezone",
-  "human-readable","fluent-ffmpeg","@ffmpeg-installer/ffmpeg",
-  "crypto-js","adm-zip"
-];
+// © 2026 Alpha - AUTO STATUS (FIXED + CACHE FOR .take)
 
-modules.forEach(mod => {
-  try { require.resolve(mod); } catch {
-    execSync(`npm install ${mod} --force`, { stdio: "inherit" });
-  }
-});
+const fs = require('fs');
+const path = require('path');
 
-console.clear();
+const configPath = path.join(__dirname, '../database/autoStatus.json');
+if (!fs.existsSync(path.join(__dirname, '../database'))) fs.mkdirSync(path.join(__dirname, '../database'), { recursive: true });
+if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, JSON.stringify({ enabled: false, reactOn: false, reactEmoji: '🔥' }));
 
-const config = () => require('./settings/config');
-process.on("uncaughtException", () => {});
+// ---------- GLOBAL STATUS CACHE ----------
+if (!global.statusCache) global.statusCache = new Map();
 
-let makeWASocket, Browsers, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, jidDecode;
-
-const loadBaileys = async () => {
-  const baileys = await import('@whiskeysockets/baileys');
-  makeWASocket = baileys.default;
-  Browsers = baileys.Browsers;
-  useMultiFileAuthState = baileys.useMultiFileAuthState;
-  DisconnectReason = baileys.DisconnectReason;
-  fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
-  jidDecode = baileys.jidDecode;
-};
-
-const pino = require('pino');
-const readline = require("readline");
-const chalk = require("chalk");
-const { Boom } = require('@hapi/boom');
-const { smsg } = require('./library/serialize');
-
-const clean = (jid) => {
-    if (!jid) return "";
-    try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; }
-};
-
-let dbPath = './database/groupSettings.json';
-let settingsPath = './database/settings.json';
-try {
-    if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
-    fs.writeFileSync(dbPath, '{}', { flag: 'a' });
-    if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}');
-} catch {
-    dbPath = '/tmp/groupSettings.json';
-    settingsPath = '/tmp/settings.json';
+function getConfig() {
+    try { return JSON.parse(fs.readFileSync(configPath)); } catch { return { enabled: false, reactOn: false, reactEmoji: '🔥' }; }
+}
+function saveConfig(data) {
+    fs.writeFileSync(configPath, JSON.stringify(data, null, 2));
 }
 
-let globalSettings = {
-    autoread: false, autotyping: false, autorecording: false, autoreact: false,
-    antidelete: false, antiedit: false
-};
+function isAutoStatusEnabled() { return getConfig().enabled; }
+function isReactEnabled() { return getConfig().reactOn; }
+function getReactEmoji() { return getConfig().reactEmoji || '🔥'; }
 
-try {
-    const saved = JSON.parse(fs.readFileSync(settingsPath));
-    if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
-} catch (err) {}
-
-let messageHandler;
-try { messageHandler = require("./message"); } catch { messageHandler = async () => {}; }
-
-let isRestarting = false;
-
-const question = (text) => {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
-};
-
-const funnyWelcomes = ["🌟 A new legend has arrived! Welcome @user! 🎉","👋 Look who decided to join us! Welcome @user! 🥳"];
-const funnyGoodbyes = ["🚶‍♂️ @user has left the building. We'll miss the vibes.","😢 Another one bites the dust. Goodbye @user!"];
-const funnyDeleted = ["🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️","📝 Deleted message rescued:"];
-const funnyEdited = ["✏️ A message was edited. Here's the original:","📝 Edit detected! Original version:"];
-
-let alwaysOnlineInterval = null;
-
-const applyAlwaysOnline = async (sock) => {
+async function reactToStatus(sock, msg) {
+    if (!isReactEnabled()) return;
+    const emoji = getReactEmoji();
     try {
-        const cfg = JSON.parse(fs.readFileSync(settingsPath));
-        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
-        const fakeSeen = (cfg.global && cfg.global.fakelastseen) ? cfg.global.fakelastseen : false;
-
-        if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-
-        if (fakeSeen) {
-            await sock.sendPresenceUpdate('unavailable');
-        } else if (alwaysOn) {
-            alwaysOnlineInterval = setInterval(async () => {
-                await sock.sendPresenceUpdate('available');
-            }, 30000);
-            await sock.sendPresenceUpdate('available');
-        } else {
-            await sock.sendPresenceUpdate('unavailable');
-        }
-    } catch {}
-};
-
-const clientstart = async () => {
-  await loadBaileys();
-  const sessionPath = `./${config().session}`;
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-  const { version } = await fetchLatestBaileysVersion();
-
-  const sock = makeWASocket({
-    logger: pino({ level: "silent" }),
-    printQRInTerminal: !config().status.terminal,
-    auth: state,
-    version,
-    browser: Browsers.macOS('Chrome'),
-    syncFullHistory: true,
-    markOnlineOnConnect: false
-  });
-
-  sock.decodeJid = (jid) => {
-    if (!jid) return jid;
-    if (/:\d+@/gi.test(jid)) {
-      let d = jidDecode(jid) || {};
-      return d.user && d.server ? d.user + '@' + d.server : jid;
-    }
-    return jid;
-  };
-
-  const store = new Map();
-
-  if (config().status.terminal && !sock.authState.creds.registered) {
-    const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
-    const code = await sock.requestPairingCode(phoneNumber);
-    console.log(chalk.green(`🔥 CODE: ${code}`));
-  }
-
-  sock.ev.on('creds.update', saveCreds);
-
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'open') {
-      console.log('✅ Bot Connected!');
-
-      const followChannel = async () => {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          const newsletterJid = config().newsletter.id + '@newsletter';
-          await sock.newsletterFollow(newsletterJid);
-        } catch (err) {}
-      };
-      followChannel();
-
-      const sendConnectionDM = async () => {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 4000));
-          const botJid = sock.user.id;
-          const botName = config().settings?.title || 'Alpha Bot';
-          const repoLink = "https://github.com/Alexio11-09/alpha-xmd";
-          const channelLink = `https://whatsapp.com/channel/${config().newsletter.id}`;
-          const ownerContact = "wa.me/263786641436";
-
-          const message = `╭───〔  🤖 *${botName}*  〕───⬣\n\n` +
-            `✅ *Bot Online*\n` +
-            `👑 *Owner:* Alpha\n` +
-            `📞 *Contact:* ${ownerContact}\n` +
-            `📂 *Repo:* ${repoLink}\n` +
-            `📢 *Channel:* ${channelLink}\n\n` +
-            `🔥 Ready to use.`;
-
-          await sock.sendMessage(botJid, {
-            text: message,
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: config().newsletter.id + "@newsletter",
-                newsletterName: config().newsletter.name
-              }
+        const participant = msg.key.participant || msg.key.remoteJid;
+        await sock.sendMessage('status@broadcast', {
+            react: {
+                text: emoji,
+                key: {
+                    remoteJid: 'status@broadcast',
+                    id: msg.key.id,
+                    participant: participant,
+                    fromMe: false
+                }
             }
-          });
-        } catch (err) {}
-      };
-      sendConnectionDM();
-
-      applyAlwaysOnline(sock);
-    }
-    if (connection === 'close') {
-      if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (statusCode === DisconnectReason.loggedOut) process.exit(0);
-      if (!isRestarting) {
-        isRestarting = true;
-        setTimeout(() => { clientstart(); isRestarting = false; }, 5000);
-      }
-    }
-  });
-
-  // ========== STATUS EVENTS ==========
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    if (!messages || !messages[0]) return;
-    const msg = messages[0];
-    if (msg.key?.remoteJid === 'status@broadcast') {
-      try {
-        const handler = require("./plugins/autostatus").handleStatusUpdate;
-        if (handler) await handler(sock, { messages: [msg] });
-      } catch {}
-    }
-  });
-
-  // ========== CHANNEL AUTO‑REACT ==========
-  const channelJid = config().newsletter.id + '@newsletter';
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    if (!messages || !messages[0]) return;
-    const msg = messages[0];
-    if (msg.key?.remoteJid !== channelJid) return;
-
-    try {
-        const saved = JSON.parse(fs.readFileSync(settingsPath));
-        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
-    } catch {}
-
-    const crConfig = globalSettings.chreact || { enabled: false, emojis: ['💬'] };
-    if (!crConfig.enabled) return;
-
-    for (const emoji of crConfig.emojis) {
-      try {
-        if (sock.newsletterReact) {
-          await sock.newsletterReact(channelJid, msg.key.id, emoji);
-        } else {
-          await sock.relayMessage(channelJid, {
-            reactionMessage: {
-              key: { remoteJid: channelJid, id: msg.key.id, fromMe: false },
-              text: emoji,
-              senderTimestampMs: Date.now()
-            }
-          }, {});
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (err) {}
-    }
-  });
-
-  // ========== MAIN MESSAGE HANDLER ==========
-  sock.ev.on('messages.upsert', async (chatUpdate) => {
-    try {
-      const messages = chatUpdate.messages;
-      if (!messages?.length) return;
-
-      for (let mek of messages) {
-        if (!mek.message) continue;
-
-        if (mek.key.fromMe) {
-            const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
-            if (!txt.startsWith(".")) continue;
-        }
-
-        if (mek.key?.remoteJid === "status@broadcast") continue;
-        if (mek.key?.remoteJid === channelJid) continue;
-
-        const m = await smsg(sock, mek);
-
-        const msgDbPath = './database/messageCount.json';
-        if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
-        if (!fs.existsSync(msgDbPath)) fs.writeFileSync(msgDbPath, '{}');
-        try {
-            const raw = fs.readFileSync(msgDbPath, 'utf-8');
-            const counts = JSON.parse(raw.length ? raw : '{}');
-            counts[m.chat] = counts[m.chat] || {};
-            counts[m.chat][m.sender] = (counts[m.chat][m.sender] || 0) + 1;
-            fs.writeFileSync(msgDbPath, JSON.stringify(counts, null, 2));
-        } catch (countErr) {}
-
-        store.set(mek.key.id, {
-            text: m.text || "",
-            message: mek.message,
-            sender: m.sender,
-            pushName: m.pushName || null
         });
+        console.log(`💚 Reacted to status from ${participant}`);
+    } catch (err) {
+        console.log('❌ Status reaction error:', err.message);
+    }
+}
 
-        if (m.isGroup) {
-          try {
-            const metadata = await sock.groupMetadata(m.chat);
-            const participants = metadata.participants;
-            const senderJidDecoded = sock.decodeJid(m.sender);
-            const senderNumber = senderJidDecoded.split('@')[0].replace(/[^0-9]/g, '');
-            m.isAdmin = participants.some(p => {
-              const pJid = sock.decodeJid(p.id);
-              const pNumber = pJid.split('@')[0].replace(/[^0-9]/g, '');
-              return pNumber === senderNumber && (p.admin === 'admin' || p.admin === true);
-            });
-            m.isBotAdmin = true;
-          } catch (err) { m.isAdmin = false; m.isBotAdmin = true; }
-        }
+async function handleStatusUpdate(sock, status) {
+    if (!isAutoStatusEnabled()) return;
 
-        if (globalSettings.autoread) await sock.readMessages([mek.key]);
-        if (globalSettings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
-        if (globalSettings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
+    const msg = status.messages ? status.messages[0] : status;
+    if (!msg || !msg.key) return;
+    if (msg.key.remoteJid !== 'status@broadcast') return;
 
-        if (globalSettings.autoreact) {
-          const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
-          if (!txt.startsWith(".")) {
-            const emojis = ["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
-            await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: mek.key } });
-          }
-        }
+    // ---------- CACHE THE STATUS BEFORE VIEWING ----------
+    const participant = msg.key.participant || msg.key.remoteJid;
+    global.statusCache.set(participant, msg);
+    // keep cache size down – remove oldest if > 100 entries
+    if (global.statusCache.size > 100) {
+        const firstKey = global.statusCache.keys().next().value;
+        global.statusCache.delete(firstKey);
+    }
 
-        await messageHandler(sock, m);
-      }
-    } catch (err) {}
-  });
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // ANTIDELETE + ANTIEDIT
-  sock.ev.on('messages.update', async (updates) => {
     try {
-      try {
-        const saved = JSON.parse(fs.readFileSync(settingsPath));
-        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
-      } catch {}
+        const keyToRead = {
+            remoteJid: 'status@broadcast',
+            id: msg.key.id,
+            participant: participant,
+            fromMe: false
+        };
 
-      const adConfig = globalSettings.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
-      const ownerJid = (config().owner?.[0] || '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        await sock.readMessages([keyToRead]);
+        console.log(`👁️ Viewed status from ${participant}`);
 
-      for (let update of updates) {
-        const oldMsg = store.get(update.key.id);
-        if (!oldMsg) continue;
+        await reactToStatus(sock, msg);
 
-        if (update.update.message === null) {
-          if (!adConfig.enabled) continue;
-
-          const chatJidDel = update.key.remoteJid;
-          const isGroup = chatJidDel.endsWith('@g.us');
-          const senderJidDel = oldMsg.sender || update.key.participant || chatJidDel;
-          const senderNumber = senderJidDel.split('@')[0];
-          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== '' ? oldMsg.pushName : senderNumber;
-
-          let chatName = 'Private Chat';
-          if (isGroup) { try { const gm = await sock.groupMetadata(chatJidDel); chatName = gm.subject; } catch { chatName = 'Group'; } }
-
-          const now = new Date();
-          const time = now.toLocaleTimeString();
-          const date = now.toLocaleDateString();
-
-          let text;
-          if (adConfig.style === 'fancy') {
-            if (isGroup) text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-            else text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-          } else text = funnyDeleted[0] + `\n\n${oldMsg.text||'Media'}`;
-
-          const mentions = isGroup && adConfig.style === 'fancy' && senderJidDel !== sock.user.id ? [senderJidDel] : [];
-          const destinations = [];
-          if (adConfig.mode === 'chat' || adConfig.mode === 'both') destinations.push(chatJidDel);
-          if ((adConfig.mode === 'owner' || adConfig.mode === 'both') && ownerJid) destinations.push(ownerJid);
-
-          for (const dest of destinations) {
-            const opts = {};
-            if (mentions.length > 0 && dest === chatJidDel) opts.mentions = mentions;
-            if (adConfig.style === 'fancy') {
-              await sock.sendMessage(dest, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: config().newsletter.id + "@newsletter", newsletterName: config().newsletter.name } }, ...opts });
-            } else {
-              await sock.sendMessage(dest, { text, ...opts });
+    } catch (err) {
+        if (err.message?.includes('rate-overlimit')) {
+            console.log('⚠️ Rate limit, retrying...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            try {
+                await sock.readMessages([{
+                    remoteJid: 'status@broadcast',
+                    id: msg.key.id,
+                    participant: participant,
+                    fromMe: false
+                }]);
+            } catch (retryErr) {
+                console.log('❌ Retry failed:', retryErr.message);
             }
-            if (adConfig.react && dest === chatJidDel) { try { await sock.sendMessage(dest, { react: { text: '👀', key: update.key } }); } catch {} }
-          }
+        } else {
+            console.log('❌ Status view error:', err.message);
         }
+    }
+}
 
-        if (globalSettings.antiedit && update.update?.message) {
-          let newText = "";
-          try { const msg = update.update.message; const type = Object.keys(msg)[0]; newText = msg[type]?.text || msg[type]?.caption || ""; } catch {}
-          if (oldMsg?.text && newText && oldMsg.text !== newText) {
-            await sock.sendMessage(update.key.remoteJid, { text: `✏️ Edited.\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}` });
-          }
+// Owner command to toggle settings
+module.exports = [
+    {
+        command: "autostatus",
+        aliases: ["statusauto", "autoview"],
+        category: "settings",
+        owner: true,
+        execute: async (sock, m, { args, reply }) => {
+            const config = getConfig();
+            const action = args[0]?.toLowerCase();
+
+            if (!action) {
+                const view = config.enabled ? 'ON ✅' : 'OFF ❌';
+                const react = config.reactOn ? 'ON ✅' : 'OFF ❌';
+                const emoji = config.reactEmoji || '🔥';
+                return reply(`📱 *Auto Status*\n👁️ View: ${view}\n💫 React: ${react}\n❤️ Emoji: ${emoji}\n\n.autostatus on/off\n.autostatus react on/off\n.autostatus emoji 😍`);
+            }
+
+            if (action === 'on') {
+                config.enabled = true; saveConfig(config);
+                reply("✅ Auto status view enabled!");
+            } else if (action === 'off') {
+                config.enabled = false; saveConfig(config);
+                reply("❌ Auto status view disabled!");
+            } else if (action === 'react') {
+                const sub = args[1]?.toLowerCase();
+                if (sub === 'on') { config.reactOn = true; saveConfig(config); reply("💫 Status reactions enabled!"); }
+                else if (sub === 'off') { config.reactOn = false; saveConfig(config); reply("❌ Status reactions disabled!"); }
+                else reply("❌ Use: .autostatus react on/off");
+            } else if (action === 'emoji') {
+                if (!args[1]) return reply("❌ Provide an emoji!");
+                config.reactEmoji = args[1]; saveConfig(config);
+                reply(`✅ Reaction emoji set to: ${args[1]}`);
+            } else {
+                reply("❌ Usage: .autostatus on/off, .autostatus react on/off, .autostatus emoji ❤️");
+            }
         }
-      }
-    } catch (err) {}
-  });
+    }
+];
 
-  // WELCOME & GOODBYE
-  sock.ev.on('group-participants.update', async (update) => {
-    try {
-      const { id, participants, action } = update;
-      let gs = { welcome: false, welcomeMsg: funnyWelcomes[Math.floor(Math.random() * funnyWelcomes.length)], goodbye: false, goodbyeMsg: funnyGoodbyes[Math.floor(Math.random() * funnyGoodbyes.length)] };
-      try { const all = JSON.parse(fs.readFileSync(dbPath)); gs = all[id] || gs; } catch {}
-
-      if (action === 'add' && gs.welcome) {
-        for (let user of participants) {
-          const msg = gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
-          await sock.sendMessage(id, { text: msg, mentions: [user] });
-        }
-      }
-      if (action === 'remove' && gs.goodbye) {
-        for (let user of participants) {
-          const msg = gs.goodbyeMsg.replace(/@user/g, `@${user.split("@")[0]}`);
-          await sock.sendMessage(id, { text: msg, mentions: [user] });
-        }
-      }
-    } catch (err) {}
-  });
-
-  sock.public = true;
-};
-
-clientstart();
+// Export the handler for index.js
+module.exports.handleStatusUpdate = handleStatusUpdate;
