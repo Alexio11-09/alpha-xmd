@@ -112,7 +112,7 @@ const clientstart = async () => {
 
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: !config().status.terminal,
+    printQRInTerminal: false, // ALWAYS false for pairing mode
     auth: state,
     version,
     browser: Browsers.macOS('Chrome'),
@@ -131,20 +131,15 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  // ========== PUBLIC PAIRING – ANY NUMBER ==========
-  if (config().status.terminal && !sock.authState.creds.registered) {
-    const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
-    const code = await sock.requestPairingCode(phoneNumber);
-    console.log(chalk.green(`🔥 CODE: ${code}`));
-  }
-
-  sock.ev.on('creds.update', saveCreds);
-
+  // ========== IMPROVED PAIRING CODE HANDLER ==========
+  // Wait for socket to be ready before requesting pairing
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
+    
+    // Check if we need to request pairing code
     if (connection === 'open') {
       console.log('✅ Bot Connected!');
-
+      
       // ---- AUTO FOLLOW CHANNEL ----
       const followChannel = async () => {
         try {
@@ -188,15 +183,62 @@ const clientstart = async () => {
       };
       sendConnectionDM();
     }
+    
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (statusCode === DisconnectReason.loggedOut) process.exit(0);
+      if (statusCode === DisconnectReason.loggedOut) {
+        console.log(chalk.red('❌ Logged out. Please restart the bot.'));
+        process.exit(0);
+      }
       if (!isRestarting) {
         isRestarting = true;
+        console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'));
         setTimeout(() => { clientstart(); isRestarting = false; }, 5000);
       }
     }
   });
+
+  // ========== PAIRING CODE REQUEST (FIXED) ==========
+  // This runs AFTER connection update to ensure socket is ready
+  setTimeout(async () => {
+    // Check if we need to pair (no credentials or not registered)
+    const needsPairing = !sock.authState.creds.registered || 
+                         !fs.existsSync(`${sessionPath}/creds.json`);
+    
+    if (needsPairing && config().status.terminal) {
+      console.log(chalk.cyan('🔐 Pairing mode activated'));
+      console.log(chalk.gray('Enter your WhatsApp number (without + sign, e.g., 263786641436)'));
+      
+      const phoneNumber = await question('📱 Enter number: ');
+      
+      // Clean the number (remove any + or spaces)
+      const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+      
+      if (!cleanNumber || cleanNumber.length < 10) {
+        console.log(chalk.red('❌ Invalid number. Must be at least 10 digits.'));
+        process.exit(1);
+      }
+      
+      try {
+        console.log(chalk.yellow('⏳ Requesting pairing code...'));
+        const code = await sock.requestPairingCode(cleanNumber);
+        console.log(chalk.green(`\n✅ PAIRING CODE: ${code}`));
+        console.log(chalk.yellow('📱 Open WhatsApp > Linked Devices > Link with phone number'));
+        console.log(chalk.gray(`Enter this code: ${code}\n`));
+      } catch (err) {
+        console.log(chalk.red('❌ Failed to get pairing code:'), err.message);
+        console.log(chalk.yellow('💡 Make sure:'));
+        console.log(chalk.gray('   • Number is correct (no + or spaces)'));
+        console.log(chalk.gray('   • WhatsApp is installed on that number'));
+        console.log(chalk.gray('   • You have internet connection'));
+        process.exit(1);
+      }
+    } else if (sock.authState.creds.registered) {
+      console.log(chalk.green('✅ Already paired! Using existing session.'));
+    }
+  }, 1000); // Give socket time to initialize
+
+  sock.ev.on('creds.update', saveCreds);
 
   // ========== STATUS EVENTS ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
