@@ -104,6 +104,8 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
+let pairingRequested = false; // Prevent multiple pairing requests
+
 const clientstart = async () => {
   await loadBaileys();
   const sessionPath = `./${config().session}`;
@@ -131,12 +133,11 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  // ========== IMPROVED PAIRING CODE HANDLER ==========
-  // Wait for socket to be ready before requesting pairing
+  // ========== PAIRING CODE REQUEST (FIXED - INSIDE CONNECTION UPDATE) ==========
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
     
-    // Check if we need to request pairing code
+    // Check if we need to request pairing code when connection is opening
     if (connection === 'open') {
       console.log('✅ Bot Connected!');
       
@@ -184,6 +185,47 @@ const clientstart = async () => {
       sendConnectionDM();
     }
     
+    // ========== REQUEST PAIRING CODE HERE (WHILE CONNECTING) ==========
+    if (connection === 'connecting' && !pairingRequested) {
+      // Check if we need to pair (no credentials or not registered)
+      const needsPairing = !sock.authState.creds.registered || 
+                           !fs.existsSync(`${sessionPath}/creds.json`);
+      
+      if (needsPairing && config().status.terminal) {
+        pairingRequested = true; // Prevent multiple requests
+        
+        console.log(chalk.cyan('\n🔐 Pairing mode activated'));
+        console.log(chalk.gray('Enter your WhatsApp number (without + sign)'));
+        
+        const phoneNumber = await question('📱 Enter number: ');
+        
+        // Clean the number (remove any + or spaces)
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
+        if (!cleanNumber || cleanNumber.length < 10) {
+          console.log(chalk.red('❌ Invalid number. Must be at least 10 digits.'));
+          process.exit(1);
+        }
+        
+        try {
+          console.log(chalk.yellow('⏳ Requesting pairing code...'));
+          const code = await sock.requestPairingCode(cleanNumber);
+          console.log(chalk.green(`\n✅ PAIRING CODE: ${code}`));
+          console.log(chalk.yellow('📱 Open WhatsApp > Linked Devices > Link with phone number'));
+          console.log(chalk.gray(`Enter this code: ${code}\n`));
+        } catch (err) {
+          console.log(chalk.red('❌ Failed to get pairing code:'), err.message);
+          console.log(chalk.yellow('💡 Make sure:'));
+          console.log(chalk.gray('   • Number is correct (no + or spaces)'));
+          console.log(chalk.gray('   • WhatsApp is installed on that number'));
+          console.log(chalk.gray('   • You have internet connection'));
+          process.exit(1);
+        }
+      } else if (sock.authState.creds.registered) {
+        console.log(chalk.green('✅ Already paired! Using existing session.'));
+      }
+    }
+    
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (statusCode === DisconnectReason.loggedOut) {
@@ -193,50 +235,14 @@ const clientstart = async () => {
       if (!isRestarting) {
         isRestarting = true;
         console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'));
-        setTimeout(() => { clientstart(); isRestarting = false; }, 5000);
+        setTimeout(() => { 
+          pairingRequested = false; // Reset for reconnection
+          clientstart(); 
+          isRestarting = false; 
+        }, 5000);
       }
     }
   });
-
-  // ========== PAIRING CODE REQUEST (FIXED) ==========
-  // This runs AFTER connection update to ensure socket is ready
-  setTimeout(async () => {
-    // Check if we need to pair (no credentials or not registered)
-    const needsPairing = !sock.authState.creds.registered || 
-                         !fs.existsSync(`${sessionPath}/creds.json`);
-    
-    if (needsPairing && config().status.terminal) {
-      console.log(chalk.cyan('🔐 Pairing mode activated'));
-      console.log(chalk.gray('Enter your WhatsApp number (without + sign, e.g., 263786641436)'));
-      
-      const phoneNumber = await question('📱 Enter number: ');
-      
-      // Clean the number (remove any + or spaces)
-      const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
-      
-      if (!cleanNumber || cleanNumber.length < 10) {
-        console.log(chalk.red('❌ Invalid number. Must be at least 10 digits.'));
-        process.exit(1);
-      }
-      
-      try {
-        console.log(chalk.yellow('⏳ Requesting pairing code...'));
-        const code = await sock.requestPairingCode(cleanNumber);
-        console.log(chalk.green(`\n✅ PAIRING CODE: ${code}`));
-        console.log(chalk.yellow('📱 Open WhatsApp > Linked Devices > Link with phone number'));
-        console.log(chalk.gray(`Enter this code: ${code}\n`));
-      } catch (err) {
-        console.log(chalk.red('❌ Failed to get pairing code:'), err.message);
-        console.log(chalk.yellow('💡 Make sure:'));
-        console.log(chalk.gray('   • Number is correct (no + or spaces)'));
-        console.log(chalk.gray('   • WhatsApp is installed on that number'));
-        console.log(chalk.gray('   • You have internet connection'));
-        process.exit(1);
-      }
-    } else if (sock.authState.creds.registered) {
-      console.log(chalk.green('✅ Already paired! Using existing session.'));
-    }
-  }, 1000); // Give socket time to initialize
 
   sock.ev.on('creds.update', saveCreds);
 
