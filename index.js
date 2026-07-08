@@ -39,7 +39,7 @@ const chalk = require("chalk");
 const { Boom } = require('@hapi/boom');
 const { smsg } = require('./library/serialize');
 
-// Import the reliable auto‑status handler
+// Import the auto‑status handler
 let autoStatusHandler;
 try {
     autoStatusHandler = require("./plugins/autostatus");
@@ -104,30 +104,6 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
-// ==================== ALWAYSONLINE + FAKELASTSEEN ====================
-let alwaysOnlineInterval = null;
-
-const applyAlwaysOnline = async (sock) => {
-    try {
-        const cfg = JSON.parse(fs.readFileSync(settingsPath));
-        const alwaysOn = (cfg.global && cfg.global.alwaysonline) ? cfg.global.alwaysonline : false;
-        const fakeSeen = (cfg.global && cfg.global.fakelastseen) ? cfg.global.fakelastseen : false;
-
-        if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
-
-        if (fakeSeen) {
-            await sock.sendPresenceUpdate('unavailable');
-        } else if (alwaysOn) {
-            alwaysOnlineInterval = setInterval(async () => {
-                await sock.sendPresenceUpdate('available');
-            }, 30000);
-            await sock.sendPresenceUpdate('available');
-        } else {
-            await sock.sendPresenceUpdate('unavailable');
-        }
-    } catch {}
-};
-
 const clientstart = async () => {
   await loadBaileys();
   const sessionPath = `./${config().session}`;
@@ -155,6 +131,7 @@ const clientstart = async () => {
 
   const store = new Map();
 
+  // ========== PUBLIC PAIRING – ANY NUMBER ==========
   if (config().status.terminal && !sock.authState.creds.registered) {
     const phoneNumber = await question('📱 Enter your WhatsApp number:\n');
     const code = await sock.requestPairingCode(phoneNumber);
@@ -210,12 +187,8 @@ const clientstart = async () => {
         } catch (err) {}
       };
       sendConnectionDM();
-
-      // ---- APPLY ALWAYSONLINE / FAKELASTSEEN ----
-      applyAlwaysOnline(sock);
     }
     if (connection === 'close') {
-      if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (statusCode === DisconnectReason.loggedOut) process.exit(0);
       if (!isRestarting) {
@@ -225,19 +198,18 @@ const clientstart = async () => {
     }
   });
 
-  // ========== STATUS EVENTS (FIXED) ==========
+  // ========== STATUS EVENTS ==========
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
     if (msg.key?.remoteJid === 'status@broadcast') {
-      try {
-        const handler = require("./plugins/autostatus").handleStatusUpdate;
-        if (handler) await handler(sock, { messages: [msg] });
-      } catch {}
+      if (autoStatusHandler.handleStatusUpdate) {
+        await autoStatusHandler.handleStatusUpdate(sock, { messages: [msg] });
+      }
     }
   });
 
-  // ========== CHANNEL AUTO‑REACT (CHREACT) ==========
+  // ========== CHANNEL AUTO‑REACT ==========
   const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
@@ -276,11 +248,6 @@ const clientstart = async () => {
       const messages = chatUpdate.messages;
       if (!messages?.length) return;
 
-      try {
-        const saved = JSON.parse(fs.readFileSync(settingsPath));
-        if (saved["global"]) globalSettings = { ...globalSettings, ...saved["global"] };
-      } catch (err) {}
-
       for (let mek of messages) {
         if (!mek.message) continue;
 
@@ -294,7 +261,6 @@ const clientstart = async () => {
 
         const m = await smsg(sock, mek);
 
-        // 🔢 INCREMENT MESSAGE COUNT FOR RANK
         const msgDbPath = './database/messageCount.json';
         if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
         if (!fs.existsSync(msgDbPath)) fs.writeFileSync(msgDbPath, '{}');
@@ -306,7 +272,6 @@ const clientstart = async () => {
             fs.writeFileSync(msgDbPath, JSON.stringify(counts, null, 2));
         } catch (countErr) {}
 
-        // Store message for antidelete
         store.set(mek.key.id, {
             text: m.text || "",
             message: mek.message,
@@ -333,7 +298,6 @@ const clientstart = async () => {
         if (globalSettings.autotyping) await sock.sendPresenceUpdate('composing', m.chat);
         if (globalSettings.autorecording) await sock.sendPresenceUpdate('recording', m.chat);
 
-        // ---- AUTOREACT ----
         if (globalSettings.autoreact) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) {
@@ -343,7 +307,6 @@ const clientstart = async () => {
         }
 
         await messageHandler(sock, m);
-        await new Promise(r => setTimeout(r, 200));
       }
     } catch (err) {}
   });
@@ -370,17 +333,10 @@ const clientstart = async () => {
           const isGroup = chatJidDel.endsWith('@g.us');
           const senderJidDel = oldMsg.sender || update.key.participant || chatJidDel;
           const senderNumber = senderJidDel.split('@')[0];
-          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== ''
-            ? oldMsg.pushName
-            : senderNumber;
+          const senderDisplayPrivate = oldMsg.pushName && oldMsg.pushName.trim() !== '' ? oldMsg.pushName : senderNumber;
 
           let chatName = 'Private Chat';
-          if (isGroup) {
-            try {
-              const gm = await sock.groupMetadata(chatJidDel);
-              chatName = gm.subject;
-            } catch { chatName = 'Group'; }
-          }
+          if (isGroup) { try { const gm = await sock.groupMetadata(chatJidDel); chatName = gm.subject; } catch { chatName = 'Group'; } }
 
           const now = new Date();
           const time = now.toLocaleTimeString();
@@ -388,15 +344,9 @@ const clientstart = async () => {
 
           let text;
           if (adConfig.style === 'fancy') {
-            if (isGroup) {
-              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-            } else {
-              text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-            }
-          } else {
-            const funny = ["🕵️‍♂️ Deleted saved!","📝 Deleted rescued:"];
-            text = funny[0] + `\n\n${oldMsg.text || 'Media'}`;
-          }
+            if (isGroup) text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+            else text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+          } else text = funnyDeleted[0] + `\n\n${oldMsg.text||'Media'}`;
 
           const mentions = isGroup && adConfig.style === 'fancy' && senderJidDel !== sock.user.id ? [senderJidDel] : [];
           const destinations = [];
