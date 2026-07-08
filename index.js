@@ -105,15 +105,25 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
+// Store phone number globally for pairing
+let globalPhoneNumber = null;
+
 const clientstart = async () => {
   await loadBaileys();
   const sessionPath = `./${config().session}`;
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
 
+  // Check if pairing is needed
+  const needsPairing = !state.creds.registered || 
+                       !fs.existsSync(`${sessionPath}/creds.json`);
+
+  // Set pairing mode - this controls whether QR code or pairing code is used
+  const pairingMode = needsPairing && config().status.terminal;
+
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: false,
+    printQRInTerminal: !pairingMode, // Show QR if NOT in pairing mode
     auth: state,
     version,
     browser: Browsers.macOS('Chrome'),
@@ -132,50 +142,53 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  // ========== HANDLE PAIRING (FIXED) ==========
-  // Check if we need to pair BEFORE the connection starts
-  const needsPairing = !sock.authState.creds.registered || 
-                       !fs.existsSync(`${sessionPath}/creds.json`);
-
-  // If we need pairing, request it immediately after socket creation
-  if (needsPairing && config().status.terminal && !pairingRequested) {
+  // ========== PAIRING CODE HANDLER (FIXED - USING WORKING APPROACH) ==========
+  if (pairingMode && !pairingRequested) {
     pairingRequested = true;
     
     console.log(chalk.cyan('\n🔐 Pairing mode activated'));
     console.log(chalk.gray('Enter your WhatsApp number (without + sign)'));
+    console.log(chalk.gray('Example: 263784969735'));
     
-    const phoneNumber = await question('📱 Enter number: ');
-    const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+    // Get phone number
+    if (!globalPhoneNumber) {
+      const phoneNumber = await question('📱 Enter number: ');
+      globalPhoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+    }
+    
+    const cleanNumber = globalPhoneNumber;
     
     if (!cleanNumber || cleanNumber.length < 10) {
       console.log(chalk.red('❌ Invalid number. Must be at least 10 digits.'));
       process.exit(1);
     }
     
-    try {
-      console.log(chalk.yellow('⏳ Requesting pairing code...'));
-      
-      // Use waitForConnectionUpdate to ensure socket is ready
-      const code = await sock.requestPairingCode(cleanNumber);
-      
-      console.log(chalk.green(`\n✅ PAIRING CODE: ${code}`));
-      console.log(chalk.yellow('📱 Open WhatsApp > Linked Devices > Link with phone number'));
-      console.log(chalk.gray(`Enter this code: ${code}\n`));
-      
-      // Wait for connection to complete
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-    } catch (err) {
-      console.log(chalk.red('❌ Failed to get pairing code:'), err.message);
-      console.log(chalk.yellow('💡 Make sure:'));
-      console.log(chalk.gray('   • Number is correct (no + or spaces)'));
-      console.log(chalk.gray('   • WhatsApp is installed on that number'));
-      console.log(chalk.gray('   • You have internet connection'));
-      
-      // Don't exit, let the bot retry connection
-      pairingRequested = false;
-    }
-  } else if (sock.authState.creds.registered) {
+    console.log(chalk.green(`✅ Using number: ${cleanNumber}`));
+    
+    // Wait 3 seconds before requesting pairing code (like the working bot)
+    setTimeout(async () => {
+      try {
+        console.log(chalk.yellow('⏳ Requesting pairing code...'));
+        let code = await sock.requestPairingCode(cleanNumber);
+        // Format code with dashes for readability
+        code = code?.match(/.{1,4}/g)?.join("-") || code;
+        console.log(chalk.black(chalk.bgGreen(`\n✅ PAIRING CODE: ${code}`)));
+        console.log(chalk.yellow('\n📱 Please enter this code in your WhatsApp app:'));
+        console.log(chalk.gray('1. Open WhatsApp'));
+        console.log(chalk.gray('2. Go to Settings > Linked Devices'));
+        console.log(chalk.gray('3. Tap "Link a Device"'));
+        console.log(chalk.gray(`4. Enter the code: ${code}\n`));
+      } catch (error) {
+        console.log(chalk.red('❌ Failed to get pairing code:'), error.message);
+        console.log(chalk.yellow('💡 Troubleshooting:'));
+        console.log(chalk.gray('   • Make sure the number is correct'));
+        console.log(chalk.gray('   • Check your internet connection'));
+        console.log(chalk.gray('   • Try restarting the bot'));
+        pairingRequested = false;
+        process.exit(1);
+      }
+    }, 3000); // 3 second delay like the working bot
+  } else if (state.creds.registered) {
     console.log(chalk.green('✅ Already paired! Using existing session.'));
   }
 
@@ -238,7 +251,7 @@ const clientstart = async () => {
       }
       if (!isRestarting) {
         isRestarting = true;
-        pairingRequested = false; // Reset pairing flag
+        pairingRequested = false;
         console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'));
         setTimeout(() => { 
           clientstart(); 
