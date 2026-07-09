@@ -102,8 +102,10 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
-let pairingRequested = false;
-let storedPhoneNumber = null;
+// ========== PAIRING CONFIG (MATCHES KNIGHT BOT) ==========
+let phoneNumber = null;
+const pairingCode = true; // Force pairing mode
+const useMobile = false;
 
 const clientstart = async () => {
   await loadBaileys();
@@ -111,12 +113,9 @@ const clientstart = async () => {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
 
-  const needsPairing = !state.creds.registered || 
-                       !fs.existsSync(`${sessionPath}/creds.json`);
-
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: false,
+    printQRInTerminal: !pairingCode, // FALSE for pairing mode
     auth: state,
     version,
     browser: Browsers.macOS('Chrome'),
@@ -135,49 +134,52 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  // ========== CONNECTION UPDATE HANDLER ==========
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect } = update;
-    
-    // ========== REQUEST PAIRING CODE HERE - DURING CONNECTING ==========
-    if (connection === 'connecting' && needsPairing && !pairingRequested) {
-      pairingRequested = true;
-      
-      console.log(chalk.cyan('\n🔐 Pairing mode activated'));
-      
-      // Get phone number if not stored
-      if (!storedPhoneNumber) {
-        console.log(chalk.gray('Enter your WhatsApp number (without + sign)'));
-        console.log(chalk.gray('Example: 263784969735'));
-        const phoneNumber = await question('📱 Enter number: ');
-        storedPhoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-      }
-      
-      if (!storedPhoneNumber || storedPhoneNumber.length < 10) {
-        console.log(chalk.red('❌ Invalid number. Must be at least 10 digits.'));
-        process.exit(1);
-      }
-      
-      console.log(chalk.green(`✅ Using number: ${storedPhoneNumber}`));
-      
+  // ========== PAIRING CODE (EXACTLY LIKE KNIGHT BOT) ==========
+  if (pairingCode && !sock.authState.creds.registered) {
+    if (useMobile) throw new Error('Cannot use pairing code with mobile api');
+
+    let inputNumber = phoneNumber;
+    if (!inputNumber) {
+      inputNumber = await question(chalk.bgBlack(chalk.greenBright(`📱 Enter your WhatsApp number (without + or spaces): `)));
+    }
+
+    // Clean the phone number
+    inputNumber = inputNumber.replace(/[^0-9]/g, '');
+
+    // Validate
+    if (!inputNumber || inputNumber.length < 10) {
+      console.log(chalk.red('❌ Invalid phone number. Must be at least 10 digits.'));
+      process.exit(1);
+    }
+
+    // 3 second delay like Knight Bot
+    setTimeout(async () => {
       try {
         console.log(chalk.yellow('⏳ Requesting pairing code...'));
-        let code = await sock.requestPairingCode(storedPhoneNumber);
+        let code = await sock.requestPairingCode(inputNumber);
         code = code?.match(/.{1,4}/g)?.join("-") || code;
         console.log(chalk.black(chalk.bgGreen(`\n✅ PAIRING CODE: ${code}`)));
-        console.log(chalk.yellow('\n📱 Instructions:'));
+        console.log(chalk.yellow(`\n📱 Instructions:`));
         console.log(chalk.gray('1. Open WhatsApp on your phone'));
         console.log(chalk.gray('2. Go to Settings > Linked Devices'));
         console.log(chalk.gray('3. Tap "Link a Device"'));
         console.log(chalk.gray(`4. Enter this code: ${code}\n`));
-      } catch (err) {
-        console.log(chalk.red('❌ Failed:'), err.message);
-        pairingRequested = false;
+      } catch (error) {
+        console.log(chalk.red('❌ Failed:'), error.message);
+        console.log(chalk.yellow('💡 Make sure the number is correct and try again.'));
+        process.exit(1);
       }
-    }
+    }, 3000);
+  } else if (sock.authState.creds.registered) {
+    console.log(chalk.green('✅ Already paired! Using existing session.'));
+  }
+
+  // ========== CONNECTION UPDATE ==========
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
     
     if (connection === 'open') {
-      console.log('✅ Bot Connected!');
+      console.log(chalk.green('✅ Bot Connected!'));
       
       const followChannel = async () => {
         try {
@@ -229,7 +231,6 @@ const clientstart = async () => {
       }
       if (!isRestarting) {
         isRestarting = true;
-        pairingRequested = false;
         console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'));
         setTimeout(() => { 
           clientstart(); 
