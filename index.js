@@ -113,7 +113,7 @@ const clientstart = async () => {
   // --- EXACT SOCKET CONFIG FROM THE WORKING TEST ---
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: false,          // force pairing
+    printQRInTerminal: false,
     auth: state,
     version,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
@@ -144,7 +144,7 @@ const clientstart = async () => {
   }
   console.log(chalk.green(`✅ Using number: ${phoneNumber}`));
 
-  // ---------- FORCE PAIRING (no registered check) ----------
+  // ---------- FORCE PAIRING ----------
   setTimeout(async () => {
     try {
       console.log(chalk.yellow('⏳ Requesting pairing code...'));
@@ -156,18 +156,14 @@ const clientstart = async () => {
       console.log(chalk.gray('2. Go to Settings > Linked Devices'));
       console.log(chalk.gray('3. Tap "Link a Device"'));
       console.log(chalk.gray(`4. Enter this code: ${code}\n`));
+      console.log(chalk.green('⏳ Waiting for you to enter the code in WhatsApp...'));
     } catch (error) {
       console.log(chalk.red('❌ Failed:'), error.message);
-      console.log(chalk.yellow('💡 Troubleshooting:'));
-      console.log(chalk.gray('1. Ensure Termux has internet access'));
-      console.log(chalk.gray('2. Run: echo "nameserver 8.8.8.8" > $PREFIX/etc/resolv.conf'));
-      console.log(chalk.gray('3. Run: pkg install openssl-tool -y'));
-      console.log(chalk.gray('4. Try restarting Termux'));
       process.exit(1);
     }
   }, 3000);
 
-  // ---------- CONNECTION UPDATE ----------
+  // ---------- CONNECTION UPDATE – FIXED CLOSE HANDLER ----------
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
 
@@ -218,16 +214,30 @@ const clientstart = async () => {
     
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (statusCode === DisconnectReason.loggedOut) {
-        console.log(chalk.red('❌ Logged out. Please restart the bot.'));
+      
+      // Log the status code for debugging
+      console.log(chalk.yellow(`🔍 Close status code: ${statusCode}`));
+
+      // If logged out, delete session and exit (or restart)
+      if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+        console.log(chalk.red('❌ Session logged out. Deleting session...'));
+        try {
+          fs.rmSync('./session', { recursive: true, force: true });
+          console.log(chalk.yellow('Session folder deleted. Please restart the bot.'));
+        } catch (err) {
+          console.error('Error deleting session:', err);
+        }
+        // Instead of exiting, we could restart, but let's exit cleanly
         process.exit(0);
       }
+
+      // For other disconnections, reconnect
       if (!isRestarting) {
         isRestarting = true;
         console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'));
-        setTimeout(() => { 
-          clientstart(); 
-          isRestarting = false; 
+        setTimeout(() => {
+          clientstart();
+          isRestarting = false;
         }, 5000);
       }
     }
