@@ -102,10 +102,7 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
-// ========== PAIRING CONFIG (MATCHES KNIGHT BOT) ==========
 let phoneNumber = null;
-const pairingCode = true; // Force pairing mode
-const useMobile = false;
 
 const clientstart = async () => {
   await loadBaileys();
@@ -113,14 +110,16 @@ const clientstart = async () => {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
 
+  // --- EXACT SOCKET CONFIG FROM THE WORKING TEST ---
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: !pairingCode, // FALSE for pairing mode
+    printQRInTerminal: false,          // force pairing
     auth: state,
     version,
-    browser: Browsers.macOS('Chrome'),
-    syncFullHistory: true,
-    markOnlineOnConnect: false
+    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 10000,
   });
 
   sock.decodeJid = (jid) => {
@@ -134,50 +133,44 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  // ========== PAIRING CODE (EXACTLY LIKE KNIGHT BOT) ==========
-  if (pairingCode && !sock.authState.creds.registered) {
-    if (useMobile) throw new Error('Cannot use pairing code with mobile api');
+  // ---------- GET PHONE NUMBER ----------
+  if (!phoneNumber) {
+    phoneNumber = await question(chalk.bgBlack(chalk.greenBright(`📱 Enter your WhatsApp number (without + or spaces): `)));
+    phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+  }
+  if (!phoneNumber || phoneNumber.length < 10) {
+    console.log(chalk.red('❌ Invalid phone number. Must be at least 10 digits.'));
+    process.exit(1);
+  }
+  console.log(chalk.green(`✅ Using number: ${phoneNumber}`));
 
-    let inputNumber = phoneNumber;
-    if (!inputNumber) {
-      inputNumber = await question(chalk.bgBlack(chalk.greenBright(`📱 Enter your WhatsApp number (without + or spaces): `)));
-    }
-
-    // Clean the phone number
-    inputNumber = inputNumber.replace(/[^0-9]/g, '');
-
-    // Validate
-    if (!inputNumber || inputNumber.length < 10) {
-      console.log(chalk.red('❌ Invalid phone number. Must be at least 10 digits.'));
+  // ---------- FORCE PAIRING (no registered check) ----------
+  setTimeout(async () => {
+    try {
+      console.log(chalk.yellow('⏳ Requesting pairing code...'));
+      let code = await sock.requestPairingCode(phoneNumber);
+      code = code?.match(/.{1,4}/g)?.join("-") || code;
+      console.log(chalk.black(chalk.bgGreen(`\n✅ PAIRING CODE: ${code}`)));
+      console.log(chalk.yellow(`\n📱 Instructions:`));
+      console.log(chalk.gray('1. Open WhatsApp on your phone'));
+      console.log(chalk.gray('2. Go to Settings > Linked Devices'));
+      console.log(chalk.gray('3. Tap "Link a Device"'));
+      console.log(chalk.gray(`4. Enter this code: ${code}\n`));
+    } catch (error) {
+      console.log(chalk.red('❌ Failed:'), error.message);
+      console.log(chalk.yellow('💡 Troubleshooting:'));
+      console.log(chalk.gray('1. Ensure Termux has internet access'));
+      console.log(chalk.gray('2. Run: echo "nameserver 8.8.8.8" > $PREFIX/etc/resolv.conf'));
+      console.log(chalk.gray('3. Run: pkg install openssl-tool -y'));
+      console.log(chalk.gray('4. Try restarting Termux'));
       process.exit(1);
     }
+  }, 3000);
 
-    // 3 second delay like Knight Bot
-    setTimeout(async () => {
-      try {
-        console.log(chalk.yellow('⏳ Requesting pairing code...'));
-        let code = await sock.requestPairingCode(inputNumber);
-        code = code?.match(/.{1,4}/g)?.join("-") || code;
-        console.log(chalk.black(chalk.bgGreen(`\n✅ PAIRING CODE: ${code}`)));
-        console.log(chalk.yellow(`\n📱 Instructions:`));
-        console.log(chalk.gray('1. Open WhatsApp on your phone'));
-        console.log(chalk.gray('2. Go to Settings > Linked Devices'));
-        console.log(chalk.gray('3. Tap "Link a Device"'));
-        console.log(chalk.gray(`4. Enter this code: ${code}\n`));
-      } catch (error) {
-        console.log(chalk.red('❌ Failed:'), error.message);
-        console.log(chalk.yellow('💡 Make sure the number is correct and try again.'));
-        process.exit(1);
-      }
-    }, 3000);
-  } else if (sock.authState.creds.registered) {
-    console.log(chalk.green('✅ Already paired! Using existing session.'));
-  }
-
-  // ========== CONNECTION UPDATE ==========
+  // ---------- CONNECTION UPDATE ----------
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
-    
+
     if (connection === 'open') {
       console.log(chalk.green('✅ Bot Connected!'));
       
@@ -242,7 +235,7 @@ const clientstart = async () => {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ========== STATUS EVENTS ==========
+  // ---------- YOUR HANDLERS (unchanged) ----------
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
@@ -253,7 +246,6 @@ const clientstart = async () => {
     }
   });
 
-  // ========== CHANNEL AUTO‑REACT ==========
   const channelJid = config().newsletter.id + '@newsletter';
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
@@ -286,7 +278,6 @@ const clientstart = async () => {
     }
   });
 
-  // ========== MAIN MESSAGE HANDLER ==========
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
       const messages = chatUpdate.messages;
@@ -355,7 +346,6 @@ const clientstart = async () => {
     } catch (err) {}
   });
 
-  // ANTIDELETE + ANTIEDIT
   sock.ev.on('messages.update', async (updates) => {
     try {
       try {
@@ -420,7 +410,6 @@ const clientstart = async () => {
     } catch (err) {}
   });
 
-  // WELCOME & GOODBYE
   sock.ev.on('group-participants.update', async (update) => {
     try {
       const { id, participants, action } = update;
