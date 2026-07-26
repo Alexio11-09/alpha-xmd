@@ -15,8 +15,8 @@ const config = {
     // 🖼️ THUMBNAIL
     thumbUrl: "https://files.catbox.moe/soc5w1.jpg",
 
-    // 📁 SESSION FOLDER
-    session: "sessions",
+    // 📁 SESSION FOLDER – changed to "session" (to match test)
+    session: "session",
 
     // ⚙️ BOT MODE
     mode: "public", // public / self
@@ -32,7 +32,7 @@ const config = {
     // 📊 STATUS SETTINGS
     status: {
         public: true,
-        terminal: true,
+        terminal: true,   // must be true for pairing
         reactsw: false
     },
 
@@ -49,7 +49,7 @@ const config = {
         title: "ALPHA-XMD BOT",
         description: "Custom WhatsApp Bot by Alpha",
         footer: "⚡ Powered by Alpha-XMD",
-        menuSongUrl: "https://files.catbox.moe/soKHEOR3yQOZE51.mp3"   // 👈 Evil Jordan intro (direct mp3)
+        menuSongUrl: "https://files.catbox.moe/soKHEOR3yQOZE51.mp3"
     },
 
     // 📢 CHANNEL / NEWSLETTER
