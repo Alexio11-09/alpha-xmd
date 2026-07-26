@@ -113,7 +113,7 @@ const clientstart = async () => {
   // --- EXACT SOCKET CONFIG FROM THE WORKING TEST ---
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: false,
+    printQRInTerminal: false,          // force pairing
     auth: state,
     version,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
@@ -144,7 +144,7 @@ const clientstart = async () => {
   }
   console.log(chalk.green(`✅ Using number: ${phoneNumber}`));
 
-  // ---------- FORCE PAIRING ----------
+  // ---------- FORCE PAIRING (exactly like test) ----------
   setTimeout(async () => {
     try {
       console.log(chalk.yellow('⏳ Requesting pairing code...'));
@@ -159,17 +159,18 @@ const clientstart = async () => {
       console.log(chalk.green('⏳ Waiting for you to enter the code in WhatsApp...'));
     } catch (error) {
       console.log(chalk.red('❌ Failed:'), error.message);
-      process.exit(1);
+      // Don't exit – let the bot retry or stay alive
     }
   }, 3000);
 
-  // ---------- CONNECTION UPDATE – FIXED CLOSE HANDLER ----------
+  // ---------- CONNECTION UPDATE – minimal, like test ----------
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
 
     if (connection === 'open') {
       console.log(chalk.green('✅ Bot Connected!'));
       
+      // ---- Your handlers after connection ----
       const followChannel = async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 3000));
@@ -214,24 +215,18 @@ const clientstart = async () => {
     
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      console.log(chalk.yellow(`🔍 Connection closed with code: ${statusCode}`));
       
-      // Log the status code for debugging
-      console.log(chalk.yellow(`🔍 Close status code: ${statusCode}`));
-
-      // If logged out, delete session and exit (or restart)
+      // If logged out, delete session and exit
       if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
         console.log(chalk.red('❌ Session logged out. Deleting session...'));
         try {
           fs.rmSync('./session', { recursive: true, force: true });
-          console.log(chalk.yellow('Session folder deleted. Please restart the bot.'));
-        } catch (err) {
-          console.error('Error deleting session:', err);
-        }
-        // Instead of exiting, we could restart, but let's exit cleanly
+        } catch (err) {}
         process.exit(0);
       }
 
-      // For other disconnections, reconnect
+      // Otherwise, reconnect
       if (!isRestarting) {
         isRestarting = true;
         console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'));
@@ -245,7 +240,7 @@ const clientstart = async () => {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ---------- YOUR HANDLERS (unchanged) ----------
+  // ---------- YOUR FULL HANDLERS (unchanged) ----------
   sock.ev.on('messages.upsert', async ({ messages }) => {
     if (!messages || !messages[0]) return;
     const msg = messages[0];
