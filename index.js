@@ -19,7 +19,7 @@ modules.forEach(mod => {
 console.clear();
 
 const config = () => require('./settings/config');
-process.on("uncaughtException", (e) => console.log('Uncaught:', e));
+process.on("uncaughtException", (e) => console.log('⚠️ Error:', e.message));
 
 let makeWASocket, Browsers, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, jidDecode;
 
@@ -81,15 +81,26 @@ const funnyEdited = [
     "📝 Edit detected! Original version:"
 ];
 
-let phoneNumber = null; // store globally
+let phoneNumber = null;
 let pairingRequested = false;
+const STATE_FILE = './.pairing_state';
+
+// ---------- Read/write pairing state ----------
+const readPairingState = () => {
+  try {
+    return fs.readFileSync(STATE_FILE, 'utf-8').trim() === 'true';
+  } catch { return false; }
+};
+const writePairingState = (val) => {
+  fs.writeFileSync(STATE_FILE, val ? 'true' : 'false', 'utf-8');
+};
 
 const question = (text) => {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
 };
 
-// ---------- HANDLER ATTACHMENT (ONLY AFTER 'open') ----------
+// ---------- HANDLER ATTACHMENT ----------
 const attachHandlers = (sock, store) => {
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath));
@@ -257,7 +268,6 @@ const attachHandlers = (sock, store) => {
     } catch (err) {}
   });
 
-  // --- send connection DM after handlers attached
   const followChannel = async () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -302,11 +312,10 @@ const attachHandlers = (sock, store) => {
 const clientstart = async () => {
   await loadBaileys();
 
-  // Delete session only if no creds (first run)
-  if (!fs.existsSync('./session/creds.json')) {
-    if (fs.existsSync('./session')) fs.rmSync('./session', { recursive: true, force: true });
-  }
+  // Read pairing state from file
+  pairingRequested = readPairingState();
 
+  // Do NOT delete session – keep it for reconnection
   const { state, saveCreds } = await useMultiFileAuthState('./session');
   const { version } = await fetchLatestBaileysVersion();
 
@@ -316,9 +325,9 @@ const clientstart = async () => {
     auth: state,
     version,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
-    connectTimeoutMs: 120000,
-    defaultQueryTimeoutMs: 120000,
-    keepAliveIntervalMs: 30000,
+    connectTimeoutMs: 180000,
+    defaultQueryTimeoutMs: 180000,
+    keepAliveIntervalMs: 10000,
   });
 
   sock.decodeJid = (jid) => {
@@ -332,7 +341,7 @@ const clientstart = async () => {
 
   const store = new Map();
 
-  // ---------- GET PHONE NUMBER (only once) ----------
+  // ---------- GET PHONE NUMBER ----------
   if (!phoneNumber) {
     phoneNumber = await question(chalk.bgBlack(chalk.greenBright(`📱 Enter your WhatsApp number (without + or spaces): `)));
     phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
@@ -343,11 +352,11 @@ const clientstart = async () => {
   }
   console.log(chalk.green(`✅ Using number: ${phoneNumber}`));
 
-  // ---------- PAIRING REQUEST (only once) ----------
+  // ---------- REQUEST PAIRING ONLY IF NOT ALREADY REQUESTED ----------
   if (!pairingRequested && !state.creds.registered) {
+    console.log(chalk.yellow('⏳ Requesting pairing code...'));
     setTimeout(async () => {
       try {
-        console.log(chalk.yellow('⏳ Requesting pairing code...'));
         let code = await sock.requestPairingCode(phoneNumber);
         code = code?.match(/.{1,4}/g)?.join("-") || code;
         console.log(chalk.black(chalk.bgGreen(`\n✅ PAIRING CODE: ${code}`)));
@@ -358,47 +367,45 @@ const clientstart = async () => {
         console.log(chalk.gray(`4. Enter this code: ${code}\n`));
         console.log(chalk.green('⏳ Waiting for you to enter the code in WhatsApp...'));
         pairingRequested = true;
+        writePairingState(true); // remember we requested
       } catch (error) {
         console.log(chalk.red('❌ Failed:'), error.message);
+        writePairingState(false);
       }
     }, 3000);
   } else if (state.creds.registered) {
     console.log(chalk.green('✅ Already paired.'));
+  } else {
+    console.log(chalk.yellow('ℹ️ Pairing already requested. Waiting for code entry...'));
   }
 
   // ---------- CONNECTION UPDATE ----------
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
-    console.log(chalk.blue(`🔍 Connection state: ${connection}`));
 
     if (connection === 'open') {
       console.log(chalk.green('✅ Bot Connected!'));
+      writePairingState(false); // success, clear state
       attachHandlers(sock, store);
     }
     
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      console.log(chalk.yellow(`🔍 Close status code: ${statusCode}`));
-      
-      // If 401 (logged out), delete session and exit
       if (statusCode === 401 || statusCode === DisconnectReason.loggedOut) {
-        console.log(chalk.red('❌ Logged out. Deleting session and exiting.'));
         try {
           fs.rmSync('./session', { recursive: true, force: true });
+          fs.rmSync(STATE_FILE, { force: true });
         } catch (err) {}
         process.exit(0);
       }
-
-      // For any other close (including 515, 408), reconnect without resetting pairing flag
-      // This keeps the same code valid.
-      console.log(chalk.yellow('🔄 Reconnecting in 10 seconds...'));
+      // Reconnect without resetting pairing state
+      console.log(chalk.yellow('🔄 Reconnecting...'));
       setTimeout(clientstart, 10000);
     }
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // Ping interval to keep socket alive
   setInterval(() => {
     if (sock.user) {
       sock.sendPresenceUpdate('available').catch(() => {});
@@ -406,7 +413,5 @@ const clientstart = async () => {
   }, 20000);
 };
 
-// Keep process alive
 setInterval(() => {}, 60000);
-
 clientstart();
