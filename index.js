@@ -83,17 +83,6 @@ const funnyEdited = [
 
 let phoneNumber = null;
 let pairingRequested = false;
-const STATE_FILE = './.pairing_state';
-
-// ---------- Read/write pairing state ----------
-const readPairingState = () => {
-  try {
-    return fs.readFileSync(STATE_FILE, 'utf-8').trim() === 'true';
-  } catch { return false; }
-};
-const writePairingState = (val) => {
-  fs.writeFileSync(STATE_FILE, val ? 'true' : 'false', 'utf-8');
-};
 
 const question = (text) => {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -312,9 +301,6 @@ const attachHandlers = (sock, store) => {
 const clientstart = async () => {
   await loadBaileys();
 
-  // Read pairing state from file
-  pairingRequested = readPairingState();
-
   // Do NOT delete session – keep it for reconnection
   const { state, saveCreds } = await useMultiFileAuthState('./session');
   const { version } = await fetchLatestBaileysVersion();
@@ -342,41 +328,54 @@ const clientstart = async () => {
   const store = new Map();
 
   // ---------- GET PHONE NUMBER ----------
-  if (!phoneNumber) {
-    phoneNumber = await question(chalk.bgBlack(chalk.greenBright(`📱 Enter your WhatsApp number (without + or spaces): `)));
-    phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-  }
-  if (!phoneNumber || phoneNumber.length < 10) {
-    console.log(chalk.red('❌ Invalid number.'));
-    process.exit(1);
-  }
-  console.log(chalk.green(`✅ Using number: ${phoneNumber}`));
+  if (!state.creds.registered) {
+    phoneNumber = await question(
+      chalk.bgBlack(
+        chalk.greenBright(
+          `📱 Enter your WhatsApp number (without + or spaces): `
+        )
+      )
+    );
 
-  // ---------- REQUEST PAIRING ONLY IF NOT ALREADY REQUESTED ----------
-  if (!pairingRequested && !state.creds.registered) {
-    console.log(chalk.yellow('⏳ Requesting pairing code...'));
-    setTimeout(async () => {
-      try {
-        let code = await sock.requestPairingCode(phoneNumber);
-        code = code?.match(/.{1,4}/g)?.join("-") || code;
-        console.log(chalk.black(chalk.bgGreen(`\n✅ PAIRING CODE: ${code}`)));
-        console.log(chalk.yellow(`\n📱 Instructions:`));
-        console.log(chalk.gray('1. Open WhatsApp on your phone'));
-        console.log(chalk.gray('2. Go to Settings > Linked Devices'));
-        console.log(chalk.gray('3. Tap "Link a Device"'));
-        console.log(chalk.gray(`4. Enter this code: ${code}\n`));
-        console.log(chalk.green('⏳ Waiting for you to enter the code in WhatsApp...'));
-        pairingRequested = true;
-        writePairingState(true); // remember we requested
-      } catch (error) {
-        console.log(chalk.red('❌ Failed:'), error.message);
-        writePairingState(false);
-      }
-    }, 3000);
-  } else if (state.creds.registered) {
-    console.log(chalk.green('✅ Already paired.'));
+    phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+
+    if (!phoneNumber || phoneNumber.length < 10) {
+      console.log(chalk.red('❌ Invalid number.'));
+      process.exit(1);
+    }
+
+    console.log(chalk.green(`✅ Using number: ${phoneNumber}`));
+
+    try {
+      console.log(chalk.yellow('⏳ Requesting pairing code...'));
+
+      // Baileys 6.7.24
+      let code = await sock.requestPairingCode(phoneNumber);
+
+      code = code?.match(/.{1,4}/g)?.join("-") || code;
+
+      console.log(chalk.black(chalk.bgGreen(
+        `\\n✅ PAIRING CODE: ${code}`
+      )));
+
+      console.log(chalk.yellow(`\\n📱 Instructions:`));
+      console.log(chalk.gray('1. Open WhatsApp on your phone'));
+      console.log(chalk.gray('2. Go to Settings > Linked Devices'));
+      console.log(chalk.gray('3. Tap "Link a Device"'));
+      console.log(chalk.gray('4. Enter the code shown above'));
+
+      pairingRequested = true;
+
+    } catch (error) {
+      pairingRequested = false;
+      console.log(
+        chalk.red('❌ Failed to request pairing code:'),
+        error.message
+      );
+    }
+
   } else {
-    console.log(chalk.yellow('ℹ️ Pairing already requested. Waiting for code entry...'));
+    console.log(chalk.green('✅ Already paired. Starting bot...'));
   }
 
   // ---------- CONNECTION UPDATE ----------
@@ -385,7 +384,6 @@ const clientstart = async () => {
 
     if (connection === 'open') {
       console.log(chalk.green('✅ Bot Connected!'));
-      writePairingState(false); // success, clear state
       attachHandlers(sock, store);
     }
     
@@ -394,7 +392,6 @@ const clientstart = async () => {
       if (statusCode === 401 || statusCode === DisconnectReason.loggedOut) {
         try {
           fs.rmSync('./session', { recursive: true, force: true });
-          fs.rmSync(STATE_FILE, { force: true });
         } catch (err) {}
         process.exit(0);
       }
