@@ -32,3 +32,8 @@ creds.json
 
 # Upload/temp media
 downloads/
+# Local bot runtime state
+.pairing_state
+
+# Local backup files
+*.backup

@@ -52,8 +52,7 @@ module.exports = [
                     edit: loadMsg.key
                 });
 
-                const menuSongUrl = config.settings?.menuSongUrl ||
-                    "https://files.catbox.moe/soKHEOR3yQOZE51.mp3";
+                const menuSongUrl = path.join(__dirname, "../../test-menu.mp3");
 
                 const now = new Date();
                 const time = now.toLocaleTimeString();
