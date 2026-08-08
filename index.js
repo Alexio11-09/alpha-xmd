@@ -221,7 +221,7 @@ const attachHandlers = (sock, store) => {
           let text;
           if (adConfig.style === 'fancy') {
             if (isGroup) text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
-            else text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│ 📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
+            else text = `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 ${senderDisplayPrivate}\n│  📍 Private\n│ 🕒 ${time}\n│ 📅 ${date}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${(oldMsg.text||'Media').replace(/\n/g,'\n│ │ ')}\n│ └─\n│ 🛡️ Alpha\n╰──`;
           } else text = funnyDeleted[0] + `\n\n${oldMsg.text||'Media'}`;
           const mentions = isGroup && adConfig.style === 'fancy' && senderJidDel !== sock.user.id ? [senderJidDel] : [];
           const destinations = [];
@@ -339,6 +339,86 @@ const clientstart = async () => {
 
   const store = new Map();
 
+  // ---------- CONNECTION UPDATE ----------
+  let reconnectTimer = null;
+  let socketClosed = false;
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
+
+    if (connection === 'open') {
+      socketClosed = false;
+
+      console.log(chalk.green('✅ Bot Connected!'));
+
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+
+      attachHandlers(sock, store);
+      return;
+    }
+
+    if (connection === 'close') {
+      if (socketClosed) return;
+      socketClosed = true;
+
+      const error = lastDisconnect?.error;
+      const statusCode =
+        new Boom(error)?.output?.statusCode;
+
+      console.log(
+        chalk.yellow(
+          `🔌 Connection closed (${statusCode || 'unknown'})`
+        )
+      );
+
+      if (error) {
+        console.log(
+          chalk.gray(
+            `Reason: ${error?.message || error}`
+          )
+        );
+      }
+
+      if (
+        statusCode === 401 ||
+        statusCode === DisconnectReason.loggedOut
+      ) {
+        console.log(
+          chalk.red('❌ WhatsApp session logged out.')
+        );
+
+        try {
+          fs.rmSync('./session', {
+            recursive: true,
+            force: true
+          });
+        } catch {}
+
+        process.exit(0);
+      }
+
+      if (reconnectTimer) return;
+
+      console.log(
+        chalk.yellow('🔄 Reconnecting in 10 seconds...')
+      );
+
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+
+        clientstart().catch(err => {
+          console.log(
+            chalk.red('⚠️ Reconnect failed:'),
+            err.message
+          );
+        });
+      }, 10000);
+    }
+  });
+
   // ---------- GET PHONE NUMBER ----------
   if (!state.creds.registered) {
     phoneNumber = await question(
@@ -362,7 +442,19 @@ const clientstart = async () => {
       console.log(chalk.yellow('⏳ Requesting pairing code...'));
 
       // Baileys 6.7.24
-      let code = await sock.requestPairingCode(phoneNumber);
+      console.log(chalk.gray("🔌 Waiting for WhatsApp connection before requesting code..."));
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      console.log(chalk.gray("📡 Calling requestPairingCode()..."));
+
+      const pairingPromise = sock.requestPairingCode(phoneNumber);
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Pairing code request timed out after 30 seconds")), 30000)
+      );
+
+      let code = await Promise.race([pairingPromise, timeoutPromise]);
 
       code = code?.match(/.{1,4}/g)?.join("-") || code;
 
@@ -389,29 +481,6 @@ const clientstart = async () => {
   } else {
     console.log(chalk.green('✅ Already paired. Starting bot...'));
   }
-
-  // ---------- CONNECTION UPDATE ----------
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect } = update;
-
-    if (connection === 'open') {
-      console.log(chalk.green('✅ Bot Connected!'));
-      attachHandlers(sock, store);
-    }
-    
-    if (connection === 'close') {
-      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (statusCode === 401 || statusCode === DisconnectReason.loggedOut) {
-        try {
-          fs.rmSync('./session', { recursive: true, force: true });
-        } catch (err) {}
-        process.exit(0);
-      }
-      // Reconnect without resetting pairing state
-      console.log(chalk.yellow('🔄 Reconnecting...'));
-      setTimeout(clientstart, 10000);
-    }
-  });
 
   sock.ev.on('creds.update', saveCreds);
 
