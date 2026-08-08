@@ -86,7 +86,8 @@ let pairingRequested = false;
 
 const question = (text) => {
   return new Promise(resolve => {
-    process.stdout.write(chalk.yellow(text));
+    console.log(chalk.yellow(text));
+
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
