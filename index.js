@@ -85,8 +85,19 @@ let phoneNumber = null;
 let pairingRequested = false;
 
 const question = (text) => {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => rl.question(chalk.yellow(text), ans => { resolve(ans); rl.close(); }));
+  return new Promise(resolve => {
+    process.stdout.write(chalk.yellow(text));
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: false
+    });
+
+    rl.once("line", (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
 };
 
 // ---------- HANDLER ATTACHMENT ----------
