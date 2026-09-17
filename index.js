@@ -1,30 +1,15 @@
 // © 2026 Alpha. All Rights Reserved.
 const fs = require("fs");
-const { execSync } = require("child_process");
-
-const modules = [
-  "pino", "@whiskeysockets/baileys", "@hapi/boom", "chalk", "axios",
-  "node-fetch", "yt-search", "form-data", "file-type", "moment-timezone",
-  "human-readable", "fluent-ffmpeg", "@ffmpeg-installer/ffmpeg",
-  "crypto-js", "adm-zip"
-];
-
-for (const mod of modules) {
-  try { require.resolve(mod) }
-  catch {
-    try { execSync(`npm install ${mod} --force`, { stdio: "inherit" }) }
-    catch (e) { console.log(`⚠️ Failed installing ${mod}`) }
-  }
-}
-
-console.clear();
-
+const path = require("path");
 const config = () => require("./settings/config");
 const pino = require("pino");
 const readline = require("readline");
 const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
+const PhoneNumber = require("awesome-phonenumber");
+
+console.log("🚀 Starting Alpha Bot...");
 
 let autoStatusHandler;
 try {
@@ -42,7 +27,6 @@ try {
   messageHandler = async () => {};
 }
 
-// ✅ FIXED: Store moved to top level so it persists across reconnects
 const store = new Map();
 
 let globalSettings = {
@@ -71,12 +55,6 @@ const funnyDeleted = [
   "📝 Deleted message rescued:"
 ];
 
-const phoneNumberPrompt = text => new Promise(resolve => {
-  process.stdout.write(chalk.yellow(text));
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
-  rl.once("line", answer => { rl.close(); resolve(answer.trim()); });
-});
-
 function loadGlobalSettings() {
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
@@ -93,7 +71,6 @@ function attachHandlers(sock) {
   loadGlobalSettings();
   const channelJid = getChannelJid();
 
-  // ✅ FIXED: Merged all three messages.upsert listeners into ONE
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       const messages = chatUpdate.messages;
@@ -103,7 +80,6 @@ function attachHandlers(sock) {
         if (!mek.message) continue;
         const remote = mek.key?.remoteJid;
 
-        // 1. Handle Status Broadcast
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) {
             await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
@@ -111,7 +87,6 @@ function attachHandlers(sock) {
           continue;
         }
 
-        // 2. Handle Channel Reacts
         if (remote === channelJid) {
           loadGlobalSettings();
           const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
@@ -136,7 +111,6 @@ function attachHandlers(sock) {
           continue;
         }
 
-        // 3. Main Message Handler
         if (mek.key.fromMe) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) continue;
@@ -339,29 +313,42 @@ let restarting = false;
 async function clientstart() {
   const baileys = await import("@whiskeysockets/baileys");
   const makeWASocket = baileys.default;
-  const { useMultiFileAuthState, DisconnectReason, jidDecode } = baileys;
+  const { useMultiFileAuthState, DisconnectReason, jidDecode, fetchLatestBaileysVersion } = baileys;
 
   const { state, saveCreds } = await useMultiFileAuthState("./session");
+  const { version } = await fetchLatestBaileysVersion();
 
-  // ✅ FIXED: Prompt for number BEFORE creating the socket
   let pairingNumber = "";
   if (!state.creds.registered) {
-    pairingNumber = await phoneNumberPrompt("📱 Enter your WhatsApp number (without + or spaces): ");
+    if (process.stdin.isTTY) {
+      // ✅ FIXED: Use console.log to force a newline so Pterodactyl renders the prompt!
+      console.log(chalk.yellow("\n📱 Enter your WhatsApp number (without + or spaces) and press Enter:"));
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      pairingNumber = await new Promise(resolve => rl.once('line', (line) => { rl.close(); resolve(line.trim()); }));
+    } else {
+      // Pterodactyl / Docker fallback if TTY is not detected
+      pairingNumber = process.env.PHONE_NUMBER || (config().owner?.[0] || "");
+      console.log(chalk.yellow("⚠️ Non-interactive environment detected. Using fallback number."));
+    }
+    
     pairingNumber = pairingNumber.replace(/[^0-9]/g, "");
-    if (!pairingNumber || pairingNumber.length < 10) {
-      console.log(chalk.red("❌ Invalid number."));
+
+    if (!pairingNumber || !PhoneNumber('+' + pairingNumber).isValid()) {
+      console.log(chalk.red(`❌ Invalid or missing phone number: ${pairingNumber}`));
+      console.log(chalk.yellow("Please add PHONE_NUMBER=2637... to the Startup tab in Pterodactyl."));
       process.exit(1);
     }
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
   const sock = makeWASocket({
+    version,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
     auth: state,
     browser: ["Ubuntu", "Chrome", "20.0.04"],
-    connectTimeoutMs: 180000,
-    defaultQueryTimeoutMs: 180000,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 10000
   });
 
@@ -374,16 +361,9 @@ async function clientstart() {
     return jid;
   };
 
-  let socketClosed = false;
-  let pairingInProgress = !state.creds.registered;
-  let pairingCodeRequested = false; // ✅ FIXED: Track if we already requested the code
-
-  sock.ev.on("connection.update", async update => {
-    const { connection, lastDisconnect } = update;
-
-    // ✅ FIXED: Request pairing code when connection is "connecting", not "open"
-    if (connection === "connecting" && !state.creds.registered && pairingNumber && !pairingCodeRequested) {
-      pairingCodeRequested = true;
+  // ✅ FIXED: Knight Bot style pairing request (3s delay, outside listener)
+  if (!state.creds.registered && pairingNumber) {
+    setTimeout(async () => {
       try {
         console.log(chalk.yellow("📡 Requesting pairing code..."));
         const code = await sock.requestPairingCode(pairingNumber);
@@ -394,17 +374,19 @@ async function clientstart() {
         console.log(chalk.yellow("📱 Open WhatsApp > Settings > Linked Devices"));
         console.log(chalk.yellow("📱 Tap Link a Device"));
         console.log(chalk.yellow("📱 Enter the pairing code above"));
-        console.log("");
-        console.log(chalk.green("⏳ Waiting for WhatsApp to finish linking..."));
       } catch (error) {
         console.log(chalk.red("❌ Failed to request pairing code:"), error.message);
-        pairingCodeRequested = false; // Allow retry
       }
-    }
+    }, 3000);
+  }
+
+  let socketClosed = false;
+
+  sock.ev.on("connection.update", async update => {
+    const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
       socketClosed = false;
-      pairingInProgress = false;
       console.log(chalk.green("✅ Bot Connected!"));
       attachHandlers(sock);
       return;
@@ -424,11 +406,6 @@ async function clientstart() {
         console.log(chalk.red("❌ WhatsApp session logged out."));
         try { fs.rmSync("./session", { recursive: true, force: true }); } catch {}
         process.exit(0);
-      }
-
-      if (pairingInProgress) {
-        console.log(chalk.yellow("⏳ Waiting for the initial pairing process..."));
-        return;
       }
 
       if (restarting) return;
