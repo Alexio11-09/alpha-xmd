@@ -307,7 +307,6 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
                 tempSock.ev.on('connection.update', async (up) => {
                     const { connection } = up;
                     if (connection === 'connecting') {
-                        // Wait 2 seconds for socket to fully initialize before requesting
                         setTimeout(requestCode, 2000);
                     } else if (connection === 'close') {
                         clearTimeout(timeout);
@@ -315,7 +314,6 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
                     }
                 });
 
-                // Fallback if 'connecting' event doesn't fire
                 setTimeout(requestCode, 4000);
 
             } else if (method === 'qr') {
