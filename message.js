@@ -258,7 +258,7 @@ module.exports = async (sock, m) => {
     }
 };
 
-// PAIR HANDLER (unchanged)
+// ✅ FIXED: PAIR HANDLER - Now correctly waits for the 'connecting' state before requesting the code
 module.exports.handlePairChoice = async (sock, m, number, method, reply, send) => {
     const baileys = await import('@whiskeysockets/baileys');
     const { makeWASocket, Browsers, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
@@ -286,11 +286,14 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
             let settled = false;
             const finish = (data) => { if (settled) return; settled = true; resolve(data); };
             const fail = (err) => { if (settled) return; settled = true; reject(err); };
-            const timeout = setTimeout(() => fail(new Error('Request timed out.')), 50000);
+            const timeout = setTimeout(() => fail(new Error('Request timed out.')), 60000);
 
-            tempSock.ev.on('connection.update', async (up) => {
-                const { connection, qr } = up;
-                if (connection === 'open' && method === 'code') {
+            if (method === 'code') {
+                let codeRequested = false;
+                
+                const requestCode = async () => {
+                    if (codeRequested) return;
+                    codeRequested = true;
                     try {
                         const code = await tempSock.requestPairingCode(number);
                         clearTimeout(timeout);
@@ -299,14 +302,33 @@ module.exports.handlePairChoice = async (sock, m, number, method, reply, send) =
                         clearTimeout(timeout);
                         fail(err);
                     }
-                } else if (qr && method === 'qr') {
-                    clearTimeout(timeout);
-                    finish({ qr });
-                } else if (connection === 'close') {
-                    clearTimeout(timeout);
-                    fail(new Error('Connection closed'));
-                }
-            });
+                };
+
+                tempSock.ev.on('connection.update', async (up) => {
+                    const { connection } = up;
+                    if (connection === 'connecting') {
+                        // Wait 2 seconds for socket to fully initialize before requesting
+                        setTimeout(requestCode, 2000);
+                    } else if (connection === 'close') {
+                        clearTimeout(timeout);
+                        fail(new Error('Connection closed before pairing code could be generated'));
+                    }
+                });
+
+                // Fallback if 'connecting' event doesn't fire
+                setTimeout(requestCode, 4000);
+
+            } else if (method === 'qr') {
+                tempSock.ev.on('connection.update', (up) => {
+                    if (up.qr) {
+                        clearTimeout(timeout);
+                        finish({ qr: up.qr });
+                    } else if (up.connection === 'close') {
+                        clearTimeout(timeout);
+                        fail(new Error('Connection closed'));
+                    }
+                });
+            }
         });
 
         tempSock.end();
