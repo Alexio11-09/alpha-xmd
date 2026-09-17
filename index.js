@@ -1,504 +1,331 @@
 // © 2026 Alpha. All Rights Reserved.
 
-const fs = require("fs");
-const { execSync } = require("child_process");
+const fs=require("fs");
+const {execSync}=require("child_process");
 
-const modules = [
-  "pino",
-  "@whiskeysockets/baileys",
-  "@hapi/boom",
-  "chalk",
-  "axios",
-  "node-fetch",
-  "yt-search",
-  "form-data",
-  "file-type",
-  "moment-timezone",
-  "human-readable",
-  "fluent-ffmpeg",
-  "@ffmpeg-installer/ffmpeg",
-  "crypto-js",
-  "adm-zip"
+const modules=[
+"pino","@whiskeysockets/baileys","@hapi/boom","chalk","axios",
+"node-fetch","yt-search","form-data","file-type","moment-timezone",
+"human-readable","fluent-ffmpeg","@ffmpeg-installer/ffmpeg",
+"crypto-js","adm-zip"
 ];
 
-modules.forEach(mod => {
-  try {
-    require.resolve(mod);
-  } catch {
-    execSync(`npm install ${mod} --force`, { stdio: "inherit" });
-  }
-});
+for(const mod of modules){
+ try{require.resolve(mod)}
+ catch{
+  try{execSync(`npm install ${mod} --force`,{stdio:"inherit"})}
+  catch(e){console.log(`⚠️ Failed installing ${mod}`)}
+ }
+}
 
 console.clear();
 
-const config = () => require("./settings/config");
+const config=()=>require("./settings/config");
 
-process.on("uncaughtException", (e) => {
-  console.log("⚠️ Error:", e.message);
+process.on("uncaughtException",e=>{
+ console.log("⚠️ Error:",e.message);
 });
 
 let makeWASocket;
 let Browsers;
 let useMultiFileAuthState;
 let DisconnectReason;
-let fetchLatestBaileysVersion;
 let jidDecode;
 
-const loadBaileys = async () => {
-  const baileys = await import("@whiskeysockets/baileys");
+async function loadBaileys(){
+ const b=await import("@whiskeysockets/baileys");
+ makeWASocket=b.default;
+ Browsers=b.Browsers;
+ useMultiFileAuthState=b.useMultiFileAuthState;
+ DisconnectReason=b.DisconnectReason;
+ jidDecode=b.jidDecode;
+}
 
-  makeWASocket = baileys.default;
-  Browsers = baileys.Browsers;
-  useMultiFileAuthState = baileys.useMultiFileAuthState;
-  DisconnectReason = baileys.DisconnectReason;
-  fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
-  jidDecode = baileys.jidDecode;
-};
-
-const pino = require("pino");
-const readline = require("readline");
-const chalk = require("chalk");
-const { Boom } = require("@hapi/boom");
-const { smsg } = require("./library/serialize");
+const pino=require("pino");
+const readline=require("readline");
+const chalk=require("chalk");
+const {Boom}=require("@hapi/boom");
+const {smsg}=require("./library/serialize");
 
 let autoStatusHandler;
-
-try {
-  autoStatusHandler = require("./plugins/autostatus");
-} catch {
-  autoStatusHandler = {
-    handleStatusUpdate: () => {}
-  };
+try{
+ autoStatusHandler=require("./plugins/autostatus");
+}catch{
+ autoStatusHandler={handleStatusUpdate:()=>{}};
 }
 
 let messageHandler;
-
-try {
-  messageHandler = require("./message");
-} catch {
-  messageHandler = async () => {};
+try{
+ messageHandler=require("./message");
+}catch{
+ messageHandler=async()=>{};
 }
 
-let globalSettings = {
-  autoread: false,
-  autotyping: false,
-  autorecording: false,
-  autoreact: false,
-  antidelete: false,
-  antiedit: false
+let globalSettings={
+ autoread:false,
+ autotyping:false,
+ autorecording:false,
+ autoreact:false,
+ antidelete:false,
+ antiedit:false
 };
 
-let dbPath = "./database/groupSettings.json";
-let settingsPath = "./database/settings.json";
+let dbPath="./database/groupSettings.json";
+let settingsPath="./database/settings.json";
 
-try {
-  if (!fs.existsSync("./database")) {
-    fs.mkdirSync("./database", { recursive: true });
-  }
+try{
+ if(!fs.existsSync("./database"))
+  fs.mkdirSync("./database",{recursive:true});
 
-  fs.writeFileSync(dbPath, "{}", { flag: "a" });
+ if(!fs.existsSync(dbPath))
+  fs.writeFileSync(dbPath,"{}");
 
-  if (!fs.existsSync(settingsPath)) {
-    fs.writeFileSync(settingsPath, "{}");
-  }
-} catch {
-  dbPath = "/tmp/groupSettings.json";
-  settingsPath = "/tmp/settings.json";
+ if(!fs.existsSync(settingsPath))
+  fs.writeFileSync(settingsPath,"{}");
+}catch{
+ dbPath="/tmp/groupSettings.json";
+ settingsPath="/tmp/settings.json";
 }
 
-const funnyWelcomes = [
-  "🌟 A new legend has arrived! Welcome @user! 🎉",
-  "👋 Look who decided to join us! Welcome @user! 🥳"
+const funnyWelcomes=[
+ "🌟 A new legend has arrived! Welcome @user! 🎉",
+ "👋 Look who decided to join us! Welcome @user! 🥳"
 ];
 
-const funnyGoodbyes = [
-  "🚶‍♂️ @user has left the building. We'll miss the vibes.",
-  "😢 Another one bites the dust. Goodbye @user!"
+const funnyGoodbyes=[
+ "🚶‍♂️ @user has left the building. We'll miss the vibes.",
+ "😢 Another one bites the dust. Goodbye @user!"
 ];
 
-const funnyDeleted = [
-  "🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️",
-  "📝 Deleted message rescued:"
+const funnyDeleted=[
+ "🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️",
+ "📝 Deleted message rescued:"
 ];
 
-const funnyEdited = [
-  "✏️ A message was edited. Here's the original:",
-  "📝 Edit detected! Original version:"
-];
+const phoneNumberPrompt=text=>new Promise(resolve=>{
+ process.stdout.write(chalk.yellow(text));
+ const rl=readline.createInterface({
+  input:process.stdin,
+  output:process.stdout,
+  terminal:false
+ });
+ rl.once("line",answer=>{
+  rl.close();
+  resolve(answer.trim());
+ });
+});
 
-let phoneNumber = null;
-let pairingRequested = false;
+function loadGlobalSettings(){
+ try{
+  const saved=JSON.parse(fs.readFileSync(settingsPath,"utf8"));
+  if(saved.global)
+   globalSettings={...globalSettings,...saved.global};
+ }catch{}
+}
 
-/*
- * Panel-safe input.
- * The prompt is written directly to stdout and readline
- * listens for the next complete line.
- */
-const question = (text) => {
-  return new Promise((resolve) => {
-    process.stdout.write(chalk.yellow(text));
+function getChannelJid(){
+ const c=config();
+ return `${c.newsletter.id}@newsletter`;
+}
 
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      terminal: false
+function attachHandlers(sock,store){
+ loadGlobalSettings();
+
+ const channelJid=getChannelJid();
+
+ sock.ev.on("messages.upsert",async({messages})=>{
+  try{
+   const msg=messages?.[0];
+   if(!msg)return;
+
+   if(msg.key?.remoteJid==="status@broadcast" &&
+      autoStatusHandler.handleStatusUpdate){
+    await autoStatusHandler.handleStatusUpdate(sock,{messages:[msg]});
+   }
+  }catch{}
+ });
+
+ sock.ev.on("messages.upsert",async({messages})=>{
+  try{
+   const msg=messages?.[0];
+   if(!msg||msg.key?.remoteJid!==channelJid)return;
+
+   loadGlobalSettings();
+
+   const cr=globalSettings.chreact||{
+    enabled:false,
+    emojis:["💬"]
+   };
+
+   if(!cr.enabled)return;
+
+   for(const emoji of cr.emojis||[]){
+    try{
+     if(sock.newsletterReact){
+      await sock.newsletterReact(channelJid,msg.key.id,emoji);
+     }else{
+      await sock.relayMessage(channelJid,{
+       reactionMessage:{
+        key:{
+         remoteJid:channelJid,
+         id:msg.key.id,
+         fromMe:false
+        },
+        text:emoji,
+        senderTimestampMs:Date.now()
+       }
+      },{});
+     }
+     await new Promise(r=>setTimeout(r,1000));
+    }catch{}
+   }
+  }catch{}
+ });
+
+ sock.ev.on("messages.upsert",async chatUpdate=>{
+  try{
+   const messages=chatUpdate.messages;
+   if(!messages?.length)return;
+
+   for(const mek of messages){
+    if(!mek.message)continue;
+
+    if(mek.key.fromMe){
+     const txt=
+      mek.message?.conversation||
+      mek.message?.extendedTextMessage?.text||
+      "";
+     if(!txt.startsWith("."))continue;
+    }
+
+    const remote=mek.key?.remoteJid;
+    if(remote==="status@broadcast"||remote===channelJid)continue;
+
+    const m=await smsg(sock,mek);
+
+    store.set(mek.key.id,{
+     text:m.text||"",
+     message:mek.message,
+     sender:m.sender,
+     pushName:m.pushName||null
     });
 
-    rl.once("line", (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-};
+    if(m.isGroup){
+     try{
+      const metadata=await sock.groupMetadata(m.chat);
+      const sender=sock.decodeJid(m.sender);
+      const senderNumber=sender.split("@")[0].replace(/[^0-9]/g,"");
 
+      m.isAdmin=metadata.participants.some(p=>{
+       const pj=sock.decodeJid(p.id);
+       const pn=pj.split("@")[0].replace(/[^0-9]/g,"");
+       return pn===senderNumber &&
+        (p.admin==="admin"||p.admin==="superadmin"||p.admin===true);
+      });
 
-// ============================================================
-// HANDLER ATTACHMENT
-// ============================================================
-
-const attachHandlers = (sock, store) => {
-
-  try {
-    const saved = JSON.parse(
-      fs.readFileSync(settingsPath)
-    );
-
-    if (saved["global"]) {
-      globalSettings = {
-        ...globalSettings,
-        ...saved["global"]
-      };
+      const botJid=sock.decodeJid(sock.user?.id);
+      m.isBotAdmin=metadata.participants.some(p=>{
+       return sock.decodeJid(p.id)===botJid &&
+        (p.admin==="admin"||p.admin==="superadmin"||p.admin===true);
+      });
+     }catch{
+      m.isAdmin=false;
+      m.isBotAdmin=false;
+     }
     }
-  } catch (err) {}
 
-
-  // ---------- STATUS ----------
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    if (!messages || !messages[0]) return;
-
-    const msg = messages[0];
-
-    if (msg.key?.remoteJid === "status@broadcast") {
-      if (autoStatusHandler.handleStatusUpdate) {
-        await autoStatusHandler.handleStatusUpdate(
-          sock,
-          { messages: [msg] }
-        );
-      }
+    if(globalSettings.autoread){
+     try{await sock.readMessages([mek.key])}catch{}
     }
-  });
 
-
-  // ---------- CHANNEL REACT ----------
-  const channelJid =
-    config().newsletter.id + "@newsletter";
-
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    if (!messages || !messages[0]) return;
-
-    const msg = messages[0];
-
-    if (msg.key?.remoteJid !== channelJid) return;
-
-    try {
-      const saved = JSON.parse(
-        fs.readFileSync(settingsPath)
-      );
-
-      if (saved["global"]) {
-        globalSettings = {
-          ...globalSettings,
-          ...saved["global"]
-        };
-      }
-    } catch {}
-
-    const crConfig =
-      globalSettings.chreact || {
-        enabled: false,
-        emojis: ["💬"]
-      };
-
-    if (!crConfig.enabled) return;
-
-    for (const emoji of crConfig.emojis) {
-      try {
-        if (sock.newsletterReact) {
-          await sock.newsletterReact(
-            channelJid,
-            msg.key.id,
-            emoji
-          );
-        } else {
-          await sock.relayMessage(
-            channelJid,
-            {
-              reactionMessage: {
-                key: {
-                  remoteJid: channelJid,
-                  id: msg.key.id,
-                  fromMe: false
-                },
-                text: emoji,
-                senderTimestampMs: Date.now()
-              }
-            },
-            {}
-          );
-        }
-
-        await new Promise(resolve =>
-          setTimeout(resolve, 1000)
-        );
-
-      } catch (err) {}
+    if(globalSettings.autotyping){
+     try{await sock.sendPresenceUpdate("composing",m.chat)}catch{}
     }
-  });
 
+    if(globalSettings.autorecording){
+     try{await sock.sendPresenceUpdate("recording",m.chat)}catch{}
+    }
 
-  // ---------- MESSAGES ----------
-  sock.ev.on("messages.upsert", async (chatUpdate) => {
-    try {
-      const messages = chatUpdate.messages;
+    if(globalSettings.autoreact){
+     const txt=
+      mek.message?.conversation||
+      mek.message?.extendedTextMessage?.text||
+      "";
 
-      if (!messages?.length) return;
-
-      for (let mek of messages) {
-
-        if (!mek.message) continue;
-
-        if (mek.key.fromMe) {
-          const txt =
-            mek.message?.conversation ||
-            mek.message?.extendedTextMessage?.text ||
-            "";
-
-          if (!txt.startsWith(".")) continue;
+     if(!txt.startsWith(".")){
+      const emojis=["🔥","😂","😍","😎","🤖","⚡","💯","👀","🥶","😈"];
+      try{
+       await sock.sendMessage(m.chat,{
+        react:{
+         text:emojis[Math.floor(Math.random()*emojis.length)],
+         key:mek.key
         }
+       });
+      }catch{}
+     }
+    }
 
-        if (
-          mek.key?.remoteJid ===
-          "status@broadcast"
-        ) continue;
+    await messageHandler(sock,m);
+   }
+  }catch(err){
+   console.log("⚠️ Message handler:",err.message);
+  }
+ });
 
-        if (
-          mek.key?.remoteJid ===
-          channelJid
-        ) continue;
+ sock.ev.on("messages.update",async updates=>{
+  try{
+   loadGlobalSettings();
 
-        const m = await smsg(sock, mek);
+   const ad=globalSettings.antidelete||{
+    enabled:false,
+    mode:"chat",
+    style:"fancy",
+    react:true
+   };
 
-        store.set(mek.key.id, {
-          text: m.text || "",
-          message: mek.message,
-          sender: m.sender,
-          pushName: m.pushName || null
-        });
+   const ownerNumber=(config().owner?.[0]||"").replace(/[^0-9]/g,"");
+   const ownerJid=ownerNumber?
+    `${ownerNumber}@s.whatsapp.net`:null;
 
-        if (m.isGroup) {
-          try {
-            const metadata =
-              await sock.groupMetadata(m.chat);
+   for(const update of updates){
+    const oldMsg=store.get(update.key.id);
+    if(!oldMsg)continue;
 
-            const participants =
-              metadata.participants;
+    if(update.update?.message===null){
+     if(!ad.enabled)continue;
 
-            const senderJidDecoded =
-              sock.decodeJid(m.sender);
+     const chat=update.key.remoteJid;
+     if(!chat)continue;
 
-            const senderNumber =
-              senderJidDecoded
-                .split("@")[0]
-                .replace(/[^0-9]/g, "");
+     const isGroup=chat.endsWith("@g.us");
+     const sender=oldMsg.sender||
+      update.key.participant||
+      chat;
 
-            m.isAdmin = participants.some((p) => {
+     const senderNumber=sender.split("@")[0].replace(/[^0-9]/g,"");
+     const privateName=oldMsg.pushName?.trim()||senderNumber;
 
-              const pJid =
-                sock.decodeJid(p.id);
+     let chatName="Private Chat";
 
-              const pNumber =
-                pJid
-                  .split("@")[0]
-                  .replace(/[^0-9]/g, "");
-
-              return (
-                pNumber === senderNumber &&
-                (
-                  p.admin === "admin" ||
-                  p.admin === true
-                )
-              );
-            });
-
-            m.isBotAdmin = true;
-
-          } catch (err) {
-            m.isAdmin = false;
-            m.isBotAdmin = true;
-          }
-        }
-
-        if (globalSettings.autoread) {
-          await sock.readMessages([mek.key]);
-        }
-
-        if (globalSettings.autotyping) {
-          await sock.sendPresenceUpdate(
-            "composing",
-            m.chat
-          );
-        }
-
-        if (globalSettings.autorecording) {
-          await sock.sendPresenceUpdate(
-            "recording",
-            m.chat
-          );
-        }
-
-        if (globalSettings.autoreact) {
-
-          const txt =
-            mek.message?.conversation ||
-            mek.message?.extendedTextMessage?.text ||
-            "";
-
-          if (!txt.startsWith(".")) {
-
-            const emojis = [
-              "🔥",
-              "😂",
-              "😍",
-              "😎",
-              "🤖",
-              "⚡",
-              "💯",
-              "👀",
-              "🥶",
-              "😈"
-            ];
-
-            await sock.sendMessage(
-              m.chat,
-              {
-                react: {
-                  text:
-                    emojis[
-                      Math.floor(
-                        Math.random() *
-                        emojis.length
-                      )
-                    ],
-                  key: mek.key
-                }
-              }
-            );
-          }
-        }
-
-        await messageHandler(sock, m);
+     if(isGroup){
+      try{
+       const gm=await sock.groupMetadata(chat);
+       chatName=gm.subject;
+      }catch{
+       chatName="Group";
       }
+     }
 
-    } catch (err) {}
-  });
+     const now=new Date();
+     const time=now.toLocaleTimeString();
+     const date=now.toLocaleDateString();
+     const deleted=(oldMsg.text||"Media").replace(/\n/g,"\n│ │ ");
 
+     let text;
 
-  // ---------- MESSAGE UPDATE / ANTIDELETE ----------
-  sock.ev.on("messages.update", async (updates) => {
-
-    try {
-
-      try {
-        const saved = JSON.parse(
-          fs.readFileSync(settingsPath)
-        );
-
-        if (saved["global"]) {
-          globalSettings = {
-            ...globalSettings,
-            ...saved["global"]
-          };
-        }
-
-      } catch {}
-
-      const adConfig =
-        globalSettings.antidelete || {
-          enabled: false,
-          mode: "chat",
-          style: "fancy",
-          react: true
-        };
-
-      const ownerJid =
-        (
-          config().owner?.[0] || ""
-        ).replace(/[^0-9]/g, "") +
-        "@s.whatsapp.net";
-
-      for (let update of updates) {
-
-        const oldMsg =
-          store.get(update.key.id);
-
-        if (!oldMsg) continue;
-
-        if (update.update.message === null) {
-
-          if (!adConfig.enabled) continue;
-
-          const chatJidDel =
-            update.key.remoteJid;
-
-          const isGroup =
-            chatJidDel.endsWith("@g.us");
-
-          const senderJidDel =
-            oldMsg.sender ||
-            update.key.participant ||
-            chatJidDel;
-
-          const senderNumber =
-            senderJidDel.split("@")[0];
-
-          const senderDisplayPrivate =
-            oldMsg.pushName &&
-            oldMsg.pushName.trim() !== ""
-              ? oldMsg.pushName
-              : senderNumber;
-
-          let chatName = "Private Chat";
-
-          if (isGroup) {
-            try {
-              const gm =
-                await sock.groupMetadata(
-                  chatJidDel
-                );
-
-              chatName = gm.subject;
-
-            } catch {
-              chatName = "Group";
-            }
-          }
-
-          const now = new Date();
-
-          const time =
-            now.toLocaleTimeString();
-
-          const date =
-            now.toLocaleDateString();
-
-          let text;
-
-          if (adConfig.style === "fancy") {
-
-            if (isGroup) {
-
-              text =
-`╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣
+     if(ad.style==="fancy"){
+      if(isGroup){
+       text=`╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣
 │
 │ 👤 @${senderNumber}
 │ 📍 ${chatName}
@@ -507,746 +334,365 @@ const attachHandlers = (sock, store) => {
 │
 │ 🗑️:
 │ ┌─
-│ │ ${(oldMsg.text || "Media").replace(/\n/g, "\n│ │ ")}
+│ │ ${deleted}
 │ └─
 │ 🛡️ Alpha
 ╰──`;
-
-            } else {
-
-              text =
-`╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣
+      }else{
+       text=`╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣
 │
-│ 👤 ${senderDisplayPrivate}
+│ 👤 ${privateName}
 │ 📍 Private
 │ 🕒 ${time}
 │ 📅 ${date}
 │
 │ 🗑️:
 │ ┌─
-│ │ ${(oldMsg.text || "Media").replace(/\n/g, "\n│ │ ")}
+│ │ ${deleted}
 │ └─
 │ 🛡️ Alpha
 ╰──`;
-            }
+      }
+     }else{
+      text=`${funnyDeleted[0]}\n\n${oldMsg.text||"Media"}`;
+     }
 
-          } else {
+     const destinations=[];
 
-            text =
-              funnyDeleted[0] +
-              `\n\n${oldMsg.text || "Media"}`;
-          }
+     if(ad.mode==="chat"||ad.mode==="both")
+      destinations.push(chat);
 
-          const mentions =
-            isGroup &&
-            adConfig.style === "fancy" &&
-            senderJidDel !== sock.user.id
-              ? [senderJidDel]
-              : [];
+     if((ad.mode==="owner"||ad.mode==="both")&&ownerJid)
+      destinations.push(ownerJid);
 
-          const destinations = [];
+     for(const dest of destinations){
+      const opts={};
 
-          if (
-            adConfig.mode === "chat" ||
-            adConfig.mode === "both"
-          ) {
-            destinations.push(chatJidDel);
-          }
+      if(isGroup&&ad.style==="fancy"&&dest===chat){
+       opts.mentions=[sender];
+      }
 
-          if (
-            (
-              adConfig.mode === "owner" ||
-              adConfig.mode === "both"
-            ) &&
-            ownerJid
-          ) {
-            destinations.push(ownerJid);
-          }
+      if(ad.style==="fancy"){
+       await sock.sendMessage(dest,{
+        text,
+        contextInfo:{
+         forwardingScore:999,
+         isForwarded:true,
+         forwardedNewsletterMessageInfo:{
+          newsletterJid:channelJid,
+          newsletterName:config().newsletter.name
+         }
+        },
+        ...opts
+       });
+      }else{
+       await sock.sendMessage(dest,{text,...opts});
+      }
 
-          for (const dest of destinations) {
+      if(ad.react&&dest===chat){
+       try{
+        await sock.sendMessage(dest,{
+         react:{text:"👀",key:update.key}
+        });
+       }catch{}
+      }
+     }
+    }
 
-            const opts = {};
+    if(globalSettings.antiedit&&update.update?.message){
+     let newText="";
 
-            if (
-              mentions.length > 0 &&
-              dest === chatJidDel
-            ) {
-              opts.mentions = mentions;
-            }
+     try{
+      const msg=update.update.message;
+      const type=Object.keys(msg)[0];
+      newText=
+       msg[type]?.text||
+       msg[type]?.caption||
+       "";
+     }catch{}
 
-            if (adConfig.style === "fancy") {
-
-              await sock.sendMessage(
-                dest,
-                {
-                  text,
-                  contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                      newsletterJid:
-                        config().newsletter.id +
-                        "@newsletter",
-                      newsletterName:
-                        config().newsletter.name
-                    }
-                  },
-                  ...opts
-                }
-              );
-
-            } else {
-
-              await sock.sendMessage(
-                dest,
-                {
-                  text,
-                  ...opts
-                }
-              );
-            }
-
-            if (
-              adConfig.react &&
-              dest === chatJidDel
-            ) {
-              try {
-                await sock.sendMessage(
-                  dest,
-                  {
-                    react: {
-                      text: "👀",
-                      key: update.key
-                    }
-                  }
-                );
-              } catch {}
-            }
-          }
-        }
-
-        if (
-          globalSettings.antiedit &&
-          update.update?.message
-        ) {
-
-          let newText = "";
-
-          try {
-            const msg =
-              update.update.message;
-
-            const type =
-              Object.keys(msg)[0];
-
-            newText =
-              msg[type]?.text ||
-              msg[type]?.caption ||
-              "";
-
-          } catch {}
-
-          if (
-            oldMsg?.text &&
-            newText &&
-            oldMsg.text !== newText
-          ) {
-
-            await sock.sendMessage(
-              update.key.remoteJid,
-              {
-                text:
-`✏️ Edited.
+     if(oldMsg.text&&newText&&oldMsg.text!==newText){
+      try{
+       await sock.sendMessage(update.key.remoteJid,{
+        text:`✏️ Edited.
 
 📌 Old: ${oldMsg.text}
 🆕 New: ${newText}`
-              }
-            );
-          }
-        }
-      }
-
-    } catch (err) {}
-  });
-
-
-  // ---------- GROUP PARTICIPANTS ----------
-  sock.ev.on(
-    "group-participants.update",
-    async (update) => {
-
-      try {
-
-        const {
-          id,
-          participants,
-          action
-        } = update;
-
-        let gs = {
-          welcome: false,
-          welcomeMsg:
-            funnyWelcomes[
-              Math.floor(
-                Math.random() *
-                funnyWelcomes.length
-              )
-            ],
-          goodbye: false,
-          goodbyeMsg:
-            funnyGoodbyes[
-              Math.floor(
-                Math.random() *
-                funnyGoodbyes.length
-              )
-            ]
-        };
-
-        try {
-          const all =
-            JSON.parse(
-              fs.readFileSync(dbPath)
-            );
-
-          gs =
-            all[id] || gs;
-
-        } catch {}
-
-        if (
-          action === "add" &&
-          gs.welcome
-        ) {
-
-          for (let user of participants) {
-
-            const msg =
-              gs.welcomeMsg.replace(
-                /@user/g,
-                `@${user.split("@")[0]}`
-              );
-
-            await sock.sendMessage(
-              id,
-              {
-                text: msg,
-                mentions: [user]
-              }
-            );
-          }
-        }
-
-        if (
-          action === "remove" &&
-          gs.goodbye
-        ) {
-
-          for (let user of participants) {
-
-            const msg =
-              gs.goodbyeMsg.replace(
-                /@user/g,
-                `@${user.split("@")[0]}`
-              );
-
-            await sock.sendMessage(
-              id,
-              {
-                text: msg,
-                mentions: [user]
-              }
-            );
-          }
-        }
-
-      } catch (err) {}
+       });
+      }catch{}
+     }
     }
-  );
+   }
+  }catch{}
+ });
 
+ sock.ev.on("group-participants.update",async update=>{
+  try{
+   const {id,participants,action}=update;
 
-  // ---------- FOLLOW CHANNEL ----------
-  const followChannel = async () => {
+   let gs={
+    welcome:false,
+    welcomeMsg:"🌟 A new legend has arrived! Welcome @user! 🎉",
+    goodbye:false,
+    goodbyeMsg:"🚶‍♂️ @user has left the building. We'll miss the vibes."
+   };
 
-    try {
+   try{
+    const all=JSON.parse(fs.readFileSync(dbPath,"utf8"));
+    gs=all[id]||gs;
+   }catch{}
 
-      await new Promise(resolve =>
-        setTimeout(resolve, 3000)
-      );
+   if(action==="add"&&gs.welcome){
+    for(const user of participants){
+     const msg=gs.welcomeMsg.replace(
+      /@user/g,`@${user.split("@")[0]}`
+     );
+     await sock.sendMessage(id,{
+      text:msg,
+      mentions:[user]
+     });
+    }
+   }
 
-      const newsletterJid =
-        config().newsletter.id +
-        "@newsletter";
+   if(action==="remove"&&gs.goodbye){
+    for(const user of participants){
+     const msg=gs.goodbyeMsg.replace(
+      /@user/g,`@${user.split("@")[0]}`
+     );
+     await sock.sendMessage(id,{
+      text:msg,
+      mentions:[user]
+     });
+    }
+   }
+  }catch{}
+ });
 
-      await sock.newsletterFollow(
-        newsletterJid
-      );
+ setTimeout(async()=>{
+  try{
+   await sock.newsletterFollow(channelJid);
+  }catch{}
+ },3000);
 
-    } catch (err) {}
-  };
+ setTimeout(async()=>{
+  try{
+   const botName=config().settings?.title||"Alpha Bot";
+   const repo="https://github.com/Alexio11-09/alpha-xmd";
+   const channel=`https://whatsapp.com/channel/${config().newsletter.id}`;
 
-  followChannel();
+   const text=`╭───〔 🤖 ${botName} 〕───⬣
 
-
-  // ---------- CONNECTION DM ----------
-  const sendConnectionDM = async () => {
-
-    try {
-
-      await new Promise(resolve =>
-        setTimeout(resolve, 4000)
-      );
-
-      const botJid =
-        sock.user.id;
-
-      const botName =
-        config().settings?.title ||
-        "Alpha Bot";
-
-      const repoLink =
-        "https://github.com/Alexio11-09/alpha-xmd";
-
-      const channelLink =
-        `https://whatsapp.com/channel/${config().newsletter.id}`;
-
-      const ownerContact =
-        "wa.me/263786641436";
-
-      const message =
-`╭───〔  🤖 *${botName}* 〕───⬣
-
-✅ *Bot Online*
-👑 *Owner:* Alpha
-📞 *Contact:* ${ownerContact}
-📂 *Repo:* ${repoLink}
-📢 *Channel:* ${channelLink}
+✅ Bot Online
+👑 Owner: Alpha
+📞 Contact: wa.me/263786641436
+📂 Repo: ${repo}
+📢 Channel: ${channel}
 
 🔥 Ready to use.`;
 
-      await sock.sendMessage(
-        botJid,
-        {
-          text: message,
-          contextInfo: {
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-              newsletterJid:
-                config().newsletter.id +
-                "@newsletter",
-              newsletterName:
-                config().newsletter.name
-            }
-          }
-        }
-      );
-
-    } catch (err) {}
-  };
-
-  sendConnectionDM();
-};
-
-
-// ============================================================
-// MAIN CLIENT
-// ============================================================
-
-const clientstart = async () => {
-
-  await loadBaileys();
-
-  const {
-    state,
-    saveCreds
-  } = await useMultiFileAuthState("./session");
-
-  /*
-   * Keep the pinned Baileys 6.7.24 version.
-   * We don't dynamically change the WhatsApp Web version.
-   */
-  const version = undefined;
-
-  const sock = makeWASocket({
-
-    logger: pino({
-      level: "silent"
-    }),
-
-    printQRInTerminal: false,
-
-    auth: state,
-
-    version,
-
-    browser: [
-      "Ubuntu",
-      "Chrome",
-      "20.0.04"
-    ],
-
-    connectTimeoutMs: 180000,
-
-    defaultQueryTimeoutMs: 180000,
-
-    keepAliveIntervalMs: 10000
-  });
-
-
-  sock.decodeJid = (jid) => {
-
-    if (!jid) return jid;
-
-    if (/:\\d+@/gi.test(jid)) {
-
-      const d =
-        jidDecode(jid) || {};
-
-      return (
-        d.user &&
-        d.server
-          ? d.user + "@" + d.server
-          : jid
-      );
+   await sock.sendMessage(sock.user.id,{
+    text,
+    contextInfo:{
+     forwardingScore:999,
+     isForwarded:true,
+     forwardedNewsletterMessageInfo:{
+      newsletterJid:channelJid,
+      newsletterName:config().newsletter.name
+     }
     }
-
-    return jid;
-  };
-
-
-  const store = new Map();
-
-  // ==========================================================
-  // CONNECTION UPDATE
-  // ==========================================================
-
-  let reconnectTimer = null;
-
-  let socketClosed = false;
-
-  /*
-   * This is important for panel pairing.
-   * While the first pairing request is running,
-   * don't create another socket.
-   */
-  let pairingInProgress =
-    !state.creds.registered;
-
-
-  sock.ev.on(
-    "connection.update",
-    async (update) => {
-
-      const {
-        connection,
-        lastDisconnect
-      } = update;
-
-
-      // ---------- CONNECTED ----------
-      if (connection === "open") {
-
-        socketClosed = false;
-
-        pairingInProgress = false;
-
-        console.log(
-          chalk.green(
-            "✅ Bot Connected!"
-          )
-        );
-
-        if (reconnectTimer) {
-
-          clearTimeout(
-            reconnectTimer
-          );
-
-          reconnectTimer = null;
-        }
-
-        attachHandlers(
-          sock,
-          store
-        );
-
-        return;
-      }
-
-
-      // ---------- CLOSED ----------
-      if (connection === "close") {
-
-        if (socketClosed) return;
-
-        socketClosed = true;
-
-        const error =
-          lastDisconnect?.error;
-
-        const statusCode =
-          new Boom(error)
-            ?.output
-            ?.statusCode;
-
-
-              console.log(
-        chalk.yellow(
-          `🔌 Connection closed (${statusCode || "unknown"})`
-        )
-      );
-
-      if (error) {
-        console.log(
-          chalk.gray(
-            `Reason: ${error?.message || error}`
-          )
-        );
-      }
-
-      // Logged out = session is no longer usable.
-      if (
-        statusCode === 401 ||
-        statusCode === DisconnectReason.loggedOut
-      ) {
-        console.log(
-          chalk.red("❌ WhatsApp session logged out.")
-        );
-
-        try {
-          fs.rmSync("./session", {
-            recursive: true,
-            force: true
-          });
-        } catch {}
-
-        process.exit(0);
-      }
-
-      // During the initial pairing request, do NOT
-      // start another socket. This prevents the panel
-      // from creating competing connections.
-      if (pairingInProgress) {
-        console.log(
-          chalk.yellow(
-            "⏳ Pairing is still in progress. Waiting..."
-          )
-        );
-        return;
-      }
-
-      if (reconnectTimer) return;
-
-      console.log(
-        chalk.yellow(
-          "🔄 Reconnecting in 10 seconds..."
-        )
-      );
-
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-
-        clientstart().catch((err) => {
-          console.log(
-            chalk.red("⚠️ Reconnect failed:"),
-            err.message
-          );
-        });
-      }, 10000);
-    }
-  );
-
-
-  // ==========================================================
-  // PAIRING CODE
-  // ==========================================================
-
-  if (!state.creds.registered) {
-
-    phoneNumber = await question(
-      chalk.greenBright(
-        "📱 Enter your WhatsApp number (without + or spaces): "
-      )
-    );
-
-    phoneNumber = phoneNumber.replace(
-      /[^0-9]/g,
-      ""
-    );
-
-    if (
-      !phoneNumber ||
-      phoneNumber.length < 10
-    ) {
-      console.log(
-        chalk.red("❌ Invalid number.")
-      );
-
-      process.exit(1);
-    }
-
-    console.log(
-      chalk.green(
-        `✅ Using number: ${phoneNumber}`
-      )
-    );
-
-    try {
-
-      console.log(
-        chalk.yellow(
-          "⏳ Requesting pairing code..."
-        )
-      );
-
-      /*
-       * Give the socket a moment to establish its
-       * initial connection before requesting the code.
-       */
-      await new Promise((resolve) =>
-        setTimeout(resolve, 5000)
-      );
-
-      console.log(
-        chalk.gray(
-          "📡 Requesting WhatsApp pairing code..."
-        )
-      );
-
-      const pairingPromise =
-        sock.requestPairingCode(
-          phoneNumber
-        );
-
-      const timeoutPromise =
-        new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(
-              new Error(
-                "Pairing code request timed out after 30 seconds"
-              )
-            );
-          }, 30000);
-        });
-
-      let code =
-        await Promise.race([
-          pairingPromise,
-          timeoutPromise
-        ]);
-
-      if (!code) {
-        throw new Error(
-          "WhatsApp returned an empty pairing code"
-        );
-      }
-
-      code =
-        code
-          .match(/.{1,4}/g)
-          ?.join("-") ||
-        code;
-
-      console.log("");
-      console.log(
-        chalk.black(
-          chalk.bgGreen(
-            `  ✅ PAIRING CODE: ${code}  `
-          )
-        )
-      );
-
-      console.log("");
-      console.log(
-        chalk.yellow("📱 Instructions:")
-      );
-
-      console.log(
-        chalk.gray(
-          "1. Open WhatsApp on your phone"
-        )
-      );
-
-      console.log(
-        chalk.gray(
-          "2. Go to Settings > Linked Devices"
-        )
-      );
-
-      console.log(
-        chalk.gray(
-          "3. Tap \"Link a Device\""
-        )
-      );
-
-      console.log(
-        chalk.gray(
-          "4. Enter the code shown above"
-        )
-      );
-
-      pairingRequested = true;
-
-      console.log(
-        chalk.green(
-          "⏳ Waiting for WhatsApp to finish linking..."
-        )
-      );
-
-    } catch (error) {
-
-      pairingRequested = false;
-
-      console.log(
-        chalk.red(
-          "❌ Failed to request pairing code:"
-        ),
-        error.message
-      );
-    }
-
-  } else {
-
-    console.log(
-      chalk.green(
-        "✅ Already paired. Starting bot..."
-      )
-    );
+   });
+  }catch{}
+ },4000);
+}
+
+let restarting=false;
+
+async function clientstart(){
+ await loadBaileys();
+
+ const {state,saveCreds}=await useMultiFileAuthState("./session");
+
+ const sock=makeWASocket({
+  logger:pino({level:"silent"}),
+  printQRInTerminal:false,
+  auth:state,
+  browser:["Ubuntu","Chrome","20.0.04"],
+  connectTimeoutMs:180000,
+  defaultQueryTimeoutMs:180000,
+  keepAliveIntervalMs:10000
+ });
+
+ sock.decodeJid=jid=>{
+  if(!jid)return jid;
+  if(/:\d+@/gi.test(jid)){
+   const d=jidDecode(jid)||{};
+   return d.user&&d.server?
+    `${d.user}@${d.server}`:jid;
+  }
+  return jid;
+ };
+
+ const store=new Map();
+ let socketClosed=false;
+ let pairingInProgress=!state.creds.registered;
+
+ sock.ev.on("connection.update",async update=>{
+  const {connection,lastDisconnect}=update;
+
+  if(connection==="open"){
+   socketClosed=false;
+   pairingInProgress=false;
+
+   console.log(chalk.green("✅ Bot Connected!"));
+
+   attachHandlers(sock,store);
+   return;
   }
 
+  if(connection==="close"){
+   if(socketClosed)return;
+   socketClosed=true;
 
-  // Save authentication changes.
-  sock.ev.on(
-    "creds.update",
-    saveCreds
+   const error=lastDisconnect?.error;
+   const statusCode=new Boom(error)?.output?.statusCode;
+
+   console.log(
+    chalk.yellow(
+     `🔌 Connection closed (${statusCode||"unknown"})`
+    )
+   );
+
+   if(error?.message)
+    console.log(chalk.gray(`Reason: ${error.message}`));
+
+   if(
+    statusCode===401||
+    statusCode===DisconnectReason.loggedOut
+   ){
+    console.log(chalk.red("❌ WhatsApp session logged out."));
+
+    try{
+     fs.rmSync("./session",{recursive:true,force:true});
+    }catch{}
+
+    process.exit(0);
+   }
+
+   if(pairingInProgress){
+    console.log(
+     chalk.yellow(
+      "⏳ Waiting for the initial pairing process..."
+     )
+    );
+    return;
+   }
+
+   if(restarting)return;
+   restarting=true;
+
+   console.log(
+    chalk.yellow("🔄 Reconnecting in 10 seconds...")
+   );
+
+   setTimeout(()=>{
+    restarting=false;
+    clientstart().catch(err=>{
+     console.log(
+      chalk.red("⚠️ Reconnect failed:"),
+      err.message
+     );
+    });
+   },10000);
+  }
+ });
+
+ sock.ev.on("creds.update",saveCreds);
+
+ if(!state.creds.registered){
+  let number=await phoneNumberPrompt(
+   "📱 Enter your WhatsApp number (without + or spaces): "
   );
 
+  number=number.replace(/[^0-9]/g,"");
 
-  // Keep the connection alive.
-  setInterval(() => {
+  if(!number||number.length<10){
+   console.log(chalk.red("❌ Invalid number."));
+   process.exit(1);
+  }
 
-    if (
-      sock.user &&
-      !socketClosed
-    ) {
-      sock.sendPresenceUpdate(
-        "available"
-      ).catch(() => {});
-    }
-
-  }, 20000);
-};
-
-
-// ============================================================
-// START
-// ============================================================
-
-setInterval(() => {}, 60000);
-
-clientstart().catch((err) => {
   console.log(
-    chalk.red("❌ Startup error:"),
-    err.message
+   chalk.green(`✅ Using number: ${number}`)
   );
+
+  try{
+   console.log(
+    chalk.yellow("⏳ Waiting for WhatsApp connection...")
+   );
+
+   await new Promise(r=>setTimeout(r,5000));
+
+   console.log(
+    chalk.yellow("📡 Requesting pairing code...")
+   );
+
+   const code=await Promise.race([
+    sock.requestPairingCode(number),
+    new Promise((_,reject)=>
+     setTimeout(
+      ()=>reject(
+       new Error("Pairing code request timed out after 30 seconds")
+      ),
+      30000
+     )
+    )
+   ]);
+
+   if(!code)
+    throw new Error("WhatsApp returned an empty pairing code");
+
+   const formatted=code.match(/.{1,4}/g)?.join("-")||code;
+
+   console.log("");
+   console.log(
+    chalk.black(
+     chalk.bgGreen(`  ✅ PAIRING CODE: ${formatted}  `)
+    )
+   );
+   console.log("");
+   console.log(chalk.yellow("📱 Open WhatsApp > Settings > Linked Devices"));
+   console.log(chalk.yellow("📱 Tap Link a Device"));
+   console.log(chalk.yellow("📱 Enter the pairing code above"));
+   console.log("");
+   console.log(
+    chalk.green("⏳ Waiting for WhatsApp to finish linking...")
+   );
+
+   pairingInProgress=true;
+
+  }catch(error){
+   console.log(
+    chalk.red("❌ Failed to request pairing code:"),
+    error.message
+   );
+  }
+ }else{
+  console.log(
+   chalk.green("✅ Already paired. Starting bot...")
+  );
+ }
+
+ setInterval(()=>{
+  if(sock.user&&!socketClosed){
+   sock.sendPresenceUpdate("available").catch(()=>{});
+  }
+ },20000);
+}
+
+setInterval(()=>{},60000);
+
+clientstart().catch(err=>{
+ console.log(
+  chalk.red("❌ Startup error:"),
+  err.message
+ );
 });
