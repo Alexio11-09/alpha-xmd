@@ -77,9 +77,10 @@ function attachHandlers(sock) {
       if (!messages?.length) return;
 
       for (const mek of messages) {
-        if (!mek.message) continue;
         const remote = mek.key?.remoteJid;
 
+        // ✅ FIXED: Status check moved ABOVE the empty-message check
+        // So statuses are handled even if decryption fails (Bad MAC)
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) {
             await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
@@ -87,6 +88,9 @@ function attachHandlers(sock) {
           continue;
         }
 
+        if (!mek.message) continue;
+
+        // 2. Handle Channel Reacts
         if (remote === channelJid) {
           loadGlobalSettings();
           const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
@@ -111,6 +115,7 @@ function attachHandlers(sock) {
           continue;
         }
 
+        // 3. Main Message Handler
         if (mek.key.fromMe) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) continue;
@@ -321,12 +326,10 @@ async function clientstart() {
   let pairingNumber = "";
   if (!state.creds.registered) {
     if (process.stdin.isTTY) {
-      // ✅ FIXED: Use console.log to force a newline so Pterodactyl renders the prompt!
       console.log(chalk.yellow("\n📱 Enter your WhatsApp number (without + or spaces) and press Enter:"));
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
       pairingNumber = await new Promise(resolve => rl.once('line', (line) => { rl.close(); resolve(line.trim()); }));
     } else {
-      // Pterodactyl / Docker fallback if TTY is not detected
       pairingNumber = process.env.PHONE_NUMBER || (config().owner?.[0] || "");
       console.log(chalk.yellow("⚠️ Non-interactive environment detected. Using fallback number."));
     }
@@ -361,7 +364,6 @@ async function clientstart() {
     return jid;
   };
 
-  // ✅ FIXED: Knight Bot style pairing request (3s delay, outside listener)
   if (!state.creds.registered && pairingNumber) {
     setTimeout(async () => {
       try {
