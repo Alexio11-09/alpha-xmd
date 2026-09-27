@@ -1,9 +1,14 @@
+```html
 <div align="center">
   <img src="https://files.catbox.moe/soc5w1.jpg" alt="Alpha Bot" width="180"/>
 
   <h1>⚡ ALPHA‑XMD — The Multiverse Bot ⚡</h1>
 
   <p><i>"Not just a WhatsApp assistant — it's a digital beast with attitude, automation, and style."</i></p>
+
+  <a href="https://git.io/typing-svg">
+    <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=50&pause=1000&color=33ff00&center=true&width=910&height=100&lines=Alpha-XMD;Multi+Device+Whatsapp+Bot;Coded+By+Alpha" alt="Typing SVG" />
+  </a>
 
   <p>
     <a href="https://github.com/Alexio11-09/alpha-xmd/fork">
@@ -38,11 +43,6 @@
       <td>📢 Newsletter Branding</td>
       <td>🔄 Self‑RePair (one‑click)</td>
     </tr>
-    <tr>
-      <td>🤖 AI Chatbot</td>
-      <td>🎮 Games (Tic‑Tac‑Toe, Hangman, Trivia)</td>
-      <td>🔊 Text‑to‑Speech</td>
-    </tr>
   </table>
 </div>
 
@@ -56,7 +56,6 @@
 | **Railway** | [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=alpha-xmd) | 24/7 Forever |
 | **Koyeb** | [![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&repository=github.com/Alexio11-09/alpha-xmd) | 24/7 Free |
 | **Render** | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Alexio11-09/alpha-xmd) | 24/7 Free |
-| **Katabump** | [![Deploy on Katabump](https://img.shields.io/badge/Katabump-D6B7D6?style=for-the-badge&logo=server&logoColor=black)](https://dashboard.katabump.com/auth/login) | 24/7 Free |
 
 ---
 
@@ -77,67 +76,6 @@ Next time you just run:
 ```bash
 cd ~/alpha-xmd && node index.js
 ```
-
----
-
-🛠️ Manual Setup & Installation
-
-Prerequisites
-
-Before you begin, make sure you have:
-
-· Node.js v20 or higher — Download
-· Git — Download
-· FFmpeg — required for audio/video processing
-· A WhatsApp account (the bot links to it as a companion device)
-
-Step-by-Step Setup
-
-1. Clone the repository:
-   ```bash
-    git clone https://github.com/Alexio11-09/alpha-xmd.git
-    cd alpha-xmd
-   ```
-2. Install dependencies:
-   ```bash
-    npm install
-   ```
-3. Configure the bot (see Configuration below)
-4. Start the bot:
-   ```bash
-    npm start
-   ```
-5. Link your WhatsApp:
-   When prompted, type your number (no + or spaces, e.g. 263786641436).
-   A pairing code will appear in the terminal. Open WhatsApp → Settings → Linked Devices → Link a Device → enter the code.
-
----
-
-⚙️ Configuration
-
-Edit settings/config.js before running:
-
-```javascript
-const config = {
-    owner: ["263XXXXXXXXX"],       // Your WhatsApp number
-    botNumber: "263XXXXXXXXX",     // Same as above
-    setPair: "ALPHA-XMD",          // Pairing name shown on WhatsApp
-    session: "session",             // Session folder
-    mode: "public",                 // public or self
-
-    newsletter: {
-        name: "ALPHA_XMD_UPDATES",
-        id: "120363406868236363"    // Your WhatsApp channel ID
-    },
-
-    settings: {
-        title: "ALPHA-XMD BOT",
-        description: "Custom WhatsApp Bot by Alpha"
-    }
-}
-```
-
-💡 Tip: The owner number is the only one that can run admin/owner commands.
 
 ---
 
@@ -163,22 +101,6 @@ Store server logins and send them to users with a single command.
 
 .pair 26378... instantly returns a session code. No QR, no wait.
 
-🤖 AI Chatbot
-
-Chat naturally with the bot using the built‑in AI commands (.ai, .imagine, auto‑reply).
-
-🎮 Games & Fun
-
-Tic‑Tac‑Toe, Hangman, Trivia, Truth/Dare, and dozens of fun commands to keep groups alive.
-
-🔊 Text‑to‑Speech
-
-Convert any text to voice with .tts — perfect for groups.
-
-🛡️ Anti‑Ban Middleware
-
-Powered by baileys-antiban — human‑like delays, rate limits, and LID/PN resolution to keep your number safe.
-
 ---
 
 🤝 Community & Support
@@ -192,18 +114,6 @@ Powered by baileys-antiban — human‑like delays, rate limits, and LID/PN reso
   </a>
   <a href="https://github.com/Alexio11-09/alpha-xmd/issues">
     <img src="https://img.shields.io/badge/🐛_REPORT_BUG-Open_Issue-EF4444?style=for-the-badge&logo=github&logoColor=white" alt="Report Bug"/>
-  </a>
-</div>
-
----
-
-☕ Support the Developer
-
-If Alpha‑XMD helped you and you'd like to say thanks, you can support development. Every coffee keeps the bot alive and adds more features.
-
-<div align="center">
-  <a href="https://wa.me/263786641436">
-    <img src="https://img.shields.io/badge/☕_BUY_ME_A_COFFEE-Support_Alpha-FF813F?style=for-the-badge&logo=buymeacoffee&logoColor=white" alt="Support"/>
   </a>
 </div>
 
@@ -225,63 +135,6 @@ Let's build the ultimate bot together 🤝
   <img src="https://img.shields.io/github/forks/Alexio11-09/alpha-xmd?style=flat-square&logo=github&color=blue" alt="Forks" />
   <img src="https://img.shields.io/github/watchers/Alexio11-09/alpha-xmd?style=flat-square&logo=github&color=green" alt="Watchers" />
 </p>
-
----
-
-🙏 Credits
-
-Alpha‑XMD wouldn't exist without these projects and people:
-
-· Baileys — WhatsApp Web API
-· baileys-antiban — Anti-ban middleware
-· Knight Bot — Pair code pattern reference
-· TechGod143 & Dgxeon — Original pair code implementations
-· Alpha — Lead developer & maintainer
-
----
-
-⚠️ Important Warning
-
-This bot is for educational purposes only. It is NOT an official WhatsApp bot.
-
-· Using this bot may lead to your WhatsApp account being banned or suspended.
-· Use it at your own risk.
-· The developer is not responsible for any account bans, data loss, or consequences that occur while using this bot.
-· Do not use it for spam, bulk messaging, or illegal activities.
-
-Pro tip: Alpha‑XMD ships with baileys-antiban protection built‑in. Don't disable it — it's your safety net against WhatsApp's spam detection.
-
----
-
-📝 Legal
-
-· This project is not affiliated with, authorized, maintained, sponsored, or endorsed by WhatsApp or any of its affiliates or subsidiaries.
-· This is an independent and unofficial software. Use at your own risk.
-· Do not spam people with this bot.
-· Do not use this bot to send bulk messages or for illegal purposes.
-· The developer assumes no liability and is not responsible for any misuse or damage caused by this program.
-
-License
-
-This project is licensed under the MIT License. However, you must:
-
-· Use this software in compliance with all applicable laws and regulations
-· Include original license and copyright notices
-· Credit original authors
-· Not use it for spam or malicious purposes
-
----
-
-📜 Copyright Notice
-
-Copyright (c) 2026 Alpha. All rights reserved.
-
-This project contains code from various open-source projects:
-
-· Baileys (MIT License)
-· baileys-antiban (MIT License)
-· Other libraries as listed in package.json
-
 ---
 
 📜 License
