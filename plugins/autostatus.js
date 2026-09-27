@@ -8,34 +8,33 @@ function isAutoStatusEnabled(){return getConfig().enabled}
 function isReactEnabled(){return getConfig().reactOn}
 function getReactEmoji(){return getConfig().reactEmoji||'🔥'}
 
-// ✅ FIXED: uses your custom emoji (not 💚) via relayMessage with proper statusJidList
+// ✅ FIXED: uses your custom emoji (not 💚) with timeout protection
 async function reactToStatus(s,m){
   if(!isReactEnabled()){console.log('⏸️ Status react: disabled');return}
   let e=getReactEmoji(),p=m.key.participant||m.key.remoteJid;
-  console.log(`💫 Sending status react: emoji=${e}, to=${p}, msgId=${m.key.id}`);
+  console.log(`💫 Status react: emoji=${e}, to=${p}, msgId=${m.key.id}`);
 
-  // Method 1: relayMessage (custom emoji)
+  const timeout=(promise,ms)=>Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+
+  // Method 1: sendMessage with m.key directly
   try{
-    await s.relayMessage('status@broadcast',{
-      reactionMessage:{
-        key:{remoteJid:'status@broadcast',id:m.key.id,participant:p,fromMe:!1},
-        text:e
-      }
-    },{
-      messageId:m.key.id,
-      statusJidList:[p]
-    });
+    await timeout(s.sendMessage('status@broadcast',{
+      react:{text:e,key:m.key}
+    },{statusJidList:[p]}),5000);
     console.log(`✅ Reacted with ${e}`);
     return;
-  }catch(err){console.log('❌ relayMessage:',err.message)}
-
-  // Method 2: sendMessage fallback
-  try{
-    await s.sendMessage('status@broadcast',{
-      react:{text:e,key:{remoteJid:'status@broadcast',id:m.key.id,participant:p,fromMe:!1}}
-    },{statusJidList:[p]});
-    console.log(`✅ Reacted with ${e} (via sendMessage)`);
   }catch(err){console.log('❌ sendMessage:',err.message)}
+
+  // Method 2: relayMessage fallback
+  try{
+    await timeout(s.relayMessage('status@broadcast',{
+      reactionMessage:{
+        key:{remoteJid:'status@broadcast',id:m.key.id,participant:p,fromMe:false},
+        text:e
+      }
+    },{messageId:m.key.id,statusJidList:[p]}),5000);
+    console.log(`✅ Reacted with ${e} (relay)`);
+  }catch(err){console.log('❌ relayMessage:',err.message)}
 }
 
 // ✅ FIXED: uses full msg.key for readMessages
@@ -44,7 +43,7 @@ async function handleStatusUpdate(s,st){
   let m=st.messages?st.messages[0]:st;
   if(!m||!m.key)return;
   if(m.key.remoteJid!=='status@broadcast')return;
-  let p=m.key.participant||m.key.remoteJid;
+  let p=m.key.participantAlt||m.key.participant||m.key.remoteJid;
   global.statusCache.set(p,m);
   if(global.statusCache.size>100){let f=global.statusCache.keys().next().value;global.statusCache.delete(f)}
   await new Promise(r=>setTimeout(r,1000));
