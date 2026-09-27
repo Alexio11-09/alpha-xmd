@@ -9,6 +9,9 @@ const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const PhoneNumber = require("awesome-phonenumber");
 
+// ✅ Anti-ban middleware
+const { wrapSocket } = require("baileys-antiban");
+
 console.log("🚀 Starting Alpha Bot...");
 
 let autoStatusHandler;
@@ -80,7 +83,6 @@ function attachHandlers(sock) {
         const remote = mek.key?.remoteJid;
 
         // ✅ FIXED: Status check moved ABOVE the empty-message check
-        // So statuses are handled even if decryption fails (Bad MAC)
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) {
             await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
@@ -344,7 +346,8 @@ async function clientstart() {
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
-  const sock = makeWASocket({
+  // ✅ Create the raw socket
+  const rawSock = makeWASocket({
     version,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
@@ -353,6 +356,19 @@ async function clientstart() {
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 10000
+  });
+
+  // ✅ Wrap with anti-ban middleware
+  const sock = wrapSocket(rawSock, {
+    preset: 'conservative', // Safest preset for a flagged number
+    jidCanonicalizer: {
+      enabled: true,
+      canonical: 'pn' // Normalize to phone-number form (fixes Bad MAC)
+    },
+    persist: './database/antiban-state.json',
+    groupOpGuard: {
+      limits: { add: { max: 3, windowMs: 600000 } }
+    }
   });
 
   sock.decodeJid = jid => {
@@ -368,7 +384,7 @@ async function clientstart() {
     setTimeout(async () => {
       try {
         console.log(chalk.yellow("📡 Requesting pairing code..."));
-        const code = await sock.requestPairingCode(pairingNumber);
+        const code = await rawSock.requestPairingCode(pairingNumber);
         const formatted = code.match(/.{1,4}/g)?.join("-") || code;
         console.log("");
         console.log(chalk.black(chalk.bgGreen(`  ✅ PAIRING CODE: ${formatted}  `)));
