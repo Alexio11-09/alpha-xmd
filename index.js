@@ -8,8 +8,6 @@ const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const PhoneNumber = require("awesome-phonenumber");
-
-// ✅ Anti-ban middleware
 const { wrapSocket } = require("baileys-antiban");
 
 console.log("🚀 Starting Alpha Bot...");
@@ -82,7 +80,7 @@ function attachHandlers(sock) {
       for (const mek of messages) {
         const remote = mek.key?.remoteJid;
 
-        // ✅ FIXED: Status check moved ABOVE the empty-message check
+        // ✅ Status check moved ABOVE the empty-message check
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) {
             await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
@@ -92,7 +90,7 @@ function attachHandlers(sock) {
 
         if (!mek.message) continue;
 
-        // 2. Handle Channel Reacts
+        // Handle Channel Reacts
         if (remote === channelJid) {
           loadGlobalSettings();
           const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
@@ -117,7 +115,7 @@ function attachHandlers(sock) {
           continue;
         }
 
-        // 3. Main Message Handler
+        // Main Message Handler
         if (mek.key.fromMe) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) continue;
@@ -154,7 +152,7 @@ function attachHandlers(sock) {
         if (globalSettings.autoread) { try { await sock.readMessages([mek.key]); } catch {} }
         if (globalSettings.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); } catch {} }
         if (globalSettings.autorecording) { try { await sock.sendPresenceUpdate("recording", m.chat); } catch {} }
-        
+
         if (globalSettings.autoreact) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) {
@@ -316,6 +314,8 @@ function attachHandlers(sock) {
 }
 
 let restarting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 async function clientstart() {
   const baileys = await import("@whiskeysockets/baileys");
@@ -335,7 +335,7 @@ async function clientstart() {
       pairingNumber = process.env.PHONE_NUMBER || (config().owner?.[0] || "");
       console.log(chalk.yellow("⚠️ Non-interactive environment detected. Using fallback number."));
     }
-    
+
     pairingNumber = pairingNumber.replace(/[^0-9]/g, "");
 
     if (!pairingNumber || !PhoneNumber('+' + pairingNumber).isValid()) {
@@ -346,7 +346,7 @@ async function clientstart() {
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
-  // ✅ Create the raw socket
+  // ✅ Create raw socket (no proxy)
   const rawSock = makeWASocket({
     version,
     logger: pino({ level: "silent" }),
@@ -358,17 +358,39 @@ async function clientstart() {
     keepAliveIntervalMs: 10000
   });
 
-  // ✅ Wrap with anti-ban middleware
+  // ✅ Wrap with ultra-conservative anti-ban config
   const sock = wrapSocket(rawSock, {
-    preset: 'conservative', // Safest preset for a flagged number
+    preset: 'conservative',
+
+    rateLimiter: {
+      maxPerMinute: 3,
+      maxPerHour: 40,
+      maxPerDay: 150,
+      minDelayMs: 4000,
+      maxDelayMs: 12000,
+      newChatDelayMs: 10000
+    },
+
+    warmUp: {
+      warmUpDays: 14,
+      day1Limit: 10,
+      growthFactor: 1.5
+    },
+
+    humanEntropy: {
+      enabled: true
+    },
+
+    health: {
+      autoPauseAt: 'medium'
+    },
+
     jidCanonicalizer: {
       enabled: true,
-      canonical: 'pn' // Normalize to phone-number form (fixes Bad MAC)
+      canonical: 'pn'
     },
-    persist: './database/antiban-state.json',
-    groupOpGuard: {
-      limits: { add: { max: 3, windowMs: 600000 } }
-    }
+
+    persist: './database/antiban-state.json'
   });
 
   sock.decodeJid = jid => {
@@ -405,6 +427,7 @@ async function clientstart() {
 
     if (connection === "open") {
       socketClosed = false;
+      reconnectAttempts = 0;
       console.log(chalk.green("✅ Bot Connected!"));
       attachHandlers(sock);
       return;
@@ -426,10 +449,24 @@ async function clientstart() {
         process.exit(0);
       }
 
+      // ✅ Reconnect circuit breaker
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.log(chalk.red(`🚨 Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping bot for 30 minutes to cool down.`));
+        setTimeout(() => {
+          reconnectAttempts = 0;
+          console.log(chalk.yellow('🔄 Cool-down finished. Attempting to reconnect...'));
+          clientstart().catch(err => {
+            console.log(chalk.red("⚠️ Reconnect failed:"), err.message);
+          });
+        }, 30 * 60 * 1000);
+        return;
+      }
+
       if (restarting) return;
       restarting = true;
+      reconnectAttempts++;
 
-      console.log(chalk.yellow("🔄 Reconnecting in 10 seconds..."));
+      console.log(chalk.yellow(`🔄 Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in 10 seconds...`));
       setTimeout(() => {
         restarting = false;
         clientstart().catch(err => {
