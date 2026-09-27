@@ -68,14 +68,12 @@
 
 ## 🚀 Deploy on Any Server
 
-<div align="center">
-
-**[🚀 Bot-Hosting.net](https://bot-hosting.net/?aff=alphaXMD)** — 24/7 Free  
-**[🚂 Railway](https://railway.app/new/template?template=alpha-xmd)** — 24/7 Forever  
-**[🌊 Koyeb](https://app.koyeb.com/deploy?type=git&repository=github.com/Alexio11-09/alpha-xmd)** — 24/7 Free  
-**[🎨 Render](https://render.com/deploy?repo=https://github.com/Alexio11-09/alpha-xmd)** — 24/7 Free
-
-</div>
+| Platform | One-Click Deploy | Uptime |
+|----------|------------------|--------|
+| **Bot-Hosting.net** | [![Deploy](https://img.shields.io/badge/🚀_Deploy_Now-6C63FF?style=for-the-badge)](https://bot-hosting.net/?aff=alphaXMD) | 24/7 Free |
+| **Railway** | [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=alpha-xmd) | 24/7 Forever |
+| **Koyeb** | [![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&repository=github.com/Alexio11-09/alpha-xmd) | 24/7 Free |
+| **Render** | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Alexio11-09/alpha-xmd) | 24/7 Free |
 
 ---
 
@@ -150,15 +148,13 @@ Let's build the ultimate bot together 🤝
 
 <div align="center">
 
-  <img src="https://github-readme-stats-sigma-five.vercel.app/api?username=Alexio11-09&show_icons=true&theme=radical&border_radius=10&hide_border=true" alt="GitHub Stats" height="180"/>
-
-  <img src="https://github-readme-stats-sigma-five.vercel.app/api/top-langs/?username=Alexio11-09&layout=compact&theme=radical&border_radius=10&hide_border=true" alt="Top Languages" height="180"/>
-
-
-
-
-
   <img src="https://github-readme-streak-stats.herokuapp.com/?user=Alexio11-09&theme=radical&border_radius=10&hide_border=true" alt="GitHub Streak" />
+
+
+
+
+
+  <img src="https://github-readme-activity-graph.vercel.app/graph?username=Alexio11-09&theme=react-dark&hide_border=true&area=true" alt="Contribution Graph" />
 
 </div>
 
@@ -180,3 +176,5 @@ MIT – free to use, modify, and distribute. Attribution appreciated but not req
 
 </div>
 ```
+
+---
