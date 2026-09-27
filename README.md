@@ -1,13 +1,7 @@
 <div align="center">
 
-  <!-- FEATURE 5: WAVE HEADER -->
-
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=120&section=header&text=ALPHA-XMD&fontSize=50&fontColor=33ff00&animation=fadeIn" alt="Wave Header" width="100%"/>
-
-  <!-- FEATURE 1: TYPING ANIMATION -->
-
   <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=50&pause=1000&color=33ff00&center=true&width=910&height=100&lines=Alpha-XMD;Multi+Device+Whatsapp+Bot;Coded+By+Alpha" alt="Typing SVG" />
+    <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=40&pause=1000&color=33ff00&center=true&vCenter=true&width=800&height=80&lines=Alpha-XMD;Multi+Device+Whatsapp+Bot;Coded+By+Alpha" alt="Typing SVG" />
   </a>
 
   <img src="https://files.catbox.moe/soc5w1.jpg" alt="Alpha Bot" width="180"/>
@@ -15,8 +9,6 @@
   <h1>⚡ ALPHA‑XMD — The Multiverse Bot ⚡</h1>
 
   <p><i>"Not just a WhatsApp assistant — it's a digital beast with attitude, automation, and style."</i></p>
-
-  <!-- FEATURE 8: VISITOR COUNTER -->
 
   <img src="https://komarev.com/ghpvc/?username=Alexio11-09&label=Visitors&color=33ff00&style=for-the-badge" alt="Visitors" />
 
@@ -34,7 +26,7 @@
 
 ---
 
-🔥 Why Alpha‑XMD?
+## 🔥 Why Alpha‑XMD?
 
 <div align="center">
   <table>
@@ -58,30 +50,37 @@
 
 ---
 
-<!-- FEATURE 6: TECH STACK ICONS -->
-
-🧰 Tech Stack
+## 🧰 Tech Stack
 
 <div align="center">
-  <img src="https://skillicons.dev/icons?i=js,nodejs,git,github,vscode,linux" alt="Tech Stack" />
+
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
+
 </div>
 
 ---
 
-🚀 Deploy on Any Server
+## 🚀 Deploy on Any Server
 
-Platform One‑Click Deploy Uptime
-Bot‑Hosting.net https://img.shields.io/badge/🚀_Deploy_Now-6C63FF?style=for-the-badge 24/7 Free
-Railway https://railway.app/button.svg 24/7 Forever
-Koyeb https://www.koyeb.com/static/images/deploy/button.svg 24/7 Free
-Render https://render.com/images/deploy-to-render-button.svg 24/7 Free
+<div align="center">
+
+**[🚀 Bot-Hosting.net](https://bot-hosting.net/?aff=alphaXMD)** — 24/7 Free  
+**[🚂 Railway](https://railway.app/new/template?template=alpha-xmd)** — 24/7 Forever  
+**[🌊 Koyeb](https://app.koyeb.com/deploy?type=git&repository=github.com/Alexio11-09/alpha-xmd)** — 24/7 Free  
+**[🎨 Render](https://render.com/deploy?repo=https://github.com/Alexio11-09/alpha-xmd)** — 24/7 Free
+
+</div>
 
 ---
 
-📱 Deploy on Android (Termux)
+## 📱 Deploy on Android (Termux)
 
-Tested and working — Android ARM‑64 + Termux.
-Copy the whole command, paste it in Termux, and press Enter.
+> Tested and working — Android ARM‑64 + Termux.  
+> **Copy the whole command, paste it in Termux, and press Enter.**
 
 ```bash
 pkg update -y && pkg upgrade -y && pkg install nodejs git ffmpeg -y && cd ~ && rm -rf alpha-xmd && git clone https://github.com/Alexio11-09/alpha-xmd && cd alpha-xmd && sed -i '/jimp/d; /node-webpmux/d; /wa-sticker-formatter/d' package.json && npm install --legacy-peer-deps && node index.js
@@ -147,24 +146,17 @@ Let's build the ultimate bot together 🤝
 
 📈 Stats
 
-<!-- FEATURES 2, 3, 4, 9: STATS + LANGUAGES + STREAK + TROPHIES -->
-
 <div align="center">
 
-  <img src="https://github-readme-stats.vercel.app/api?username=Alexio11-09&show_icons=true&theme=radical&border_radius=10" alt="GitHub Stats" height="180"/>
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Alexio11-09&layout=compact&theme=radical&border_radius=10" alt="Top Languages" height="180"/>
+  <img src="https://github-readme-stats.vercel.app/api?username=Alexio11-09&show_icons=true&theme=radical&border_radius=10&hide_border=true" alt="GitHub Stats" height="180"/>
+
+  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Alexio11-09&layout=compact&theme=radical&border_radius=10&hide_border=true" alt="Top Languages" height="180"/>
 
 
 
 
 
-  <img src="https://github-readme-streak-stats.herokuapp.com/?user=Alexio11-09&theme=radical&border_radius=10" alt="GitHub Streak" />
-
-
-
-
-
-  <img src="https://github-profile-trophy.vercel.app/?username=Alexio11-09&theme=radical&no-frame=true&row=1&column=6" alt="Trophies" />
+  <img src="https://github-readme-streak-stats.herokuapp.com/?user=Alexio11-09&theme=radical&border_radius=10&hide_border=true" alt="GitHub Streak" />
 
 </div>
 
@@ -178,16 +170,11 @@ MIT – free to use, modify, and distribute. Attribution appreciated but not req
 
 <div align="center">
 
-  <!-- FEATURE 10: SECOND TYPING SVG (footer) -->
-
-  <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=30&pause=1000&color=33ff00&center=true&width=600&height=50&lines=Thanks+for+visiting!;Star+the+repo+%E2%AD%90;Join+our+channel+%F0%9F%93%A2" alt="Footer Typing" />
+  <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=28&pause=1000&color=33ff00&center=true&vCenter=true&width=600&height=50&lines=Thanks+for+visiting!;Star+the+repo+%E2%AD%90;Join+our+channel+%F0%9F%93%A2" alt="Footer Typing" />
 
   <p><i>Built with ❤️ by Alpha</i></p>
 
-  <!-- FEATURE 7: WAVE FOOTER -->
-
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=100&section=footer" alt="Wave Footer" width="100%"/>
-
 </div>
+```
 
 ---
