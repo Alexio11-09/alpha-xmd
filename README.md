@@ -1,7 +1,7 @@
 <div align="center">
 
   <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=50&pause=1000&color=33ff00&center=true&width=910&height=100&lines=Alpha-XMD;Multi+Device+Whatsapp+Bot;Coded+By+Alpha" alt="Typing SVG" />
+    <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=50&pause=1000&color=33ff00&center=true&width=910&height=100&lines=Alpha-XMD;Multi+Device+Whatsapp+Bot; Developed+By+Alpha" alt="Typing SVG" />
   </a>
 
   <img src="https://files.catbox.moe/soc5w1.jpg" alt="Alpha Bot" width="180"/>
