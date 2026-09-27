@@ -1,5 +1,7 @@
 <div align="center">
 
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=0,2,2,5,30&height=120&section=header&text=ALPHA-XMD&fontSize=50&fontColor=33ff00&animation=fadeIn" alt="Wave Header" width="100%"/>
+
   <a href="https://git.io/typing-svg">
     <img src="https://readme-typing-svg.demolab.com?font=Ribeye&size=40&pause=1000&color=33ff00&center=true&vCenter=true&width=800&height=80&lines=Alpha-XMD;Multi+Device+Whatsapp+Bot;Coded+By+Alpha" alt="Typing SVG" />
   </a>
@@ -148,9 +150,9 @@ Let's build the ultimate bot together 🤝
 
 <div align="center">
 
-  <img src="https://github-readme-stats.vercel.app/api?username=Alexio11-09&show_icons=true&theme=radical&border_radius=10&hide_border=true" alt="GitHub Stats" height="180"/>
+  <img src="https://github-readme-stats-sigma-five.vercel.app/api?username=Alexio11-09&show_icons=true&theme=radical&border_radius=10&hide_border=true" alt="GitHub Stats" height="180"/>
 
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Alexio11-09&layout=compact&theme=radical&border_radius=10&hide_border=true" alt="Top Languages" height="180"/>
+  <img src="https://github-readme-stats-sigma-five.vercel.app/api/top-langs/?username=Alexio11-09&layout=compact&theme=radical&border_radius=10&hide_border=true" alt="Top Languages" height="180"/>
 
 
 
@@ -174,7 +176,7 @@ MIT – free to use, modify, and distribute. Attribution appreciated but not req
 
   <p><i>Built with ❤️ by Alpha</i></p>
 
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=0,2,2,5,30&height=100&section=footer" alt="Wave Footer" width="100%"/>
+
 </div>
 ```
-
----
