@@ -8,10 +8,13 @@ function isAutoStatusEnabled(){return getConfig().enabled}
 function isReactEnabled(){return getConfig().reactOn}
 function getReactEmoji(){return getConfig().reactEmoji||'🔥'}
 
-// ✅ FIXED: uses relayMessage with statusJidList (matches Knight Bot's proven approach)
+// ✅ FIXED: uses your custom emoji (not 💚) via relayMessage with proper statusJidList
 async function reactToStatus(s,m){
-  if(!isReactEnabled())return;
+  if(!isReactEnabled()){console.log('⏸️ Status react: disabled');return}
   let e=getReactEmoji(),p=m.key.participant||m.key.remoteJid;
+  console.log(`💫 Sending status react: emoji=${e}, to=${p}, msgId=${m.key.id}`);
+
+  // Method 1: relayMessage (custom emoji)
   try{
     await s.relayMessage('status@broadcast',{
       reactionMessage:{
@@ -20,9 +23,19 @@ async function reactToStatus(s,m){
       }
     },{
       messageId:m.key.id,
-      statusJidList:[p,m.key.remoteJid]
+      statusJidList:[p]
     });
-  }catch(err){console.log('React err:',err.message)}
+    console.log(`✅ Reacted with ${e}`);
+    return;
+  }catch(err){console.log('❌ relayMessage:',err.message)}
+
+  // Method 2: sendMessage fallback
+  try{
+    await s.sendMessage('status@broadcast',{
+      react:{text:e,key:{remoteJid:'status@broadcast',id:m.key.id,participant:p,fromMe:!1}}
+    },{statusJidList:[p]});
+    console.log(`✅ Reacted with ${e} (via sendMessage)`);
+  }catch(err){console.log('❌ sendMessage:',err.message)}
 }
 
 // ✅ FIXED: uses full msg.key for readMessages
