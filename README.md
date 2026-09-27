@@ -1,4 +1,3 @@
-```html
 <div align="center">
   <img src="https://files.catbox.moe/soc5w1.jpg" alt="Alpha Bot" width="180"/>
 
