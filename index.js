@@ -8,7 +8,21 @@ const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const PhoneNumber = require("awesome-phonenumber");
-const { wrapSocket } = require("baileys-antiban");
+
+// ✅ Suppress noisy Bad MAC / decrypt errors (cosmetic only)
+const _origErr = console.error;
+console.error = (...a) => {
+  const m = a.join(" ");
+  if (
+    m.includes("Bad MAC") ||
+    m.includes("Session error") ||
+    m.includes("verifyMAC") ||
+    m.includes("Failed to decrypt") ||
+    m.includes("decryptWithSessions") ||
+    m.includes("doDecryptWhisperMessage")
+  ) return;
+  _origErr(...a);
+};
 
 console.log("🚀 Starting Alpha Bot...");
 
@@ -80,7 +94,6 @@ function attachHandlers(sock) {
       for (const mek of messages) {
         const remote = mek.key?.remoteJid;
 
-        // ✅ Status check moved ABOVE the empty-message check
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) {
             await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
@@ -90,7 +103,6 @@ function attachHandlers(sock) {
 
         if (!mek.message) continue;
 
-        // Handle Channel Reacts
         if (remote === channelJid) {
           loadGlobalSettings();
           const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
@@ -115,7 +127,6 @@ function attachHandlers(sock) {
           continue;
         }
 
-        // Main Message Handler
         if (mek.key.fromMe) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) continue;
@@ -346,8 +357,8 @@ async function clientstart() {
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
-  // ✅ Create raw socket (no proxy)
-  const rawSock = makeWASocket({
+  // ✅ Clean socket — no anti-ban wrapper
+  const sock = makeWASocket({
     version,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
@@ -356,41 +367,6 @@ async function clientstart() {
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 10000
-  });
-
-  // ✅ Wrap with ultra-conservative anti-ban config
-  const sock = wrapSocket(rawSock, {
-    preset: 'conservative',
-
-    rateLimiter: {
-      maxPerMinute: 3,
-      maxPerHour: 40,
-      maxPerDay: 150,
-      minDelayMs: 4000,
-      maxDelayMs: 12000,
-      newChatDelayMs: 10000
-    },
-
-    warmUp: {
-      warmUpDays: 14,
-      day1Limit: 10,
-      growthFactor: 1.5
-    },
-
-    humanEntropy: {
-      enabled: true
-    },
-
-    health: {
-      autoPauseAt: 'medium'
-    },
-
-    jidCanonicalizer: {
-      enabled: true,
-      canonical: 'pn'
-    },
-
-    persist: './database/antiban-state.json'
   });
 
   sock.decodeJid = jid => {
@@ -406,7 +382,7 @@ async function clientstart() {
     setTimeout(async () => {
       try {
         console.log(chalk.yellow("📡 Requesting pairing code..."));
-        const code = await rawSock.requestPairingCode(pairingNumber);
+        const code = await sock.requestPairingCode(pairingNumber);
         const formatted = code.match(/.{1,4}/g)?.join("-") || code;
         console.log("");
         console.log(chalk.black(chalk.bgGreen(`  ✅ PAIRING CODE: ${formatted}  `)));
@@ -449,12 +425,11 @@ async function clientstart() {
         process.exit(0);
       }
 
-      // ✅ Reconnect circuit breaker
       if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        console.log(chalk.red(`🚨 Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping bot for 30 minutes to cool down.`));
+        console.log(chalk.red(`🚨 Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Cooling down for 30 minutes.`));
         setTimeout(() => {
           reconnectAttempts = 0;
-          console.log(chalk.yellow('🔄 Cool-down finished. Attempting to reconnect...'));
+          console.log(chalk.yellow('🔄 Cool-down finished. Reconnecting...'));
           clientstart().catch(err => {
             console.log(chalk.red("⚠️ Reconnect failed:"), err.message);
           });
