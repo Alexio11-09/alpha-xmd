@@ -1,14 +1,14 @@
 const fs=require('fs'),ax=require('axios'),yts=require('yt-search'),{downloadContentFromMessage}=require('@whiskeysockets/baileys'),{execSync}=require('child_process');
 const cl=f=>setTimeout(()=>{try{fs.unlinkSync(f)}catch{}},3e5);
-const dl=async(u,o,to=60000)=>{const w=fs.createWriteStream(o),r=await ax({url:u,method:'GET',responseType:'stream',timeout:to,headers:{'User-Agent':'Mozilla/5.0'}});return new Promise((res,rej)=>{const t=setTimeout(()=>{w.destroy();rej(new Error('timeout'))},to);r.data.pipe(w);w.on('finish',()=>{clearTimeout(t);res()});w.on('error',e=>{clearTimeout(t);rej(e)});r.data.on('error',e=>{clearTimeout(t);rej(e)})})};
+const dl=async(u,o)=>{const w=fs.createWriteStream(o),r=await ax({url:u,method:'GET',responseType:'stream',timeout:12e4,headers:{'User-Agent':'Mozilla/5.0'}});r.data.pipe(w);return new Promise((a,b)=>{w.on('finish',a);w.on('error',b)})};
 const bf=async u=>Buffer.from((await ax.get(u,{responseType:'arraybuffer',timeout:15e3})).data);
 const B=c=>({forwardingScore:999,isForwarded:!0,forwardedNewsletterMessageInfo:{newsletterJid:c.newsletter.id+'@newsletter',newsletterName:c.newsletter.name}});
 
 module.exports=[
-// ===== PLAY — 3-API fallback =====
+// ===== PLAY — working 3-API fallback =====
 {command:'play',aliases:['song','music','play2','ytmp3'],category:'downloader',execute:async(s,m,{args,reply,config:c})=>{
   let t=args.join(' ');
-  if(!t)return reply('🎧 Usage: .play <song name>\nEx: .play faded alan walker');
+  if(!t)return reply('🎧 Usage: .play <song name>');
   try{
     await s.sendMessage(m.chat,{react:{text:'🎶',key:m.key}});
     let sr=await yts(t);
@@ -27,10 +27,10 @@ module.exports=[
   }catch(e){console.log('play error:',e.message);await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});reply('❌ Failed to download audio')}
 }},
 
-// ===== VIDEO — checks for audio-only + download timeout =====
+// ===== VIDEO — EXACT mirror of play (send URL directly, no disk download) =====
 {command:'video',aliases:['vid','dl','yt','ytmp4'],category:'downloader',execute:async(s,m,{args,reply,config:c})=>{
   let t=args.join(' ');
-  if(!t)return reply('🎥 Usage: .video <name/url>\nEx: .video drake - gods plan');
+  if(!t)return reply('🎥 Usage: .video <name/url>');
   try{
     await s.sendMessage(m.chat,{react:{text:'⚡',key:m.key}});
     let u=t,info=null;
@@ -39,81 +39,33 @@ module.exports=[
       if(!sr.videos.length){await s.sendMessage(m.chat,{react:{text:'🔍',key:m.key}});return reply('❌ No videos found')}
       info=sr.videos[0];u=info.url;
     }
-    if(!u.includes('youtube.com')&&!u.includes('youtu.be')){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('❌ Invalid YouTube link')}
-
     await s.sendMessage(m.chat,{react:{text:'⬇️',key:m.key}});
     let d=null;
 
-    // API 1 — nyxs
-    try{
-      const r=await ax.get(`https://api.nyxs.pw/dl/ytmp4?url=${encodeURIComponent(u)}`,{timeout:15e3});
-      if(r.data?.result?.url)d={title:r.data.result.title,thumb:r.data.result.thumbnail,url:r.data.result.url};
+    // SAME 3 APIs as play, just video endpoints
+    try{const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(u)}`,{timeout:1e4});
+      if(r.data?.status){
+        const vu=r.data.videos?.['360']||r.data.videos?.['720']||r.data.videos?.['480']||r.data.video||r.data.url;
+        if(vu)d={title:r.data.title,thumb:r.data.thumbnail,video:vu};
+      }
     }catch(e){console.log('v-api1:',e.message)}
 
-    // API 2 — ryzendesu
-    if(!d){try{
-      const r=await ax.get(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(u)}`,{timeout:15e3});
-      if(r.data?.url)d={title:r.data.title,thumb:r.data.thumbnail,url:r.data.url};
+    if(!d){try{const r=await ax.get(`https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(u)}`,{timeout:1e4});
+      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,video:r.data.result.download};
     }catch(e){console.log('v-api2:',e.message)}}
 
-    // API 3 — hectormanuel
-    if(!d){try{
-      const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(u)}`,{timeout:15e3});
-      if(r.data?.status){
-        const vUrl=r.data.videos?.['360']||r.data.videos?.['720']||r.data.videos?.['480']||r.data.video;
-        if(vUrl)d={title:r.data.title,thumb:r.data.thumbnail,url:vUrl};
-      }
+    if(!d){try{const r=await ax.get(`https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(u)}`,{timeout:1e4});
+      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,video:r.data.result.link};
     }catch(e){console.log('v-api3:',e.message)}}
 
-    if(!d?.url){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All download servers failed. Try again later.')}
+    if(!d?.video){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All video servers failed. Try again later.')}
 
     const title=d.title||info?.title||'Video';
-    console.log('📹 Video URL fetched:',title);
-    await s.sendMessage(m.chat,{image:{url:d.thumb||info?.thumbnail},caption:`🎬 *${title}*\n⬇️ Downloading video...\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
-
-    // Download with 90-second timeout
-    const o=`./vid_${Date.now()}.mp4`;
-    try{
-      await dl(d.url,o,90000);
-    }catch(e){
-      console.log('video dl error:',e.message);
-      try{fs.unlinkSync(o)}catch{}
-      await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
-      return reply('❌ Download timeout. Try another video.');
-    }
-
-    const stats=fs.statSync(o);
-    const sizeMB=(stats.size/1024/1024).toFixed(2);
-    console.log('📹 Video size:',sizeMB,'MB');
-
-    // If file is too small, it's probably an error page or audio-only
-    if(stats.size<102400){
-      cl(o);
-      await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
-      return reply('❌ This video is audio-only or unavailable. Try a different one.');
-    }
-
-    if(stats.size>104857600){
-      cl(o);
-      await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
-      return reply('❌ Video too large (>100MB)');
-    }
-
-    await s.sendMessage(m.chat,{
-      video:fs.readFileSync(o),
-      mimetype:'video/mp4',
-      fileName:title.replace(/[^a-zA-Z0-9]/g,'_')+'.mp4',
-      caption:`✅ *${title}*\n\n👑 ${c.settings.title}`,
-      contextInfo:B(c)
-    },{quoted:m});
-
-    cl(o);
+    // Send video via URL directly — same pattern as play
+    await s.sendMessage(m.chat,{image:{url:d.thumb||info?.thumbnail},caption:`🎬 *${title}*\n\n⬇️ Downloading video...\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
+    await s.sendMessage(m.chat,{video:{url:d.video},mimetype:'video/mp4',fileName:title.replace(/[^a-zA-Z0-9]/g,'_')+'.mp4',caption:`✅ *${title}*\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
     await s.sendMessage(m.chat,{react:{text:'✅',key:m.key}});
-  }catch(e){
-    console.log('video error:',e.message);
-    await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
-    reply('❌ Download failed. Try again.');
-  }
+  }catch(e){console.log('video error:',e.message);await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});reply('❌ Failed to download video')}
 }},
 
 // ===== TIKTOK =====
