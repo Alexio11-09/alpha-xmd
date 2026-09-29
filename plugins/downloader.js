@@ -5,7 +5,7 @@ const bf=async u=>Buffer.from((await ax.get(u,{responseType:'arraybuffer',timeou
 const B=c=>({forwardingScore:999,isForwarded:!0,forwardedNewsletterMessageInfo:{newsletterJid:c.newsletter.id+'@newsletter',newsletterName:c.newsletter.name}});
 
 module.exports=[
-// ===== PLAY — working 3-API fallback =====
+// ===== PLAY =====
 {command:'play',aliases:['song','music','play2','ytmp3'],category:'downloader',execute:async(s,m,{args,reply,config:c})=>{
   let t=args.join(' ');
   if(!t)return reply('🎧 Usage: .play <song name>');
@@ -27,45 +27,61 @@ module.exports=[
   }catch(e){console.log('play error:',e.message);await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});reply('❌ Failed to download audio')}
 }},
 
-// ===== VIDEO — EXACT mirror of play (send URL directly, no disk download) =====
+// ===== VIDEO — EXACT copy of working pattern =====
 {command:'video',aliases:['vid','dl','yt','ytmp4'],category:'downloader',execute:async(s,m,{args,reply,config:c})=>{
-  let t=args.join(' ');
-  if(!t)return reply('🎥 Usage: .video <name/url>');
+  let text=args.join(' ');
+  if(!text)return reply('🎥 Usage: .video <name/url>\nEx: .video drake - gods plan');
   try{
     await s.sendMessage(m.chat,{react:{text:'⚡',key:m.key}});
-    let u=t,info=null;
-    if(!t.startsWith('http')){
-      const sr=await yts(t);
-      if(!sr.videos.length){await s.sendMessage(m.chat,{react:{text:'🔍',key:m.key}});return reply('❌ No videos found')}
-      info=sr.videos[0];u=info.url;
+    let videoUrl=text;
+    let videoInfo=null;
+    if(!text.startsWith('http')){
+      const search=await yts(text);
+      if(!search.videos.length){await s.sendMessage(m.chat,{react:{text:'🔍',key:m.key}});return reply('❌ No videos found')}
+      videoInfo=search.videos[0];
+      videoUrl=videoInfo.url;
     }
+    if(!videoUrl.includes('youtube.com')&&!videoUrl.includes('youtu.be')){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('❌ Invalid YouTube link')}
     await s.sendMessage(m.chat,{react:{text:'⬇️',key:m.key}});
-    let d=null;
+    let data=null;
 
-    // SAME 3 APIs as play, just video endpoints
-    try{const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(u)}`,{timeout:1e4});
-      if(r.data?.status){
-        const vu=r.data.videos?.['360']||r.data.videos?.['720']||r.data.videos?.['480']||r.data.video||r.data.url;
-        if(vu)d={title:r.data.title,thumb:r.data.thumbnail,video:vu};
-      }
+    // API 1
+    try{
+      const res1=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`,{timeout:1e4});
+      if(res1.data?.status)data=res1.data;
     }catch(e){console.log('v-api1:',e.message)}
 
-    if(!d){try{const r=await ax.get(`https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(u)}`,{timeout:1e4});
-      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,video:r.data.result.download};
+    // API 2
+    if(!data){try{
+      const res2=await ax.get(`https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(videoUrl)}`,{timeout:1e4});
+      if(res2.data?.result)data={title:res2.data.result.title,thumbnail:res2.data.result.thumbnail,videos:{'360':res2.data.result.download}};
     }catch(e){console.log('v-api2:',e.message)}}
 
-    if(!d){try{const r=await ax.get(`https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(u)}`,{timeout:1e4});
-      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,video:r.data.result.link};
+    // API 3
+    if(!data){try{
+      const res3=await ax.get(`https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(videoUrl)}`,{timeout:1e4});
+      if(res3.data?.result)data={title:res3.data.result.title,thumbnail:res3.data.result.thumbnail,videos:{'360':res3.data.result.link}};
     }catch(e){console.log('v-api3:',e.message)}}
 
-    if(!d?.video){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All video servers failed. Try again later.')}
+    if(!data){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All download servers failed. Try again later.')}
 
-    const title=d.title||info?.title||'Video';
-    // Send video via URL directly — same pattern as play
-    await s.sendMessage(m.chat,{image:{url:d.thumb||info?.thumbnail},caption:`🎬 *${title}*\n\n⬇️ Downloading video...\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
-    await s.sendMessage(m.chat,{video:{url:d.video},mimetype:'video/mp4',fileName:title.replace(/[^a-zA-Z0-9]/g,'_')+'.mp4',caption:`✅ *${title}*\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
+    const title=data.title||videoInfo?.title||'Video';
+    const videoLink=data.videos?.['360'];
+
+    if(!videoLink){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ Video not available')}
+
+    const filename=title.replace(/[^a-zA-Z0-9]/g,'_')+'.mp4';
+
+    await s.sendMessage(m.chat,{image:{url:data.thumbnail||videoInfo?.thumbnail},caption:`🎬 *${title}*\n⬇️ Downloading...\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
+
+    await s.sendMessage(m.chat,{video:{url:videoLink},mimetype:'video/mp4',fileName:filename,caption:`✅ Done\n\n🎬 ${title}\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
+
     await s.sendMessage(m.chat,{react:{text:'✅',key:m.key}});
-  }catch(e){console.log('video error:',e.message);await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});reply('❌ Failed to download video')}
+  }catch(err){
+    console.log('video error:',err.message);
+    await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
+    reply('❌ Download failed. Try again.');
+  }
 }},
 
 // ===== TIKTOK =====
