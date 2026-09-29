@@ -1,6 +1,6 @@
 const fs=require('fs'),ax=require('axios'),yts=require('yt-search'),{downloadContentFromMessage}=require('@whiskeysockets/baileys'),{execSync}=require('child_process');
 const cl=f=>setTimeout(()=>{try{fs.unlinkSync(f)}catch{}},3e5);
-const dl=async(u,o)=>{const w=fs.createWriteStream(o),r=await ax({url:u,method:'GET',responseType:'stream',timeout:12e4,headers:{'User-Agent':'Mozilla/5.0'}});r.data.pipe(w);return new Promise((a,b)=>{w.on('finish',a);w.on('error',b)})};
+const dl=async(u,o,to=60000)=>{const w=fs.createWriteStream(o),r=await ax({url:u,method:'GET',responseType:'stream',timeout:to,headers:{'User-Agent':'Mozilla/5.0'}});return new Promise((res,rej)=>{const t=setTimeout(()=>{w.destroy();rej(new Error('timeout'))},to);r.data.pipe(w);w.on('finish',()=>{clearTimeout(t);res()});w.on('error',e=>{clearTimeout(t);rej(e)});r.data.on('error',e=>{clearTimeout(t);rej(e)})})};
 const bf=async u=>Buffer.from((await ax.get(u,{responseType:'arraybuffer',timeout:15e3})).data);
 const B=c=>({forwardingScore:999,isForwarded:!0,forwardedNewsletterMessageInfo:{newsletterJid:c.newsletter.id+'@newsletter',newsletterName:c.newsletter.name}});
 
@@ -16,27 +16,10 @@ module.exports=[
     let v=sr.videos[0];
     await s.sendMessage(m.chat,{react:{text:'⬇️',key:m.key}});
     let d=null;
-
-    // API 1
-    try{
-      const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(v.url)}`,{timeout:1e4});
-      if(r.data?.status)d={title:r.data.title,thumb:r.data.thumbnail,audio:r.data.audio};
-    }catch{}
-
-    // API 2
-    if(!d){try{
-      const r=await ax.get(`https://api.douxx.tech/api/youtube/audio?url=${encodeURIComponent(v.url)}`,{timeout:1e4});
-      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,audio:r.data.result.download};
-    }catch{}}
-
-    // API 3
-    if(!d){try{
-      const r=await ax.get(`https://api.lolhuman.xyz/api/ytaudio?apikey=GataDios&url=${encodeURIComponent(v.url)}`,{timeout:1e4});
-      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,audio:r.data.result.link};
-    }catch{}}
-
+    try{const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(v.url)}`,{timeout:1e4});if(r.data?.status)d={title:r.data.title,thumb:r.data.thumbnail,audio:r.data.audio};}catch{}
+    if(!d){try{const r=await ax.get(`https://api.douxx.tech/api/youtube/audio?url=${encodeURIComponent(v.url)}`,{timeout:1e4});if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,audio:r.data.result.download};}catch{}}
+    if(!d){try{const r=await ax.get(`https://api.lolhuman.xyz/api/ytaudio?apikey=GataDios&url=${encodeURIComponent(v.url)}`,{timeout:1e4});if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,audio:r.data.result.link};}catch{}}
     if(!d?.audio){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All audio servers failed. Try again later.')}
-
     const title=d.title||v.title;
     await s.sendMessage(m.chat,{image:{url:d.thumb||v.thumbnail},caption:`🎵 *${title}*\n\n⬇️ Downloading audio...\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
     await s.sendMessage(m.chat,{audio:{url:d.audio},mimetype:'audio/mpeg',ptt:!1,fileName:title.replace(/[^a-zA-Z0-9]/g,'_')+'.mp3',contextInfo:{externalAdReply:{title,body:'Now playing 🎧',thumbnailUrl:d.thumb||v.thumbnail,mediaType:1}}},{quoted:m});
@@ -44,7 +27,7 @@ module.exports=[
   }catch(e){console.log('play error:',e.message);await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});reply('❌ Failed to download audio')}
 }},
 
-// ===== VIDEO — downloads to disk first (fixes expired URL) =====
+// ===== VIDEO — checks for audio-only + download timeout =====
 {command:'video',aliases:['vid','dl','yt','ytmp4'],category:'downloader',execute:async(s,m,{args,reply,config:c})=>{
   let t=args.join(' ');
   if(!t)return reply('🎥 Usage: .video <name/url>\nEx: .video drake - gods plan');
@@ -61,46 +44,54 @@ module.exports=[
     await s.sendMessage(m.chat,{react:{text:'⬇️',key:m.key}});
     let d=null;
 
-    // API 1
+    // API 1 — nyxs
     try{
-      const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(u)}`,{timeout:15e3});
-      if(r.data?.status&&r.data?.videos)d={title:r.data.title,thumb:r.data.thumbnail,videos:r.data.videos};
-      else if(r.data?.status&&r.data?.video)d={title:r.data.title,thumb:r.data.thumbnail,videos:{'360':r.data.video}};
+      const r=await ax.get(`https://api.nyxs.pw/dl/ytmp4?url=${encodeURIComponent(u)}`,{timeout:15e3});
+      if(r.data?.result?.url)d={title:r.data.result.title,thumb:r.data.result.thumbnail,url:r.data.result.url};
     }catch(e){console.log('v-api1:',e.message)}
 
-    // API 2
+    // API 2 — ryzendesu
     if(!d){try{
-      const r=await ax.get(`https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(u)}`,{timeout:15e3});
-      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,videos:{'360':r.data.result.download}};
+      const r=await ax.get(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(u)}`,{timeout:15e3});
+      if(r.data?.url)d={title:r.data.title,thumb:r.data.thumbnail,url:r.data.url};
     }catch(e){console.log('v-api2:',e.message)}}
 
-    // API 3
+    // API 3 — hectormanuel
     if(!d){try{
-      const r=await ax.get(`https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(u)}`,{timeout:15e3});
-      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,videos:{'360':r.data.result.link}};
+      const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(u)}`,{timeout:15e3});
+      if(r.data?.status){
+        const vUrl=r.data.videos?.['360']||r.data.videos?.['720']||r.data.videos?.['480']||r.data.video;
+        if(vUrl)d={title:r.data.title,thumb:r.data.thumbnail,url:vUrl};
+      }
     }catch(e){console.log('v-api3:',e.message)}}
 
-    if(!d){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All download servers failed. Try again later.')}
+    if(!d?.url){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All download servers failed. Try again later.')}
 
     const title=d.title||info?.title||'Video';
-    const vlink=d.videos?.['360']||d.videos?.['720']||d.videos?.['480']||Object.values(d.videos||{})[0];
-    if(!vlink){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ Video URL not found')}
-
-    console.log('📹 Downloading video to disk:',title);
+    console.log('📹 Video URL fetched:',title);
     await s.sendMessage(m.chat,{image:{url:d.thumb||info?.thumbnail},caption:`🎬 *${title}*\n⬇️ Downloading video...\n\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
 
-    // Download video to local disk first
+    // Download with 90-second timeout
     const o=`./vid_${Date.now()}.mp4`;
     try{
-      await dl(vlink,o);
+      await dl(d.url,o,90000);
     }catch(e){
       console.log('video dl error:',e.message);
+      try{fs.unlinkSync(o)}catch{}
       await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
-      return reply('❌ Failed to download video file');
+      return reply('❌ Download timeout. Try another video.');
     }
 
     const stats=fs.statSync(o);
-    console.log('📹 Video size:',(stats.size/1024/1024).toFixed(2),'MB');
+    const sizeMB=(stats.size/1024/1024).toFixed(2);
+    console.log('📹 Video size:',sizeMB,'MB');
+
+    // If file is too small, it's probably an error page or audio-only
+    if(stats.size<102400){
+      cl(o);
+      await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});
+      return reply('❌ This video is audio-only or unavailable. Try a different one.');
+    }
 
     if(stats.size>104857600){
       cl(o);
@@ -108,7 +99,6 @@ module.exports=[
       return reply('❌ Video too large (>100MB)');
     }
 
-    // Send file buffer
     await s.sendMessage(m.chat,{
       video:fs.readFileSync(o),
       mimetype:'video/mp4',
