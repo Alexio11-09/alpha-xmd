@@ -5,10 +5,10 @@ const bf=async u=>Buffer.from((await ax.get(u,{responseType:'arraybuffer',timeou
 const B=c=>({forwardingScore:999,isForwarded:!0,forwardedNewsletterMessageInfo:{newsletterJid:c.newsletter.id+'@newsletter',newsletterName:c.newsletter.name}});
 
 module.exports=[
-// ===== PLAY — 5-API fallback =====
+// ===== PLAY =====
 {command:'play',aliases:['song','music','play2','ytmp3'],category:'downloader',execute:async(s,m,{args,reply,config:c})=>{
   let t=args.join(' ');
-  if(!t)return reply('🎧 Usage: .play <song name>');
+  if(!t)return reply('🎧 Usage: .play <song name>\nEx: .play faded alan walker');
   try{
     await s.sendMessage(m.chat,{react:{text:'🎶',key:m.key}});
     let sr=await yts(t);
@@ -18,20 +18,20 @@ module.exports=[
     let d=null;
     const enc=encodeURIComponent(v.url);
 
-    // API 1
-    try{const r=await ax.get(`https://api.zenkey.my.id/download/ytmp3?url=${enc}&apikey=zenkey`,{timeout:15e3});if(r.data?.result?.url)d={title:r.data.result.title||v.title,thumb:r.data.result.thumbnail||v.thumbnail,audio:r.data.result.url};}catch(e){console.log('p-api1:',e.message)}
+    // API 1 — zenkey
+    try{const r=await ax.get(`https://api.zenkey.my.id/download/ytmp3?url=${enc}&apikey=zenkey`,{timeout:15e3});
+      if(r.data?.result?.url)d={title:r.data.result.title||v.title,thumb:r.data.result.thumbnail||v.thumbnail,audio:r.data.result.url};
+    }catch(e){console.log('play api1:',e.message)}
 
-    // API 2
-    if(!d){try{const r=await ax.get(`https://api.ryzendesu.vip/api/downloader/ytmp3?url=${enc}`,{timeout:15e3});if(r.data?.url)d={title:r.data.title||v.title,thumb:r.data.thumbnail||v.thumbnail,audio:r.data.url};}catch(e){console.log('p-api2:',e.message)}}
+    // API 2 — ryzendesu
+    if(!d){try{const r=await ax.get(`https://api.ryzendesu.vip/api/downloader/ytmp3?url=${enc}`,{timeout:15e3});
+      if(r.data?.url)d={title:r.data.title||v.title,thumb:r.data.thumbnail||v.thumbnail,audio:r.data.url};
+    }catch(e){console.log('play api2:',e.message)}}
 
-    // API 3
-    if(!d){try{const r=await ax.get(`https://api.nyxs.pw/dl/ytmp3?url=${enc}`,{timeout:15e3});if(r.data?.result?.url)d={title:r.data.result.title||v.title,thumb:r.data.result.thumbnail||v.thumbnail,audio:r.data.result.url};}catch(e){console.log('p-api3:',e.message)}}
-
-    // API 4
-    if(!d){try{const r=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${enc}`,{timeout:1e4});if(r.data?.status)d={title:r.data.title,thumb:r.data.thumbnail,audio:r.data.audio};}catch(e){console.log('p-api4:',e.message)}}
-
-    // API 5
-    if(!d){try{const r=await ax.get(`https://api.douxx.tech/api/youtube/audio?url=${enc}`,{timeout:1e4});if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,audio:r.data.result.download};}catch(e){console.log('p-api5:',e.message)}}
+    // API 3 — lolhuman
+    if(!d){try{const r=await ax.get(`https://api.lolhuman.xyz/api/ytaudio?apikey=GataDios&url=${enc}`,{timeout:15e3});
+      if(r.data?.result)d={title:r.data.result.title,thumb:r.data.result.thumbnail,audio:r.data.result.link};
+    }catch(e){console.log('play api3:',e.message)}}
 
     if(!d?.audio){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All audio servers failed. Try again later.')}
 
@@ -60,40 +60,28 @@ module.exports=[
     await s.sendMessage(m.chat,{react:{text:'⬇️',key:m.key}});
     let data=null;
 
-    // API 1
+    // API 1 — zenkey
     try{
-      const res1=await ax.get(`https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`,{timeout:1e4});
-      if(res1.data?.status)data=res1.data;
+      const r=await ax.get(`https://api.zenkey.my.id/download/ytmp4?url=${encodeURIComponent(videoUrl)}&apikey=zenkey`,{timeout:15e3});
+      if(r.data?.result?.url)data={title:r.data.result.title,thumbnail:r.data.result.thumbnail,videos:{'360':r.data.result.url}};
     }catch(e){console.log('v-api1:',e.message)}
 
-    // API 2
+    // API 2 — ryzendesu
     if(!data){try{
-      const res2=await ax.get(`https://api.douxx.tech/api/youtube/video?url=${encodeURIComponent(videoUrl)}`,{timeout:1e4});
-      if(res2.data?.result)data={title:res2.data.result.title,thumbnail:res2.data.result.thumbnail,videos:{'360':res2.data.result.download}};
+      const r=await ax.get(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(videoUrl)}`,{timeout:15e3});
+      if(r.data?.url)data={title:r.data.title,thumbnail:r.data.thumbnail,videos:{'360':r.data.url}};
     }catch(e){console.log('v-api2:',e.message)}}
 
-    // API 3
+    // API 3 — lolhuman
     if(!data){try{
-      const res3=await ax.get(`https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(videoUrl)}`,{timeout:1e4});
-      if(res3.data?.result)data={title:res3.data.result.title,thumbnail:res3.data.result.thumbnail,videos:{'360':res3.data.result.link}};
+      const r=await ax.get(`https://api.lolhuman.xyz/api/youtube?apikey=GataDios&url=${encodeURIComponent(videoUrl)}`,{timeout:15e3});
+      if(r.data?.result)data={title:r.data.result.title,thumbnail:r.data.result.thumbnail,videos:{'360':r.data.result.link}};
     }catch(e){console.log('v-api3:',e.message)}}
-
-    // API 4 (new)
-    if(!data){try{
-      const res4=await ax.get(`https://api.zenkey.my.id/download/ytmp4?url=${encodeURIComponent(videoUrl)}&apikey=zenkey`,{timeout:15e3});
-      if(res4.data?.result?.url)data={title:res4.data.result.title,thumbnail:res4.data.result.thumbnail,videos:{'360':res4.data.result.url}};
-    }catch(e){console.log('v-api4:',e.message)}}
-
-    // API 5 (new)
-    if(!data){try{
-      const res5=await ax.get(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(videoUrl)}`,{timeout:15e3});
-      if(res5.data?.url)data={title:res5.data.title,thumbnail:res5.data.thumbnail,videos:{'360':res5.data.url}};
-    }catch(e){console.log('v-api5:',e.message)}}
 
     if(!data){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ All download servers failed. Try again later.')}
 
     const title=data.title||videoInfo?.title||'Video';
-    const videoLink=data.videos?.['360']||data.videos?.['720']||data.videos?.['480']||Object.values(data.videos||{})[0];
+    const videoLink=data.videos?.['360'];
 
     if(!videoLink){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ Video not available')}
 
