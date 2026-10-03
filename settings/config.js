@@ -12,14 +12,14 @@ const config = {
     // 🔐 PAIR NAME
     setPair: "ALPHA-XMD",
 
-    // 🖼️ THUMBNAIL
-    thumbUrl: "https://files.catbox.moe/soc5w1.jpg",
+    // 🖼️ THUMBNAIL — working placeholder (swap later)
+    thumbUrl: "https://placehold.co/500x500/0f172a/33ff00/png?text=ALPHA-XMD",
 
-    // 📁 SESSION FOLDER – changed to "session" (to match test)
+    // 📁 SESSION FOLDER
     session: "session",
 
     // ⚙️ BOT MODE
-    mode: "public", // public / self
+    mode: "public",
 
     // 🤖 AUTO FEATURES
     auto: {
@@ -32,7 +32,7 @@ const config = {
     // 📊 STATUS SETTINGS
     status: {
         public: true,
-        terminal: true,   // must be true for pairing
+        terminal: true,
         reactsw: false
     },
 
@@ -49,7 +49,7 @@ const config = {
         title: "ALPHA-XMD BOT",
         description: "Custom WhatsApp Bot by Alpha",
         footer: "⚡ Powered by Alpha-XMD",
-        menuSongUrl: "" // ← removed
+        menuSongUrl: ""
     },
 
     // 📢 CHANNEL / NEWSLETTER
