@@ -49,7 +49,7 @@ const config = {
         title: "ALPHA-XMD BOT",
         description: "Custom WhatsApp Bot by Alpha",
         footer: "⚡ Powered by Alpha-XMD",
-        menuSongUrl: "https://files.catbox.moe/soKHEOR3yQOZE51.mp3"
+        menuSongUrl: "" // ← removed
     },
 
     // 📢 CHANNEL / NEWSLETTER
