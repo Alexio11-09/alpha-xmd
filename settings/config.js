@@ -12,8 +12,8 @@ const config = {
     // 🔐 PAIR NAME
     setPair: "ALPHA-XMD",
 
-    // 🖼️ THUMBNAIL — working placeholder (swap later)
-    thumbUrl: "https://placehold.co/500x500/0f172a/33ff00/png?text=ALPHA-XMD",
+    // 🖼️ THUMBNAIL — from your GitHub repo
+    thumbUrl: "https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg",
 
     // 📁 SESSION FOLDER
     session: "session",
