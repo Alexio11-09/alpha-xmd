@@ -366,8 +366,13 @@ async function clientstart() {
     browser: ["Ubuntu", "Chrome", "20.0.04"],
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 10000
+    keepAliveIntervalMs: 20000, // A slightly longer interval can be more stable
   });
+
+  // ✅ Enable TCP keep-alive to prevent silent drops
+  if (sock.ws && sock.ws._socket) {
+    sock.ws._socket.setKeepAlive(true, 15000);
+  }
 
   sock.decodeJid = jid => {
     if (!jid) return jid;
@@ -412,6 +417,9 @@ async function clientstart() {
     if (connection === "close") {
       if (socketClosed) return;
       socketClosed = true;
+
+      // ✅ CRITICAL: Clean up the old socket to prevent memory leaks
+      try { sock.end(undefined); } catch (e) {}
 
       const error = lastDisconnect?.error;
       const statusCode = new Boom(error)?.output?.statusCode;
