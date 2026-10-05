@@ -34,13 +34,31 @@ module.exports=[
     if(!t.startsWith('http')){const sr=await yts(t);if(!sr.videos.length)return reply('❌ No videos');u=sr.videos[0].url}
     await s.sendMessage(m.chat,{react:{text:'⬇️',key:m.key}});
 
-    console.log('🎬 @pontalabs/ytdl video request');
-    const video=await ytdl.downloadVideo(u,720);
-    const videoUrl=video.download.downloadUrl;
+    console.log('🎬 @pontalabs/ytdl video request for:',u);
+
+    let videoUrl=null;
+
+    // Attempt 1: exactly like audio (no quality param)
+    try{
+      const video=await ytdl.downloadVideo(u);
+      console.log('  → no-quality response:',JSON.stringify(video,null,2).substring(0,400));
+      videoUrl=video?.download?.downloadUrl || video?.url || video?.downloadUrl;
+      if(videoUrl)console.log('✅ Got URL (no quality)');
+    }catch(e){console.log('  ❌ no-quality failed:',e.message)}
+
+    // Attempt 2: with 360p quality
+    if(!videoUrl){
+      try{
+        const video=await ytdl.downloadVideo(u,360);
+        console.log('  → 360p response:',JSON.stringify(video,null,2).substring(0,400));
+        videoUrl=video?.download?.downloadUrl || video?.url || video?.downloadUrl;
+        if(videoUrl)console.log('✅ Got URL (360p)');
+      }catch(e){console.log('  ❌ 360p failed:',e.message)}
+    }
 
     if(!videoUrl){await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});return reply('⚠️ No video URL returned.')}
 
-    console.log('✅ @pontalabs/ytdl returned video URL');
+    console.log('✅ Sending video...');
     await s.sendMessage(m.chat,{video:{url:videoUrl},mimetype:'video/mp4',fileName:'video_'+Date.now()+'.mp4',caption:`✅ Downloaded\n👑 ${c.settings.title}`,contextInfo:B(c)},{quoted:m});
     await s.sendMessage(m.chat,{react:{text:'✅',key:m.key}});
   }catch(e){console.log('video err:',e.message);await s.sendMessage(m.chat,{react:{text:'❌',key:m.key}});reply('❌ Failed')}
