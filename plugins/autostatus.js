@@ -9,24 +9,62 @@ function isAutoStatusEnabled() { return getConfig().enabled }
 function isReactEnabled() { return getConfig().reactOn }
 function getReactEmoji() { return getConfig().reactEmoji || '🔥' }
 
-// ✅ Single attempt, silent fail (Baileys 6.7.24 LID limitation)
-async function reactToStatus(s, m) {
-  if (!isReactEnabled()) return;
-  const e = getReactEmoji();
-  const p = m.key.participantAlt || m.key.participant;
-  if (!p) return;
+// ✅ FIX: Detect addressing mode from JID (lid vs pn)
+function getAddressingMode(jid) {
+  if (!jid) return 'pn';
+  return jid.endsWith('@lid') ? 'lid' : 'pn';
+}
 
-  try {
-    await Promise.race([
-      s.sendMessage('status@broadcast', {
-        react: { text: e, key: { remoteJid: 'status@broadcast', id: m.key.id, participant: p, fromMe: false } }
-      }, { statusJidList: [p] }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-    ]);
-    console.log(`✅ Status reacted with ${e}`);
-  } catch (err) {
-    // Silent fail — no retry, no spam
+// ✅ FIX: Build proper reaction key with addressing mode
+function buildStatusReactionKey(msg, participantJid) {
+  return {
+    remoteJid: 'status@broadcast',
+    id: msg.key.id,
+    participant: participantJid,
+    fromMe: false,
+    addressingMode: getAddressingMode(participantJid)
+  };
+}
+
+// ✅ FIX: Try multiple candidate JIDs with proper addressing mode
+async function reactToStatus(s, m) {
+  if (!isReactEnabled()) { console.log('⏸️ Status react: disabled'); return; }
+  const e = getReactEmoji();
+
+  // Collect all possible JIDs (prefer participantAlt — that's the phone number for LID contacts)
+  const candidates = [
+    m.key.participantAlt,
+    m.key.remoteJidAlt,
+    m.key.participant,
+    m.key.remoteJid
+  ].filter(Boolean).filter(j => j !== 'status@broadcast');
+
+  if (!candidates.length) {
+    console.log('❌ Status react: no valid participant JID');
+    return;
   }
+
+  console.log(`💫 Status react: emoji=${e}, candidates=${candidates.map(c => c + ' (' + getAddressingMode(c) + ')').join(' | ')}`);
+
+  for (const p of candidates) {
+    const mode = getAddressingMode(p);
+    try {
+      await Promise.race([
+        s.sendMessage('status@broadcast', {
+          react: {
+            text: e,
+            key: buildStatusReactionKey(m, p)
+          }
+        }, { statusJidList: [p] }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+      ]);
+      console.log(`✅ Reacted via ${p} (mode: ${mode})`);
+      return;
+    } catch (err) {
+      console.log(`❌ ${p} (mode: ${mode}) failed: ${err.message}`);
+    }
+  }
+  console.log('❌ All reaction methods failed');
 }
 
 async function handleStatusUpdate(s, st) {
@@ -35,8 +73,9 @@ async function handleStatusUpdate(s, st) {
   if (!m || !m.key) return;
   if (m.key.remoteJid !== 'status@broadcast') return;
 
-  const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
-  global.statusCache.set(p, m);
+  // Cache using the phone-number version if available
+  const cacheKey = m.key.participantAlt || m.key.participant || m.key.remoteJid;
+  global.statusCache.set(cacheKey, m);
   if (global.statusCache.size > 100) {
     const f = global.statusCache.keys().next().value;
     global.statusCache.delete(f);
@@ -68,7 +107,7 @@ module.exports = [{
       const x = args[1]?.toLowerCase();
       if (x === 'on') { c.reactOn = true; saveConfig(c); reply('💫 Status reactions enabled!') }
       else if (x === 'off') { c.reactOn = false; saveConfig(c); reply('❌ Status reactions disabled!') }
-      else reply('❌ Use: .autostatus react on/off')
+      else reply('❌ Use: .autostatus react on/off');
     }
     else if (a === 'emoji') {
       if (!args[1]) return reply('❌ Provide an emoji!');
