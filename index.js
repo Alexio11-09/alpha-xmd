@@ -133,6 +133,30 @@ function attachHandlers(sock) {
         }
 
         const m = await smsg(sock, mek);
+
+        // 🎨 Beautiful Console Logger
+        try {
+          const senderName = m.pushName || 'N/A';
+          const senderNumber = m.sender.split('@')[0];
+          const chatType = m.isGroup ? 'Group' : 'Private';
+          const msgType = Object.keys(mek.message || {})[0] || 'unknown';
+          const msgText = m.text || '[Media / Non-text]';
+          const shortText = msgText.length > 60 ? msgText.substring(0, 60) + '...' : msgText;
+
+          console.log(`\n${chalk.green('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓')}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.magenta.bold('ALPHA-XMD LOGGER')}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Sent Time:')} ${new Date().toLocaleString()}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message Type:')} ${chalk.yellow(msgType)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Sender:')} ${chalk.green(senderNumber)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Name:')} ${chalk.green(senderName)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat Type:')} ${chalk.blue(chatType)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat ID:')} ${chalk.green(m.chat.split('@')[0])}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message:')} ${chalk.white(shortText)}`);
+          console.log(`${chalk.green('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛')}`);
+        } catch (logErr) {
+          // Silently ignore logger errors
+        }
+
         store.set(mek.key.id, {
           text: m.text || "",
           message: mek.message,
@@ -357,7 +381,6 @@ async function clientstart() {
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
-  // ✅ Clean socket — no anti-ban wrapper
   const sock = makeWASocket({
     version,
     logger: pino({ level: "silent" }),
@@ -366,10 +389,9 @@ async function clientstart() {
     browser: ["Ubuntu", "Chrome", "20.0.04"],
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 20000, // A slightly longer interval can be more stable
+    keepAliveIntervalMs: 20000,
   });
 
-  // ✅ Enable TCP keep-alive to prevent silent drops
   if (sock.ws && sock.ws._socket) {
     sock.ws._socket.setKeepAlive(true, 15000);
   }
@@ -418,7 +440,6 @@ async function clientstart() {
       if (socketClosed) return;
       socketClosed = true;
 
-      // ✅ CRITICAL: Clean up the old socket to prevent memory leaks
       try { sock.end(undefined); } catch (e) {}
 
       const error = lastDisconnect?.error;
