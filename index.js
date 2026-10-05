@@ -9,7 +9,7 @@ const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const PhoneNumber = require("awesome-phonenumber");
 
-// ✅ Suppress noisy Bad MAC / decrypt errors (cosmetic only)
+// ✅ Suppress noisy Bad MAC / decrypt errors
 const _origErr = console.error;
 console.error = (...a) => {
   const m = a.join(" ");
@@ -86,7 +86,6 @@ function attachHandlers(sock) {
       for (const mek of messages) {
         const remote = mek.key?.remoteJid;
 
-        // Skip status broadcasts — queen-senaya handles them internally
         if (remote === "status@broadcast") continue;
 
         if (!mek.message) continue;
@@ -347,10 +346,9 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 async function clientstart() {
   const baileys = await import("@whiskeysockets/baileys");
   const makeWASocket = baileys.default;
-  const { useMultiFileAuthState, DisconnectReason, jidDecode, fetchLatestBaileysVersion } = baileys;
+  const { useMultiFileAuthState, DisconnectReason, jidDecode } = baileys;
 
   const { state, saveCreds } = await useMultiFileAuthState("./session");
-  const { version } = await fetchLatestBaileysVersion();
 
   let pairingNumber = "";
   if (!state.creds.registered) {
@@ -373,8 +371,10 @@ async function clientstart() {
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
+  const WHATSAPP_VERSION = [2, 3000, 1027934701];
+
   const sock = makeWASocket({
-    version,
+    version: WHATSAPP_VERSION,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
     auth: state,
@@ -396,29 +396,6 @@ async function clientstart() {
     }
     return jid;
   };
-
-  // ✅ QUEEN-SENAYA: Enable auto status view + react (1-line, LID+PN fixed)
-  // Read your config to decide whether to enable
-  let autoStatusConfig = { enabled: false, reactOn: false, reactEmoji: '🔥' };
-  try {
-    const autoStatusPath = './database/autoStatus.json';
-    if (fs.existsSync(autoStatusPath)) {
-      autoStatusConfig = JSON.parse(fs.readFileSync(autoStatusPath, 'utf8'));
-    }
-  } catch {}
-
-  if (autoStatusConfig.enabled && sock.enableAutoStatus) {
-    try {
-      sock.enableAutoStatus({
-        autoView: true,
-        autoReact: autoStatusConfig.reactOn || false,
-        emojis: [autoStatusConfig.reactEmoji || '🔥']
-      });
-      console.log(`✅ Auto-status enabled: view=${true}, react=${autoStatusConfig.reactOn}, emoji=${autoStatusConfig.reactEmoji || '🔥'}`);
-    } catch (e) {
-      console.log('⚠️ Failed to enable auto-status:', e.message);
-    }
-  }
 
   if (!state.creds.registered && pairingNumber) {
     setTimeout(async () => {
