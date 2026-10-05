@@ -127,35 +127,41 @@ function attachHandlers(sock) {
           continue;
         }
 
+        // 🎨 Beautiful Console Logger — runs on EVERY message
+        try {
+          const msgType = Object.keys(mek.message || {})[0] || 'unknown';
+          const msgText = mek.message?.conversation
+            || mek.message?.extendedTextMessage?.text
+            || mek.message?.imageMessage?.caption
+            || mek.message?.videoMessage?.caption
+            || '[Media / Non-text]';
+          const shortText = msgText.length > 60 ? msgText.substring(0, 60) + '...' : msgText;
+          const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown';
+          const chatId = mek.key.remoteJid?.split('@')[0] || 'unknown';
+          const isGroup = mek.key.remoteJid?.endsWith('@g.us');
+          const chatType = isGroup ? 'Group' : 'Private';
+          const direction = mek.key.fromMe ? '⬅️ From Bot' : '➡️ To Bot';
+
+          console.log(`\n${chalk.green('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓')}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.magenta.bold('ALPHA-XMD LOGGER')}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Sent Time:')} ${new Date().toLocaleString()}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Direction:')} ${chalk.yellow(direction)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message Type:')} ${chalk.yellow(msgType)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Sender:')} ${chalk.green(senderNumber)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat Type:')} ${chalk.blue(chatType)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat ID:')} ${chalk.green(chatId)}`);
+          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message:')} ${chalk.white(shortText)}`);
+          console.log(`${chalk.green('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛')}`);
+        } catch (logErr) {
+          // Silently ignore logger errors
+        }
+
         if (mek.key.fromMe) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           if (!txt.startsWith(".")) continue;
         }
 
         const m = await smsg(sock, mek);
-
-        // 🎨 Beautiful Console Logger
-        try {
-          const senderName = m.pushName || 'N/A';
-          const senderNumber = m.sender.split('@')[0];
-          const chatType = m.isGroup ? 'Group' : 'Private';
-          const msgType = Object.keys(mek.message || {})[0] || 'unknown';
-          const msgText = m.text || '[Media / Non-text]';
-          const shortText = msgText.length > 60 ? msgText.substring(0, 60) + '...' : msgText;
-
-          console.log(`\n${chalk.green('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓')}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.magenta.bold('ALPHA-XMD LOGGER')}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Sent Time:')} ${new Date().toLocaleString()}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message Type:')} ${chalk.yellow(msgType)}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Sender:')} ${chalk.green(senderNumber)}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Name:')} ${chalk.green(senderName)}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat Type:')} ${chalk.blue(chatType)}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat ID:')} ${chalk.green(m.chat.split('@')[0])}`);
-          console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message:')} ${chalk.white(shortText)}`);
-          console.log(`${chalk.green('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛')}`);
-        } catch (logErr) {
-          // Silently ignore logger errors
-        }
 
         store.set(mek.key.id, {
           text: m.text || "",
