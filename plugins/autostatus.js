@@ -15,33 +15,30 @@ module.exports = [{
   execute: async (s, m, { args, reply }) => {
     const c = getConfig(), a = args[0]?.toLowerCase();
 
-    if (!a) return reply(`📱 *Auto Status*\n👁️ View: ${c.enabled ? 'ON ✅' : 'OFF ❌'}\n💫 React: ${c.reactOn ? 'ON ✅' : 'OFF ❌'}\n❤️ Emoji: ${c.reactEmoji || '🔥'}\n\n.autostatus on/off\n.autostatus react on/off\n.autostatus emoji 😍\n\n⚠️ Restart bot after changes.`);
+    if (!a) return reply(`📱 *Auto Status*\n👁️ View: ${c.enabled ? 'ON ✅' : 'OFF ❌'}\n💫 React: ${c.reactOn ? 'ON ✅' : 'OFF ❌'}\n❤️ Emoji: ${c.reactEmoji || '🔥'}\n\n.autostatus on/off\n.autostatus react on/off\n.autostatus emoji 😍`);
 
     if (a === 'on') {
       c.enabled = true;
       saveConfig(c);
-      reply('✅ Auto status view enabled!\n\n⚠️ Restart the bot for changes to take effect.');
+      reply('✅ Auto status view enabled!');
     }
     else if (a === 'off') {
       c.enabled = false;
       saveConfig(c);
-      reply('❌ Auto status view disabled!\n\n⚠️ Restart the bot for changes to take effect.');
+      reply('❌ Auto status view disabled!');
     }
     else if (a === 'react') {
       const x = args[1]?.toLowerCase();
-      if (x === 'on') { c.reactOn = true; saveConfig(c); reply('💫 Status reactions enabled!\n\n⚠️ Restart the bot for changes to take effect.') }
-      else if (x === 'off') { c.reactOn = false; saveConfig(c); reply('❌ Status reactions disabled!\n\n⚠️ Restart the bot for changes to take effect.') }
+      if (x === 'on') { c.reactOn = true; saveConfig(c); reply('💫 Status reactions enabled!') }
+      else if (x === 'off') { c.reactOn = false; saveConfig(c); reply('❌ Status reactions disabled!') }
       else reply('❌ Use: .autostatus react on/off');
     }
     else if (a === 'emoji') {
       if (!args[1]) return reply('❌ Provide an emoji!');
       c.reactEmoji = args[1];
       saveConfig(c);
-      reply(`✅ Emoji set to: ${args[1]}\n\n⚠️ Restart the bot for changes to take effect.`);
+      reply(`✅ Emoji set to: ${args[1]}`);
     }
     else reply('❌ Usage: .autostatus on/off, .autostatus react on/off, .autostatus emoji ❤️');
   }
 }];
-
-// Kept for backward compatibility — no longer used by index.js
-module.exports.handleStatusUpdate = async () => {};
