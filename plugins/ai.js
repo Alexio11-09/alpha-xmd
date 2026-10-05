@@ -1,1 +1,223 @@
-const axios=require('axios'),F=p=>`https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random()*1e5)}`,upload=async(b,f='img.png')=>{const fd=new(require('form-data'))();fd.append('reqtype','fileupload');fd.append('fileToUpload',b,{filename:f,contentType:'image/png'});const r=await axios.post('https://catbox.moe/user/api.php',fd,{headers:{...fd.getHeaders(),'User-Agent':'AlphaBot/1.0'},timeout:15e3});if(typeof r.data==='string'&&r.data.startsWith('http'))return r.data;throw new Error('Catbox failed')};module.exports=[{command:"gpt",aliases:["chatgpt","gpt4"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .gpt <question>");try{let r=await axios.get(`https://text.pollinations.ai/${encodeURIComponent(args.join(" "))}`);reply(`🤖 *GPT-4:*\n\n${r.data}`)}catch{reply("❌ GPT failed")}}},{command:"gemini",aliases:["googleai"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .gemini <question>");try{let r=await axios.post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyB0zgrVxLhlCfPOcPcFyHQBhHkYRNPdEX8',{contents:[{parts:[{text:args.join(" ")}]}]});reply(`🤖 *Gemini:*\n\n${r.data.candidates[0].content.parts[0].text}`)}catch{reply("❌ Gemini failed")}}},{command:"blackbox",aliases:["bb"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .blackbox <question>");try{let r=await axios.get(`https://api.blackbox.ai/api/chat?text=${encodeURIComponent(args.join(" "))}`);reply(`🤖 *Blackbox:*\n\n${r.data}`)}catch{reply("❌ Blackbox failed")}}},{command:"deepseek",aliases:["ds"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .deepseek <question>");try{let r=await axios.post('https://api.deepseek.com/v1/chat/completions',{model:'deepseek-chat',messages:[{role:'user',content:args.join(" ")}]},{headers:{'Authorization':'Bearer sk-04bd8e6f30844946a0f4f472b1e3b359','Content-Type':'application/json'}});reply(`🤖 *DeepSeek:*\n\n${r.data.choices[0].message.content}`)}catch{reply("❌ DeepSeek failed")}}},{command:"copilot",aliases:["bing"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .copilot <question>");try{let r=await axios.get(`https://text.pollinations.ai/copilot%20${encodeURIComponent(args.join(" "))}`);reply(`🤖 *Copilot:*\n\n${r.data}`)}catch{reply("❌ Copilot failed")}}},{command:"claude",aliases:["claudeai"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .claude <question>");try{let r=await axios.get(`https://text.pollinations.ai/claude%20${encodeURIComponent(args.join(" "))}`);reply(`🤖 *Claude:*\n\n${r.data}`)}catch{reply("❌ Claude failed")}}},{command:"perplexity",aliases:["pplx"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .perplexity <question>");try{let r=await axios.get(`https://text.pollinations.ai/perplexity%20${encodeURIComponent(args.join(" "))}`);reply(`🤖 *Perplexity:*\n\n${r.data}`)}catch{reply("❌ Perplexity failed")}}},{command:"venice",aliases:["veniceai"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .venice <question>");try{let r=await axios.get(`https://text.pollinations.ai/venice%20${encodeURIComponent(args.join(" "))}`);reply(`🤖 *Venice:*\n\n${r.data}`)}catch{reply("❌ Venice failed")}}},{command:"dalle",aliases:["dalle3"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .dalle <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=1024&height=1024&nologo=true&model=dall-e-3`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *DALL·E:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"flux",aliases:["fluxpro"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .flux <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=F(p);await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Flux:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"imagine",aliases:["imagine3","imagine4","imagineai"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .imagine <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=F(p);await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Imagine:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"animagine",category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .animagine <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/anime%20style%20${encodeURIComponent(p)}?width=1024&height=1024&nologo=true`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Animagine:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"dreamshaper",aliases:["sdxl"],category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .dreamshaper <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=1024&height=1024&nologo=true&model=stable-diffusion`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *SDXL:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"pony",category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .pony <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/pony%20style%20${encodeURIComponent(p)}?width=1024&height=1024&nologo=true`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Pony:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"pixar",category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .pixar <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/pixar%20style%20${encodeURIComponent(p)}?width=1024&height=1024&nologo=true`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Pixar:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"cartoon",category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .cartoon <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/cartoon%20style%20${encodeURIComponent(p)}?width=1024&height=1024&nologo=true`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Cartoon:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"seedream",category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .seedream <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/ghibli%20style%20${encodeURIComponent(p)}?width=1024&height=1024&nologo=true`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Seedream:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"toghibili",category:"ai",execute:async(s,m,{args,reply})=>{if(!args[0])return reply("❌ .toghibili <prompt>");let p=args.join(" ");reply("🎨 Generating...");try{let url=`https://image.pollinations.ai/prompt/ghibli%20anime%20${encodeURIComponent(p)}?width=1024&height=1024&nologo=true`;await s.sendMessage(m.chat,{image:{url},caption:`🎨 *Toghibili:* ${p}`},{quoted:m})}catch{reply("❌ Failed")}}},{command:"upscale",category:"ai",execute:async(s,m,{reply})=>{if(!m.quoted?.message)return reply("❌ Reply to an image");try{let buf=await s.downloadMediaMessage(m.quoted);let url=await upload(buf,'upscale.jpg');let r=await axios.get(`https://api.popcat.xyz/upscale?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Upscaled"},{quoted:m})}catch{reply("❌ Failed")}}},{command:"restore",category:"ai",execute:async(s,m,{reply})=>{if(!m.quoted?.message)return reply("❌ Reply to an image");try{let buf=await s.downloadMediaMessage(m.quoted);let url=await upload(buf,'restore.jpg');let r=await axios.get(`https://api.popcat.xyz/restore?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Restored"},{quoted:m})}catch{reply("❌ Failed")}}},{command:"enhance",category:"ai",execute:async(s,m,{reply})=>{if(!m.quoted?.message)return reply("❌ Reply to an image");try{let buf=await s.downloadMediaMessage(m.quoted);let url=await upload(buf,'enhance.jpg');let r=await axios.get(`https://api.popcat.xyz/enhance?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Enhanced"},{quoted:m})}catch{reply("❌ Failed")}}},{command:"filter",aliases:["remini"],category:"ai",execute:async(s,m,{reply})=>{if(!m.quoted?.message)return reply("❌ Reply to an image");try{let buf=await s.downloadMediaMessage(m.quoted);let url=await upload(buf,'filter.jpg');let r=await axios.get(`https://api.popcat.xyz/filter?image=${encodeURIComponent(url)}`,{responseType:'arraybuffer'});await s.sendMessage(m.chat,{image:Buffer.from(r.data),caption:"✅ Filtered"},{quoted:m})}catch{reply("❌ Failed")}}}];
+const axios = require('axios');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
+// Pollinations image URL builder (free, no API key)
+const F = (p, model = 'flux') => `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=1024&height=1024&nologo=true&model=${model}&seed=${Math.floor(Math.random() * 1e5)}`;
+
+// Helper: download quoted image as buffer
+async function quotedToBuffer(m) {
+  const qt = m.quoted?.message;
+  if (!qt) return null;
+  const type = Object.keys(qt)[0];
+  if (!['imageMessage', 'stickerMessage', 'videoMessage'].includes(type)) return null;
+  const stream = await downloadContentFromMessage(qt[type], type === 'stickerMessage' ? 'sticker' : 'image');
+  const chunks = [];
+  for await (const c of stream) chunks.push(c);
+  return Buffer.concat(chunks);
+}
+
+module.exports = [
+  // ===== AI TEXT COMMANDS =====
+  {
+    command: 'gpt', aliases: ['chatgpt', 'gpt4'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .gpt <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *GPT:*\n\n${r.data}`);
+      } catch { reply('❌ GPT failed'); }
+    }
+  },
+  {
+    command: 'gemini', aliases: ['googleai'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .gemini <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *Gemini:*\n\n${r.data}`);
+      } catch { reply('❌ Gemini failed'); }
+    }
+  },
+  {
+    command: 'blackbox', aliases: ['bb'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .blackbox <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/blackbox%20${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *Blackbox:*\n\n${r.data}`);
+      } catch { reply('❌ Blackbox failed'); }
+    }
+  },
+  {
+    command: 'deepseek', aliases: ['ds'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .deepseek <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/deepseek%20${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *DeepSeek:*\n\n${r.data}`);
+      } catch { reply('❌ DeepSeek failed'); }
+    }
+  },
+  {
+    command: 'copilot', aliases: ['bing'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .copilot <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/copilot%20${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *Copilot:*\n\n${r.data}`);
+      } catch { reply('❌ Copilot failed'); }
+    }
+  },
+  {
+    command: 'claude', aliases: ['claudeai'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .claude <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/claude%20${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *Claude:*\n\n${r.data}`);
+      } catch { reply('❌ Claude failed'); }
+    }
+  },
+  {
+    command: 'perplexity', aliases: ['pplx'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .perplexity <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/perplexity%20${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *Perplexity:*\n\n${r.data}`);
+      } catch { reply('❌ Perplexity failed'); }
+    }
+  },
+  {
+    command: 'venice', aliases: ['veniceai'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .venice <question>');
+      try {
+        const r = await axios.get(`https://text.pollinations.ai/venice%20${encodeURIComponent(args.join(' '))}`, { timeout: 30000 });
+        reply(`🤖 *Venice:*\n\n${r.data}`);
+      } catch { reply('❌ Venice failed'); }
+    }
+  },
+
+  // ===== AI IMAGE COMMANDS =====
+  {
+    command: 'dalle', aliases: ['dalle3'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .dalle <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(p, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *DALL·E:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'flux', aliases: ['fluxpro'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .flux <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(p, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Flux:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'imagine', aliases: ['imagine3', 'imagine4'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .imagine <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(p, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Imagine:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'animagine', category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .animagine <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(`anime style ${p}`, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Anime:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'dreamshaper', aliases: ['sdxl'], category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .dreamshaper <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(p, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *SDXL:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'pony', category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .pony <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(`pony style ${p}`, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Pony:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'pixar', category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .pixar <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(`pixar style ${p}`, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Pixar:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'cartoon', category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .cartoon <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(`cartoon style ${p}`, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Cartoon:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'seedream', category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .seedream <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(`ghibli style ${p}`, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Seedream:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  },
+  {
+    command: 'toghibili', category: 'ai',
+    execute: async (s, m, { args, reply }) => {
+      if (!args[0]) return reply('❌ .toghibili <prompt>');
+      const p = args.join(' ');
+      reply('🎨 Generating...');
+      try {
+        const url = F(`ghibli anime ${p}`, 'flux');
+        await s.sendMessage(m.chat, { image: { url }, caption: `🎨 *Ghibli:* ${p}` }, { quoted: m });
+      } catch { reply('❌ Failed'); }
+    }
+  }
+];
