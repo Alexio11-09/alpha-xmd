@@ -10,9 +10,8 @@
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@hapi/boom": "^10.0.1",
-    "@pontalabs/ytdl": "^1.0.0",
     "@supabase/supabase-js": "^2.39.0",
-    "@whiskeysockets/baileys": "6.7.24",
+    "@whiskeysockets/baileys": "npm:queen-senaya@^1.0.0",
     "adm-zip": "^0.5.10",
     "awesome-phonenumber": "^5.9.0",
     "axios": "^1.6.8",
