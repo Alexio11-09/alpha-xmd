@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (FULL UPDATED MENU)
+// © 2026 Alpha - GENERAL COMMANDS (CLEANED MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -52,8 +52,6 @@ module.exports = [
                     edit: loadMsg.key
                 });
 
-                const menuSongUrl = path.join(__dirname, "../../test-menu.mp3");
-
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -103,33 +101,17 @@ module.exports = [
 │ • .owners
 │ • .mode
 │ • .anticall
-│ • .autoreply
-│ • .autosticker
-│ • .autovoice
-│ • .dmblocker
 │ • .poststatus
-│ • .hack
 │ • .cleartmp
 │ • .clearsession
-│ • .bothosting
-│ • .webzip
-│ • .antispam
 │ • .sudo
 │ • .antiblock
-│ • .chatbot
 │ • .clear
-│ • .autobio
-│ • .deljunk
-│ • .disk
 │ • .vv2
 │ • .tostatus
 │ • .toviewonce
-│ • .autosavestatus
-│ • .lastseen
-│ • .ppprivacy
-│ • .readreceipts
 │ • .save
-│ • .delete / .del
+│ • .delete
 ╰────────────⬣
 
 ╭───〔 👥 GROUP 〕───⬣
@@ -147,25 +129,28 @@ module.exports = [
 │ • .welcome on/off
 │ • .goodbye on/off
 │ • .antilink
+│ • .antispam
+│ • .antibadword
+│ • .antibot
+│ • .antitag
+│ • .antisticker
+│ • .antidemote
 │ • .poll
 │ • .listadmin
 │ • .tagadmin
+│ • .tagnotadmin
 │ • .vcf
 │ • .promoteall
 │ • .demoteall
 │ • .kickall
 │ • .approveall
 │ • .kickinactive
-│ • .antibadword
-│ • .antiforeign
-│ • .antibot
 │ • .setgname
 │ • .setgdesc
 │ • .setgpp
 │ • .warn
 │ • .warnings
 │ • .resetwarn
-│ • .tagnotadmin
 │ • .requestlist
 │ • .rejectall
 │ • .newgc
@@ -173,13 +158,11 @@ module.exports = [
 │ • .staff
 │ • .myactivity
 │ • .rank
-│ • .antidemote
-│ • .antisticker
-│ • .antitag
 │ • .invite
 │ • .listactive
 │ • .listinactive
 │ • .totalmembers
+│ • .topmembers
 │ • .mediatag
 │ • .getname
 │ • .getdeskgc
@@ -203,44 +186,24 @@ module.exports = [
 
 ╭───〔 📥 DOWNLOADER 〕───⬣
 │ • .play
-│ • .play2
-│ • .song
-│ • .music
 │ • .video
 │ • .spotify
 │ • .tiktok
-│ • .tt
 │ • .instagram
-│ • .ig
 │ • .facebook
-│ • .fb
-│ • .ytmp4
-│ • .ytmp3
 │ • .ytpost
 │ • .pindl
 │ • .mediafire
 │ • .gdrive
 │ • .ringtone
 │ • .yts
-│ • .ytsearch
 │ • .lyrics
-│ • .lyrics2
 │ • .apk
 │ • .movie
 │ • .wallpaper
 │ • .gitclone
 │ • .img
 │ • .shazam
-│ • .itunes
-│ • .playdoc
-│ • .videodoc
-│ • .tiktokaudio
-│ • .snackvideo
-│ • .soundcloud
-│ • .webdl
-│ • .savetube
-│ • .videy
-│ • .aiovideodl
 ╰────────────⬣
 
 ╭───〔 🖥️ CPANEL 〕───⬣
@@ -254,6 +217,7 @@ module.exports = [
 │ • .addprem
 │ • .delprem
 │ • .premiumlist
+│ • .bothosting
 ╰────────────⬣
 
 ╭───〔 🤖 AI & IMAGE GEN 〕───⬣
@@ -265,26 +229,17 @@ module.exports = [
 │ • .claude
 │ • .perplexity
 │ • .venice
+│ • .chatbot
 │ • .dalle
 │ • .flux
-│ • .fluxpro
 │ • .imagine
-│ • .imagine3
-│ • .imagine4
 │ • .animagine
 │ • .dreamshaper
-│ • .sdxl
 │ • .pony
 │ • .pixar
 │ • .cartoon
 │ • .seedream
 │ • .toghibili
-│ • .removebg
-│ • .upscale
-│ • .restore
-│ • .enhance
-│ • .filter
-│ • .remini
 ╰────────────⬣
 
 ╭───〔 👁️ STALK 〕───⬣
@@ -321,8 +276,6 @@ module.exports = [
 │ • .livewallpapers
 │ • .imdb
 │ • .define
-│ • .countryinfo
-│ • .news
 │ • .wiki
 ╰────────────⬣
 
@@ -345,6 +298,8 @@ module.exports = [
 │ • .styletext
 │ • .readmore
 │ • .ngldm
+│ • .webzip
+│ • .disk
 ╰────────────⬣
 
 ╭───〔 📺 CHANNEL 〕───⬣
@@ -377,7 +332,7 @@ module.exports = [
 
 ╭───〔 🎨 PHOTO EFFECTS 〕───⬣
 │ • .zombie
-│ • .figure / .figure2 / .figure3
+│ • .figure
 │ • .underground
 │ • .oldage
 │ • .turky
@@ -389,8 +344,9 @@ module.exports = [
 │ • .spirit
 │ • .toroblox
 │ • .mirror
-│ • .partner / .partner2
-│ • .bf / .gf
+│ • .partner
+│ • .bf
+│ • .gf
 │ • .polaroid
 │ • .punk
 │ • .piramid
@@ -403,7 +359,7 @@ module.exports = [
 │ • .maid
 │ • .glasses
 │ • .cambodia
-│ • .japan / .japanese
+│ • .japan
 │ • .hijab
 │ • .hitam
 │ • .vintage
@@ -427,7 +383,6 @@ module.exports = [
 
 ╭───〔 🎮 GAMES & FUN 〕───⬣
 │ • .tictactoe
-│ • .ttt
 │ • .hangman
 │ • .guess
 │ • .quiz
@@ -458,7 +413,7 @@ module.exports = [
 │ • .ship
 │ • .hug
 │ • .emojimix
-│ • .wcg start / join / leave / status / stop / leaderboard
+│ • .wcg
 ╰────────────⬣
 
 ╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
@@ -502,14 +457,11 @@ module.exports = [
 
 ╭───〔 🌐 INFORMATION 〕───⬣
 │ • .news
-│ • .define
-│ • .check
 │ • .countryinfo
-│ • .topmembers
+│ • .check
 │ • .bible
 │ • .quran
 │ • .inspect
-│ • .series
 │ • .webcrawl
 ╰────────────⬣
 
@@ -521,27 +473,35 @@ module.exports = [
 ╰────────────⬣
 
 ╭───〔 ⚙️ SETTINGS 〕───⬣
-│ • .autoread on/off
-│ • .autotyping on/off
-│ • .autorecording on/off
-│ • .autoreact on/off
-│ • .autoreactstatus on/off
-│ • .autoviewstatus on/off
+│ • .autoread
+│ • .autotyping
+│ • .autorecording
+│ • .autoreact
+│ • .autoreactstatus
+│ • .autoviewstatus
 │ • .autostatus
 │ • .antidelete
-│ • .antiedit on/off
+│ • .antiedit
+│ • .autoreply
+│ • .autosticker
+│ • .autovoice
+│ • .dmblocker
+│ • .autosavestatus
+│ • .autobio
+│ • .autoblock
+│ • .lastseen
+│ • .ppprivacy
+│ • .readreceipts
+│ • .alwaysonline
+│ • .fakelastseen
+│ • .antibug
+│ • .antiviewonce
 │ • .setpp
 │ • .setbio
 │ • .setname
 │ • .setprefix
 │ • .resetprefix
 │ • .chreact
-│ • .alwaysonline
-│ • .fakelastseen on/off
-│ • .antibug
-│ • .antiviewonce
-│ • .autobio
-│ • .autoblock
 │ • .setcontextlink
 │ • .setfont
 │ • .setmenu
@@ -609,7 +569,6 @@ module.exports = [
 │ • .silver
 │ • .foggyglass
 │ • .wetglass
-│ • .fancy
 │ • .candy
 │ • .christmas
 │ • .3dchristmas
@@ -622,7 +581,6 @@ module.exports = [
 │ • .circuit
 │ • .discovery
 │ • .fiction
-│ • .demon
 │ • .transformer
 │ • .berry
 │ • .magma
@@ -667,16 +625,6 @@ ${config.settings.footer}
                     image: { url: config.thumbUrl },
                     caption: menu
                 });
-
-                try {
-                    await sock.sendMessage(m.chat, {
-                        audio: { url: menuSongUrl },
-                        mimetype: 'audio/mpeg',
-                        ptt: true
-                    }, { quoted: m });
-                } catch (audioErr) {
-                    console.log("⚠️ Menu audio failed:", audioErr.message);
-                }
 
             } catch (err) {
                 console.log("Menu error:", err);
