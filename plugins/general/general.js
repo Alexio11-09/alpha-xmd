@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (CLEANED MENU)
+// © 2026 Alpha - GENERAL COMMANDS (PRIORITY ORDER MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -206,272 +206,6 @@ module.exports = [
 │ • .shazam
 ╰────────────⬣
 
-╭───〔 🖥️ CPANEL 〕───⬣
-│ • .addserver
-│ • .delserver
-│ • .listservers
-│ • .sendpanel
-│ • .1gb…9gb
-│ • .unli
-│ • .admin
-│ • .addprem
-│ • .delprem
-│ • .premiumlist
-│ • .bothosting
-╰────────────⬣
-
-╭───〔 🤖 AI & IMAGE GEN 〕───⬣
-│ • .gpt
-│ • .gemini
-│ • .blackbox
-│ • .deepseek
-│ • .copilot
-│ • .claude
-│ • .perplexity
-│ • .venice
-│ • .chatbot
-│ • .dalle
-│ • .flux
-│ • .imagine
-│ • .animagine
-│ • .dreamshaper
-│ • .pony
-│ • .pixar
-│ • .cartoon
-│ • .seedream
-│ • .toghibili
-╰────────────⬣
-
-╭───〔 👁️ STALK 〕───⬣
-│ • .npmstalk
-│ • .wastalk
-│ • .igstalk
-│ • .tiktokstalk
-│ • .twitterstalk
-│ • .ytstalk
-│ • .tgstalk
-│ • .minecraftstalk
-│ • .xboxstalk
-│ • .steamstalk
-│ • .githubstalk
-╰────────────⬣
-
-╭───〔 ⚽ FOOTBALL 〕───⬣
-│ • .livescore
-│ • .competitions
-│ • .matches
-│ • .standings
-│ • .team
-│ • .head2head
-│ • .matchlist
-│ • .teamperson
-│ • .teammatches
-│ • .areas
-╰────────────⬣
-
-╭───〔 🔍 SEARCH 〕───⬣
-│ • .gsmarena
-│ • .google
-│ • .bing
-│ • .livewallpapers
-│ • .imdb
-│ • .define
-│ • .wiki
-╰────────────⬣
-
-╭───〔 🔧 UTILITIES 〕───⬣
-│ • .tinyurl
-│ • .fliptext
-│ • .genpass
-│ • .device
-│ • .browse
-│ • .fancy
-│ • .font
-│ • .carbon
-│ • .obfuscate
-│ • .calc
-│ • .qr
-│ • .tts
-│ • .translate
-│ • .weather
-│ • .tozip
-│ • .styletext
-│ • .readmore
-│ • .ngldm
-│ • .webzip
-│ • .disk
-╰────────────⬣
-
-╭───〔 📺 CHANNEL 〕───⬣
-│ • .createchannel
-│ • .followchannel
-│ • .unfollowchannel
-│ • .updatechannelname
-│ • .updatechannelpic
-│ • .updatechanneldesc
-│ • .mutechannel
-│ • .unmutechannel
-│ • .deletechannel
-╰────────────⬣
-
-╭───〔 🐙 GITHUB 〕───⬣
-│ • .ghlogin
-│ • .ghtoken
-│ • .ghcreate
-│ • .ghdelete
-│ • .ghpush
-│ • .ghpushall
-│ • .ghcommit
-│ • .ghfork
-│ • .ghlist
-│ • .ghbranches
-│ • .ghdeletefile
-│ • .ghcreatebranch
-│ • .ghlogout
-╰────────────⬣
-
-╭───〔 🎨 PHOTO EFFECTS 〕───⬣
-│ • .zombie
-│ • .figure
-│ • .underground
-│ • .oldage
-│ • .turky
-│ • .train
-│ • .streetwear
-│ • .tatoo
-│ • .satan
-│ • .sdm
-│ • .spirit
-│ • .toroblox
-│ • .mirror
-│ • .partner
-│ • .bf
-│ • .gf
-│ • .polaroid
-│ • .punk
-│ • .piramid
-│ • .peci
-│ • .island
-│ • .mangu
-│ • .liquor
-│ • .mecca
-│ • .mayan
-│ • .maid
-│ • .glasses
-│ • .cambodia
-│ • .japan
-│ • .hijab
-│ • .hitam
-│ • .vintage
-╰────────────⬣
-
-╭───〔 🎬 MOVIES / SERIES 〕───⬣
-│ • .selectmovie
-│ • .dlmovie
-│ • .dlseries
-│ • .selectseries
-│ • .seriesinfo
-╰────────────⬣
-
-╭───〔 📧 TEMP MAIL / NUMBER 〕───⬣
-│ • .tempmail
-│ • .tempinbox
-│ • .tempnumber
-│ • .checksms
-│ • .listcountries
-╰────────────⬣
-
-╭───〔 🎮 GAMES & FUN 〕───⬣
-│ • .tictactoe
-│ • .hangman
-│ • .guess
-│ • .quiz
-│ • .trivia
-│ • .answer
-│ • .truth
-│ • .dare
-│ • .8ball
-│ • .compliment
-│ • .insult
-│ • .flirt
-│ • .shayari
-│ • .simp
-│ • .stupid
-│ • .goodnight
-│ • .meme
-│ • .squidgame
-│ • .konami
-│ • .lovetest
-│ • .aura
-│ • .dice
-│ • .roll
-│ • .joke
-│ • .quote
-│ • .fact
-│ • .flip
-│ • .rps
-│ • .ship
-│ • .hug
-│ • .emojimix
-│ • .wcg
-╰────────────⬣
-
-╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
-│ • .happy
-│ • .heart
-│ • .angry
-│ • .sad
-│ • .shy
-│ • .moon
-│ • .confused
-│ • .hot
-│ • .nikal
-╰────────────⬣
-
-╭───〔 🎌 ANIME & REACTIONS 〕───⬣
-│ • .waifu
-│ • .neko
-│ • .shinobu
-│ • .megumin
-│ • .aizen
-│ • .animequote
-│ • .anime
-│ • .manga
-│ • .topanime
-│ • .topmanga
-│ • .character
-│ • .randomanime
-│ • .seasonal
-│ • .hentai 🔞
-│ • .hentaigif 🔞
-│ • .nom
-│ • .poke
-│ • .cry
-│ • .kiss
-│ • .pat
-│ • .wink
-│ • .facepalm
-│ • .slap
-│ • .bite
-╰────────────⬣
-
-╭───〔 🌐 INFORMATION 〕───⬣
-│ • .news
-│ • .countryinfo
-│ • .check
-│ • .bible
-│ • .quran
-│ • .inspect
-│ • .webcrawl
-╰────────────⬣
-
-╭───〔 💰 FINANCE 〕───⬣
-│ • .currencylist
-│ • .rates
-│ • .exchange
-│ • .forex
-╰────────────⬣
-
 ╭───〔 ⚙️ SETTINGS 〕───⬣
 │ • .autoread
 │ • .autotyping
@@ -525,22 +259,104 @@ module.exports = [
 │ • .listwarn
 ╰────────────⬣
 
-╭───〔 🎵 AUDIO EFFECTS 〕───⬣
-│ • .deep
-│ • .smooth
-│ • .fat
-│ • .blown
-│ • .radio
-│ • .robot
-│ • .chipmunk
-│ • .nightcore
-│ • .earrape
-│ • .bass
-│ • .reverse
-│ • .slow
-│ • .fast
-│ • .baby
-│ • .demon
+╭───〔 🤖 AI & IMAGE GEN 〕───⬣
+│ • .gpt
+│ • .gemini
+│ • .blackbox
+│ • .deepseek
+│ • .copilot
+│ • .claude
+│ • .perplexity
+│ • .venice
+│ • .chatbot
+│ • .dalle
+│ • .flux
+│ • .imagine
+│ • .animagine
+│ • .dreamshaper
+│ • .pony
+│ • .pixar
+│ • .cartoon
+│ • .seedream
+│ • .toghibili
+╰────────────⬣
+
+╭───〔 🔧 UTILITIES 〕───⬣
+│ • .tinyurl
+│ • .fliptext
+│ • .genpass
+│ • .device
+│ • .browse
+│ • .fancy
+│ • .font
+│ • .carbon
+│ • .obfuscate
+│ • .calc
+│ • .qr
+│ • .tts
+│ • .translate
+│ • .weather
+│ • .tozip
+│ • .styletext
+│ • .readmore
+│ • .ngldm
+│ • .webzip
+│ • .disk
+╰────────────⬣
+
+╭───〔 🔍 SEARCH 〕───⬣
+│ • .gsmarena
+│ • .google
+│ • .bing
+│ • .livewallpapers
+│ • .imdb
+│ • .define
+│ • .wiki
+╰────────────⬣
+
+╭───〔 🌐 INFORMATION 〕───⬣
+│ • .news
+│ • .countryinfo
+│ • .check
+│ • .bible
+│ • .quran
+│ • .inspect
+│ • .webcrawl
+╰────────────⬣
+
+╭───〔 🎨 PHOTO EFFECTS 〕───⬣
+│ • .zombie
+│ • .figure
+│ • .underground
+│ • .oldage
+│ • .turky
+│ • .train
+│ • .streetwear
+│ • .tatoo
+│ • .satan
+│ • .sdm
+│ • .spirit
+│ • .toroblox
+│ • .mirror
+│ • .partner
+│ • .bf
+│ • .gf
+│ • .polaroid
+│ • .punk
+│ • .piramid
+│ • .peci
+│ • .island
+│ • .mangu
+│ • .liquor
+│ • .mecca
+│ • .mayan
+│ • .maid
+│ • .glasses
+│ • .cambodia
+│ • .japan
+│ • .hijab
+│ • .hitam
+│ • .vintage
 ╰────────────⬣
 
 ╭───〔 🎨 LOGO & TEXT MAKERS 〕───⬣
@@ -616,6 +432,190 @@ module.exports = [
 │ • .glue
 │ • .1917
 │ • .leaves
+╰────────────⬣
+
+╭───〔 🎵 AUDIO EFFECTS 〕───⬣
+│ • .deep
+│ • .smooth
+│ • .fat
+│ • .blown
+│ • .radio
+│ • .robot
+│ • .chipmunk
+│ • .nightcore
+│ • .earrape
+│ • .bass
+│ • .reverse
+│ • .slow
+│ • .fast
+│ • .baby
+│ • .demon
+╰────────────⬣
+
+╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
+│ • .happy
+│ • .heart
+│ • .angry
+│ • .sad
+│ • .shy
+│ • .moon
+│ • .confused
+│ • .hot
+│ • .nikal
+╰────────────⬣
+
+╭───〔 🎮 GAMES & FUN 〕───⬣
+│ • .tictactoe
+│ • .hangman
+│ • .guess
+│ • .quiz
+│ • .trivia
+│ • .answer
+│ • .truth
+│ • .dare
+│ • .8ball
+│ • .compliment
+│ • .insult
+│ • .flirt
+│ • .shayari
+│ • .simp
+│ • .stupid
+│ • .goodnight
+│ • .meme
+│ • .squidgame
+│ • .konami
+│ • .lovetest
+│ • .aura
+│ • .dice
+│ • .roll
+│ • .joke
+│ • .quote
+│ • .fact
+│ • .flip
+│ • .rps
+│ • .ship
+│ • .hug
+│ • .emojimix
+│ • .wcg
+╰────────────⬣
+
+╭───〔 🎌 ANIME & REACTIONS 〕───⬣
+│ • .waifu
+│ • .neko
+│ • .shinobu
+│ • .megumin
+│ • .aizen
+│ • .animequote
+│ • .anime
+│ • .manga
+│ • .topanime
+│ • .topmanga
+│ • .character
+│ • .randomanime
+│ • .seasonal
+│ • .hentai 🔞
+│ • .hentaigif 🔞
+│ • .nom
+│ • .poke
+│ • .cry
+│ • .kiss
+│ • .pat
+│ • .wink
+│ • .facepalm
+│ • .slap
+│ • .bite
+╰────────────⬣
+
+╭───〔 🎬 MOVIES / SERIES 〕───⬣
+│ • .selectmovie
+│ • .dlmovie
+│ • .dlseries
+│ • .selectseries
+│ • .seriesinfo
+╰────────────⬣
+
+╭───〔 ⚽ FOOTBALL 〕───⬣
+│ • .livescore
+│ • .competitions
+│ • .matches
+│ • .standings
+│ • .team
+│ • .head2head
+│ • .matchlist
+│ • .teamperson
+│ • .teammatches
+│ • .areas
+╰────────────⬣
+
+╭───〔 👁️ STALK 〕───⬣
+│ • .npmstalk
+│ • .wastalk
+│ • .igstalk
+│ • .tiktokstalk
+│ • .twitterstalk
+│ • .ytstalk
+│ • .tgstalk
+│ • .minecraftstalk
+│ • .xboxstalk
+│ • .steamstalk
+│ • .githubstalk
+╰────────────⬣
+
+╭───〔 🐙 GITHUB 〕───⬣
+│ • .ghlogin
+│ • .ghtoken
+│ • .ghcreate
+│ • .ghdelete
+│ • .ghpush
+│ • .ghpushall
+│ • .ghcommit
+│ • .ghfork
+│ • .ghlist
+│ • .ghbranches
+│ • .ghdeletefile
+│ • .ghcreatebranch
+│ • .ghlogout
+╰────────────⬣
+
+╭───〔 📺 CHANNEL 〕───⬣
+│ • .createchannel
+│ • .followchannel
+│ • .unfollowchannel
+│ • .updatechannelname
+│ • .updatechannelpic
+│ • .updatechanneldesc
+│ • .mutechannel
+│ • .unmutechannel
+│ • .deletechannel
+╰────────────⬣
+
+╭───〔 💰 FINANCE 〕───⬣
+│ • .currencylist
+│ • .rates
+│ • .exchange
+│ • .forex
+╰────────────⬣
+
+╭───〔 📧 TEMP MAIL / NUMBER 〕───⬣
+│ • .tempmail
+│ • .tempinbox
+│ • .tempnumber
+│ • .checksms
+│ • .listcountries
+╰────────────⬣
+
+╭───〔 🖥️ CPANEL 〕───⬣
+│ • .addserver
+│ • .delserver
+│ • .listservers
+│ • .sendpanel
+│ • .1gb…9gb
+│ • .unli
+│ • .admin
+│ • .addprem
+│ • .delprem
+│ • .premiumlist
+│ • .bothosting
 ╰────────────⬣
 
 ${config.settings.footer}
