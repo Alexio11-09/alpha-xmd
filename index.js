@@ -26,14 +26,6 @@ console.error = (...a) => {
 
 console.log("🚀 Starting Alpha Bot...");
 
-let autoStatusHandler;
-try {
-  autoStatusHandler = require("./plugins/autostatus");
-} catch (e) {
-  console.log("❌ Failed to load autostatus.js:", e.message);
-  autoStatusHandler = { handleStatusUpdate: () => {} };
-}
-
 let messageHandler;
 try {
   messageHandler = require("./message");
@@ -94,12 +86,8 @@ function attachHandlers(sock) {
       for (const mek of messages) {
         const remote = mek.key?.remoteJid;
 
-        if (remote === "status@broadcast") {
-          if (autoStatusHandler.handleStatusUpdate) {
-            await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
-          }
-          continue;
-        }
+        // Skip status broadcasts — queen-senaya handles them internally
+        if (remote === "status@broadcast") continue;
 
         if (!mek.message) continue;
 
@@ -127,7 +115,7 @@ function attachHandlers(sock) {
           continue;
         }
 
-        // 🎨 Beautiful Console Logger — runs on EVERY message
+        // 🎨 Console Logger
         try {
           const msgType = Object.keys(mek.message || {})[0] || 'unknown';
           const msgText = mek.message?.conversation
@@ -152,9 +140,7 @@ function attachHandlers(sock) {
           console.log(`${chalk.magenta('┃')} ${chalk.cyan('Chat ID:')} ${chalk.green(chatId)}`);
           console.log(`${chalk.magenta('┃')} ${chalk.cyan('Message:')} ${chalk.white(shortText)}`);
           console.log(`${chalk.green('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛')}`);
-        } catch (logErr) {
-          // Silently ignore logger errors
-        }
+        } catch (logErr) {}
 
         if (mek.key.fromMe) {
           const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
@@ -410,6 +396,29 @@ async function clientstart() {
     }
     return jid;
   };
+
+  // ✅ QUEEN-SENAYA: Enable auto status view + react (1-line, LID+PN fixed)
+  // Read your config to decide whether to enable
+  let autoStatusConfig = { enabled: false, reactOn: false, reactEmoji: '🔥' };
+  try {
+    const autoStatusPath = './database/autoStatus.json';
+    if (fs.existsSync(autoStatusPath)) {
+      autoStatusConfig = JSON.parse(fs.readFileSync(autoStatusPath, 'utf8'));
+    }
+  } catch {}
+
+  if (autoStatusConfig.enabled && sock.enableAutoStatus) {
+    try {
+      sock.enableAutoStatus({
+        autoView: true,
+        autoReact: autoStatusConfig.reactOn || false,
+        emojis: [autoStatusConfig.reactEmoji || '🔥']
+      });
+      console.log(`✅ Auto-status enabled: view=${true}, react=${autoStatusConfig.reactOn}, emoji=${autoStatusConfig.reactEmoji || '🔥'}`);
+    } catch (e) {
+      console.log('⚠️ Failed to enable auto-status:', e.message);
+    }
+  }
 
   if (!state.creds.registered && pairingNumber) {
     setTimeout(async () => {
