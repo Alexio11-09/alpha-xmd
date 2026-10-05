@@ -346,9 +346,13 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 async function clientstart() {
   const baileys = await import("@whiskeysockets/baileys");
   const makeWASocket = baileys.default;
-  const { useMultiFileAuthState, DisconnectReason, jidDecode } = baileys;
+  const { useMultiFileAuthState, DisconnectReason, jidDecode, fetchLatestBaileysVersion } = baileys;
 
   const { state, saveCreds } = await useMultiFileAuthState("./session");
+
+  // ✅ Fetch latest version from WhatsApp (fixes the 405 error)
+  const { version, isLatest } = await fetchLatestBaileysVersion();
+  console.log(chalk.cyan(`📡 Using WhatsApp version: ${version.join('.')} (latest: ${isLatest})`));
 
   let pairingNumber = "";
   if (!state.creds.registered) {
@@ -371,10 +375,8 @@ async function clientstart() {
     console.log(chalk.green(`✅ Using number: ${pairingNumber}`));
   }
 
-  const WHATSAPP_VERSION = [2, 3000, 1027934701];
-
   const sock = makeWASocket({
-    version: WHATSAPP_VERSION,
+    version,  // ✅ From fetchLatestBaileysVersion
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
     auth: state,
@@ -412,7 +414,7 @@ async function clientstart() {
       } catch (error) {
         console.log(chalk.red("❌ Failed to request pairing code:"), error.message);
       }
-    }, 3000);
+    }, 5000);
   }
 
   let socketClosed = false;
