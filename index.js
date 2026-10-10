@@ -9,7 +9,6 @@ const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const PhoneNumber = require("awesome-phonenumber");
 
-// ✅ Suppress noisy Bad MAC / decrypt errors
 const _origErr = console.error;
 console.error = (...a) => {
   const m = a.join(" ");
@@ -25,6 +24,14 @@ console.error = (...a) => {
 };
 
 console.log("🚀 Starting Alpha Bot...");
+
+let autoStatusHandler;
+try {
+  autoStatusHandler = require("./plugins/autostatus");
+} catch (e) {
+  console.log("❌ Failed to load autostatus.js:", e.message);
+  autoStatusHandler = { handleStatusUpdate: () => {} };
+}
 
 let messageHandler;
 try {
@@ -86,7 +93,12 @@ function attachHandlers(sock) {
       for (const mek of messages) {
         const remote = mek.key?.remoteJid;
 
-        if (remote === "status@broadcast") continue;
+        if (remote === "status@broadcast") {
+          if (autoStatusHandler.handleStatusUpdate) {
+            await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
+          }
+          continue;
+        }
 
         if (!mek.message) continue;
 
@@ -114,7 +126,6 @@ function attachHandlers(sock) {
           continue;
         }
 
-        // 🎨 Console Logger
         try {
           const msgType = Object.keys(mek.message || {})[0] || 'unknown';
           const msgText = mek.message?.conversation
@@ -349,10 +360,7 @@ async function clientstart() {
   const { useMultiFileAuthState, DisconnectReason, jidDecode, fetchLatestBaileysVersion } = baileys;
 
   const { state, saveCreds } = await useMultiFileAuthState("./session");
-
-  // ✅ Fetch latest version from WhatsApp (fixes the 405 error)
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  console.log(chalk.cyan(`📡 Using WhatsApp version: ${version.join('.')} (latest: ${isLatest})`));
+  const { version } = await fetchLatestBaileysVersion();
 
   let pairingNumber = "";
   if (!state.creds.registered) {
@@ -376,7 +384,7 @@ async function clientstart() {
   }
 
   const sock = makeWASocket({
-    version,  // ✅ From fetchLatestBaileysVersion
+    version,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
     auth: state,
@@ -414,7 +422,7 @@ async function clientstart() {
       } catch (error) {
         console.log(chalk.red("❌ Failed to request pairing code:"), error.message);
       }
-    }, 5000);
+    }, 3000);
   }
 
   let socketClosed = false;
