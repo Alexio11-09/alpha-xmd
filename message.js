@@ -38,6 +38,7 @@ async function checkAdmin(sock, chatId, senderId, botId) {
     }
 }
 
+// BAN CHECK
 const isUserBanned = (sender) => {
     try {
         const bp = './database/banned.json';
@@ -46,6 +47,7 @@ const isUserBanned = (sender) => {
     } catch { return false; }
 };
 
+// TEMP OWNER
 function isTempOwnerBase(sender) {
     try {
         const op = './database/owners.json';
@@ -56,6 +58,7 @@ function isTempOwnerBase(sender) {
     } catch { return false; }
 }
 
+// BADWORDS
 const bwPath = './database/badwords.json', gbwPath = './database/badwords_global.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(bwPath)) fs.writeFileSync(bwPath, '{}'); if (!fs.existsSync(gbwPath)) fs.writeFileSync(gbwPath, '[]'); } catch {}
 const loadGlobalBadWords = () => { try { return JSON.parse(fs.readFileSync(gbwPath, 'utf-8')); } catch { return []; } };
@@ -66,12 +69,15 @@ const containsBadWord = (text, chatId) => {
     return all.some(w => text.toLowerCase().includes(w.toLowerCase()));
 };
 
+// LINK DETECTION
 const containsLink = (text) => /https?:\/\/[^\s]+|wa\.me\/[^\s]+|chat\.whatsapp\.com\/[^\s]+/gi.test(text);
 
+// GROUP SETTINGS
 const dbPath = './database/groupSettings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
 const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
 
+// GLOBAL MODE SETTINGS
 const settingsPath = './database/settings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
 const getGlobalSettings = () => {
@@ -91,6 +97,7 @@ const setGlobalMode = (mode) => {
     setGlobalSettings(g);
 };
 
+// COMMANDS LOADER
 const commands = [];
 const loadCommands = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -105,6 +112,7 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
+// Mode command
 commands.push({
     command: "mode",
     aliases: ["botmode"],
@@ -112,37 +120,20 @@ commands.push({
     owner: true,
     execute: async (sock, m, { args, reply }) => {
         const mode = args[0]?.toLowerCase();
-        if (mode === 'public') { setGlobalMode('public'); return reply("✅ Bot is now in *public mode*."); } 
-        else if (mode === 'private') { setGlobalMode('private'); return reply("🔒 Bot is now in *private mode*."); } 
-        else { return reply(`📱 Current mode: *${getGlobalMode()}*`); }
-    }
-});
-
-commands.push({
-    command: "antideleteconfig",
-    aliases: ["adconfig", "antidelete"],
-    category: "owner",
-    owner: true,
-    execute: async (sock, m, { args, reply }) => {
-        const sub = args[0]?.toLowerCase();
-        const g = getGlobalSettings();
-        const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
-
-        if (!sub) { return reply(`🛡️ *Antidelete:* ${cfg.enabled ? 'ON' : 'OFF'}\nMode: ${cfg.mode}`); }
-        if (sub === 'on' || sub === 'off') { cfg.enabled = sub === 'on'; } 
-        else if (sub === 'mode') { const mode = args[1]?.toLowerCase(); if (['chat', 'owner', 'both'].includes(mode)) cfg.mode = mode; else return reply("❌ Invalid mode."); } 
-        else if (sub === 'style') { const style = args[1]?.toLowerCase(); if (['fancy', 'simple'].includes(style)) cfg.style = style; else return reply("❌ Invalid style."); } 
-        else if (sub === 'react') { const react = args[1]?.toLowerCase(); if (react === 'on') cfg.react = true; else if (react === 'off') cfg.react = false; else return reply("❌ Use: react on/off"); } 
-        else { return reply("❌ Unknown option."); }
-
-        g.antidelete = cfg;
-        setGlobalSettings(g);
-        reply(`✅ Antidelete updated!`);
+        if (mode === 'public') {
+            setGlobalMode('public');
+            return reply("✅ Bot is now in *public mode*. Everyone can use commands.");
+        } else if (mode === 'private') {
+            setGlobalMode('private');
+            return reply("🔒 Bot is now in *private mode*. Only the owner can use commands.");
+        } else {
+            const current = getGlobalMode();
+            return reply(`📱 Current mode: *${current}*\n\nChange with: .mode public / .mode private`);
+        }
     }
 });
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
-
 const deny = {
     owner: "😂 Only the bot owner can do that.",
     admin: "🚫 Only admins can use this.",
@@ -156,29 +147,30 @@ const deny = {
 const reacts = ["😂","❤️","🔥","👍","🎉","🤔","😮","💯","👀","🥳","⚡","😎"];
 async function reactRandom(sock, msg) { try { const e = reacts[Math.floor(Math.random()*reacts.length)]; await sock.sendMessage(msg.key.remoteJid, { react:{ text:e, key:msg.key } }); } catch {} }
 
+// MAIN HANDLER
 module.exports = async (sock, m) => {
     try {
-        const contextInfo = { forwardingScore:999, isForwarded:true, forwardedNewsletterMessageInfo:{ newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } };
+        const cfgData = typeof config === 'function' ? config() : config;
+        const newsletterId = cfgData.newsletter?.id;
+        const newsletterName = cfgData.newsletter?.name || "Alpha";
+        
+        const contextInfo = newsletterId ? { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: `${newsletterId}@newsletter`, newsletterName } } : {};
+        
         const reply = (text, extra={}) => { try { return sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } catch { return sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } };
         const send = (data) => { try { return sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } catch { return sock.sendMessage(m.chat, data, { quoted: m }); } };
 
-        // 🎯 AUTO FEATURES
-        const gs = m.globalSettings || getGlobalSettings();
+        // 🎯 FIXED AUTO FEATURES: Directly pulls from session `m.globalSettings`
+        const gs = m.globalSettings || { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: "." };
         
         if (!m.key.fromMe) {
-            // 🎯 DEBUG LOG: Watch the console to see if the toggles are saving correctly!
-            if (gs.autoread || gs.autotyping || gs.autorecording) {
-                console.log(`[AUTO-FEATURES] Read: ${gs.autoread} | Type: ${gs.autotyping} | Rec: ${gs.autorecording}`);
-            }
-
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
             if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); } catch {} }
             if (gs.autorecording) { try { await sock.sendPresenceUpdate("recording", m.chat); } catch {} }
-
-            const prefix = m.prefix || config.prefix || ".";
+            
+            const currentPrefix = m.prefix || gs.prefix || ".";
             const rawTxt = m.text || "";
-
-            if (gs.autoreact && !rawTxt.startsWith(prefix)) {
+            
+            if (gs.autoreact && !rawTxt.startsWith(currentPrefix)) {
                 const emojis = ["🔥", "😂", "😍", "😎", "🤖", "⚡", "💯", "👀", "🥶", "😈"];
                 try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
             }
@@ -186,7 +178,7 @@ module.exports = async (sock, m) => {
 
         if (!m.text) return;
 
-        const prefix = m.prefix || config.prefix || ".";
+        const prefix = m.prefix || gs.prefix || ".";
         
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
@@ -219,6 +211,7 @@ module.exports = async (sock, m) => {
             return;
         }
 
+        // COMMAND EXECUTION
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const cmdName = args.shift().toLowerCase();
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
@@ -226,7 +219,7 @@ module.exports = async (sock, m) => {
 
         const botNum = clean(sock.user.id.split('@')[0].split(':')[0]);
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
-        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender);
+        const isOwner = senderNum === botNum || cfgData.owner?.includes(senderNum) || isTempOwnerBase(m.sender);
 
         if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) return;
 
@@ -251,7 +244,7 @@ module.exports = async (sock, m) => {
             if (!isSenderAdmin && !isOwner) return reply(deny.admin); 
         }
 
-        const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: isSenderAdmin, isBotAdmin: isBotAdmin, config, prefix };
+        const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: isSenderAdmin, isBotAdmin: isBotAdmin, config: cfgData, prefix };
 
         if (command.owner && !isOwner) return reply(deny.owner);
         if (command.owner && isOwner && m.isGroup) await reply(deny.ownerPrivateReminder);
@@ -260,7 +253,7 @@ module.exports = async (sock, m) => {
 
         await command.execute(sock, m, ctx);
     } catch (err) {
-        console.log("🔥 HANDLER ERROR:", err);
+        console.log("🔥 HANDLER ERROR:", err?.message || err);
         try { await sock.sendMessage(m.chat, { text: "🤖 Error. Try again later." }, { quoted: m }); } catch {}
     }
 };
