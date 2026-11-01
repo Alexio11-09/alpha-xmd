@@ -8,7 +8,7 @@ const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const config = () => require("./settings/config");
 
-// Hide Baileys errors safely
+// Hide Baileys errors
 const _origErr = console.error;
 console.error = (...a) => {
   const m = a.join(" ");
@@ -36,8 +36,7 @@ const activeSockets = new Map();
 const store = new Map(); 
 let baileys;
 
-let autoStatusHandler; 
-try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
+let autoStatusHandler; try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
 
 let messageHandler; 
 try { 
@@ -63,37 +62,42 @@ function rateLimiter(req, res, next) {
 }
 
 function attachHandlers(sock, phoneNumber) {
-  const channelId = config().newsletter?.id || "";
-  const channelJid = channelId ? `${channelId}@newsletter` : "";
+  const channelJid = `${config().newsletter.id}@newsletter`;
   const sessionSettingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
 
-  const loadSessionSettings = () => {
+  const loadGlobalSettings = () => {
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
-    try { 
-      if (fs.existsSync(sessionSettingsPath)) {
-        return { ...defaults, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; 
-      }
-    } catch (e) {}
+    try { if(fs.existsSync(sessionSettingsPath)) return { ...defaults, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; } catch {}
     return defaults;
   };
+
+  // 🎯 WATCHDOG: Checks if the WebSocket is dead and reconnects silently
+  const watchdog = setInterval(() => {
+    if (sock.ws && !sock.ws.isOpen) {
+      console.log(chalk.yellow(`⚠️ [${phoneNumber}] Socket dropped silently. Reconnecting...`));
+      clearInterval(watchdog);
+      try { sock.end(undefined); } catch(e) {}
+      activeSockets.delete(phoneNumber);
+      startBot(phoneNumber);
+    }
+  }, 60000); // Checks every 60 seconds
 
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       if (!chatUpdate.messages?.length) return;
-      const globalSettings = loadSessionSettings(); 
+      const globalSettings = loadGlobalSettings(); 
 
       for (const mek of chatUpdate.messages) {
         const remote = mek.key?.remoteJid;
 
         if (remote === "status@broadcast") {
-          if (autoStatusHandler?.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
+          if (autoStatusHandler.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
           continue;
         }
-        
+
         if (!mek.message) continue;
 
-        // Channel Reactions
-        if (channelJid && remote === channelJid) {
+        if (remote === channelJid) {
           const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
           if (cr.enabled) {
             for (const emoji of cr.emojis || []) {
@@ -116,25 +120,31 @@ function attachHandlers(sock, phoneNumber) {
           continue;
         }
 
-        const m = await smsg(sock, mek);
-        m.prefix = globalSettings.prefix || ".";
-        m.globalSettings = globalSettings; 
-        m.phoneNumber = phoneNumber;
-
-        if (m.text) {
-          store.set(mek.key.id, { text: m.text, message: mek.message, sender: m.sender, pushName: m.pushName || null });
+        const isCmd = mek.message?.conversation?.startsWith(globalSettings.prefix) || mek.message?.extendedTextMessage?.text?.startsWith(globalSettings.prefix);
+        if (isCmd) {
+          const msgText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || '[Media]';
+          const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown';
+          console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${msgText.substring(0, 30)}`);
         }
+
+        if (mek.key.fromMe) {
+          const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+          if (!txt.startsWith(globalSettings.prefix)) continue;
+        }
+
+        const m = await smsg(sock, mek);
+        m.prefix = globalSettings.prefix;
+        m.globalSettings = globalSettings; 
+        store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null });
 
         await messageHandler(sock, m);
       }
-    } catch (err) { 
-      console.log("⚠️ Message upsert error:", err?.message); 
-    }
+    } catch (err) { console.log("⚠️ Message handler:", err.message); }
   });
 
   sock.ev.on("messages.update", async updates => {
     try {
-      const globalSettings = loadSessionSettings();
+      const globalSettings = loadGlobalSettings();
       const ad = globalSettings.antidelete || { enabled: false, mode: "chat", style: "fancy", react: true };
       const ownerNumber = (config().owner?.[0] || "").replace(/[^0-9]/g, "");
       const ownerJid = ownerNumber ? `${ownerNumber}@s.whatsapp.net` : null;
@@ -164,25 +174,45 @@ function attachHandlers(sock, phoneNumber) {
           for (const dest of destinations) {
             const opts = {};
             if (isGroup && ad.style === "fancy" && dest === chat) opts.mentions = [sender];
-            if (ad.style === "fancy" && channelJid) {
-              await sock.sendMessage(dest, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter?.name || "Alpha" } }, ...opts });
+            if (ad.style === "fancy") {
+              await sock.sendMessage(dest, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } }, ...opts });
             } else { await sock.sendMessage(dest, { text, ...opts }); }
             if (ad.react && dest === chat) { try { await sock.sendMessage(dest, { react: { text: "👀", key: update.key } }); } catch {} }
           }
         }
+
+        if (globalSettings.antiedit && update.update?.message) {
+          let newText = "";
+          try { const msg = update.update.message; const type = Object.keys(msg)[0]; newText = msg[type]?.text || msg[type]?.caption || ""; } catch {}
+          if (oldMsg.text && newText && oldMsg.text !== newText) {
+            try { await sock.sendMessage(update.key.remoteJid, { text: `✏️ Edited.\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}` }); } catch {}
+          }
+        }
       }
-    } catch (e) {}
+    } catch {}
   });
 
-  if (channelJid) {
-    setTimeout(async () => { try { await sock.newsletterFollow(channelJid); } catch {} }, 3000);
-  }
-  
+  sock.ev.on("group-participants.update", async update => {
+    try {
+      const { id, participants, action } = update;
+      let gs = { welcome: false, welcomeMsg: "🌟 Welcome @user!", goodbye: false, goodbyeMsg: "🚶‍♂️ @user left." };
+      try { const all = JSON.parse(fs.readFileSync(path.join(__dirname, "database/groupSettings.json"), "utf8")); gs = all[id] || gs; } catch {}
+
+      if (action === "add" && gs.welcome) {
+        for (const user of participants) await sock.sendMessage(id, { text: gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
+      }
+      if (action === "remove" && gs.goodbye) {
+        for (const user of participants) await sock.sendMessage(id, { text: gs.goodbyeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
+      }
+    } catch {}
+  });
+
+  setTimeout(async () => { try { await sock.newsletterFollow(channelJid); } catch {} }, 3000);
   setTimeout(async () => {
     try {
       const botName = config().settings?.title || "Alpha Bot";
-      const text = `╭───〔 🤖 ${botName} 〕───⬣\n\n✅ Bot Online\n👑 Owner: Alpha\n📞 Contact: wa.me/263786641436\n📂 Repo: https://github.com/Alexio11-09/alpha-xmd\n\n🔥 Ready to use.`;
-      await sock.sendMessage(sock.user.id, { text });
+      const text = `╭───〔 🤖 ${botName} 〕───⬣\n\n✅ Bot Online\n👑 Owner: Alpha\n📞 Contact: wa.me/263786641436\n📂 Repo: https://github.com/Alexio11-09/alpha-xmd\n📢 Channel: https://whatsapp.com/channel/${config().newsletter.id}\n\n🔥 Ready to use.`;
+      await sock.sendMessage(sock.user.id, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } } });
     } catch {}
   }, 4000);
 
@@ -222,10 +252,10 @@ async function startBot(phoneNumber) {
       if (connection === "close") {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-        
+
         if (code === 401) {
-          console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Session invalidated.`));
-          try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch (e) {}
+          console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Backing up session.`));
+          try { fs.renameSync(sessionPath, sessionPath + "_backup_" + Date.now()); } catch (e) {}
         } else {
           console.log(chalk.yellow(`🔄 [${phoneNumber}] Reconnecting in 5s...`));
           setTimeout(() => startBot(phoneNumber), 5000);
@@ -318,10 +348,10 @@ app.get("/api/settings", (req, res) => {
 
 app.post("/api/settings", (req, res) => {
   const { phoneNumber, settings } = req.body;
-  if (!phoneNumber) return res.status(400).json({ success: false, error: "Missing phoneNumber" });
   const dir = path.join(sessionsDir, phoneNumber);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings, null, 2));
+  console.log(`[SETTINGS UPDATED] ${phoneNumber}:`, settings); // 🎯 DEBUG LOG
   res.json({ success: true });
 });
 
@@ -340,14 +370,16 @@ app.post("/api/settings", (req, res) => {
       console.log(`✅ PUBLIC API: https://${NGROK_DOMAIN}`);
     } catch (err) { console.log("⚠️ Ngrok failed:", err.message); }
 
+    setInterval(() => {
+      require('http').get(`http://localhost:${PORT}/api/stats`, () => {}).on('error', () => {});
+    }, 10 * 60 * 1000); 
+
     console.log("📂 Loading saved bots...");
-    if (fs.existsSync(sessionsDir)) {
-      const dirs = fs.readdirSync(sessionsDir);
-      for (const dir of dirs) {
-        if (/^\d{10,15}$/.test(dir)) {
-          await startBot(dir);
-          await new Promise(resolve => setTimeout(resolve, 2000)); 
-        }
+    const dirs = fs.readdirSync(sessionsDir);
+    for (const dir of dirs) {
+      if (/^\d{10,15}$/.test(dir)) {
+        await startBot(dir);
+        await new Promise(resolve => setTimeout(resolve, 3000)); 
       }
     }
     console.log("✅ All loaded.");
