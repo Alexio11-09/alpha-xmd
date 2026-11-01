@@ -71,17 +71,6 @@ function attachHandlers(sock, phoneNumber) {
     return defaults;
   };
 
-  // 🎯 WATCHDOG: Checks if the WebSocket is dead and reconnects silently
-  const watchdog = setInterval(() => {
-    if (sock.ws && !sock.ws.isOpen) {
-      console.log(chalk.yellow(`⚠️ [${phoneNumber}] Socket dropped silently. Reconnecting...`));
-      clearInterval(watchdog);
-      try { sock.end(undefined); } catch(e) {}
-      activeSockets.delete(phoneNumber);
-      startBot(phoneNumber);
-    }
-  }, 60000); // Checks every 60 seconds
-
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       if (!chatUpdate.messages?.length) return;
@@ -351,7 +340,6 @@ app.post("/api/settings", (req, res) => {
   const dir = path.join(sessionsDir, phoneNumber);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings, null, 2));
-  console.log(`[SETTINGS UPDATED] ${phoneNumber}:`, settings); // 🎯 DEBUG LOG
   res.json({ success: true });
 });
 
