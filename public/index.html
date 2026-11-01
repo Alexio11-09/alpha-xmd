@@ -150,8 +150,16 @@ input:checked+.sl:before{transform:translateX(20px)}
       <label class="ts"><input type="checkbox" id="set-autotyping"><span class="sl"></span></label>
     </div>
     <div class="set-item">
+      <span class="set-name">Auto Recording</span>
+      <label class="ts"><input type="checkbox" id="set-autorecording"><span class="sl"></span></label>
+    </div>
+    <div class="set-item">
       <span class="set-name">Anti-Delete</span>
       <label class="ts"><input type="checkbox" id="set-antidelete"><span class="sl"></span></label>
+    </div>
+    <div class="set-item">
+      <span class="set-name">Anti-Edit</span>
+      <label class="ts"><input type="checkbox" id="set-antiedit"><span class="sl"></span></label>
     </div>
     <div class="set-item">
       <span class="set-name">Anti-Link</span>
@@ -215,26 +223,32 @@ alert("Network Error. Try again.");b.disabled=false;bt.innerText="Generate Code"
 }
 }
 
-// Settings Logic
 async function openSettings(){
     document.getElementById('setModal').classList.add('show');
-    // Fetch current settings
     try {
         const r = await fetch(AU+"/api/settings?phoneNumber="+cp, {headers:{'ngrok-skip-browser-warning':'true'}});
         const d = await r.json();
         document.getElementById('set-autoread').checked = d.autoread || false;
         document.getElementById('set-autotyping').checked = d.autotyping || false;
+        document.getElementById('set-autorecording').checked = d.autorecording || false;
         document.getElementById('set-antidelete').checked = d.antidelete || false;
+        document.getElementById('set-antiedit').checked = d.antiedit || false;
         document.getElementById('set-antilink').checked = d.antilink || false;
         document.getElementById('set-autoreact').checked = d.autoreact || false;
-    } catch(e) {}
+    } catch(e) {
+        console.error("Failed to load settings", e);
+    }
 }
+
 function closeSettings(){ document.getElementById('setModal').classList.remove('show'); }
+
 async function saveSettings(){
     const settings = {
         autoread: document.getElementById('set-autoread').checked,
         autotyping: document.getElementById('set-autotyping').checked,
+        autorecording: document.getElementById('set-autorecording').checked,
         antidelete: document.getElementById('set-antidelete').checked,
+        antiedit: document.getElementById('set-antiedit').checked,
         antilink: document.getElementById('set-antilink').checked,
         autoreact: document.getElementById('set-autoreact').checked,
     };
@@ -244,9 +258,8 @@ async function saveSettings(){
             headers: {'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
             body: JSON.stringify({phoneNumber: cp, settings: settings})
         });
-        alert("Settings Saved! Restarting bot to apply changes...");
+        alert("Settings Saved! The bot will apply them immediately.");
         closeSettings();
-        // Optional: Trigger a bot restart via API if you want it to apply instantly
     } catch(e) { alert("Failed to save settings."); }
 }
 
