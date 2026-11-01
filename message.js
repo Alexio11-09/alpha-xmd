@@ -10,10 +10,8 @@ async function checkAdmin(sock, chatId, senderId, botId) {
     try {
         const metadata = await sock.groupMetadata(chatId);
         const participants = metadata.participants || [];
-        
         const senderBase = senderId.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
         const botBase = botId.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-
         let isSenderAdmin = false;
         let isBotAdmin = false;
 
@@ -21,13 +19,11 @@ async function checkAdmin(sock, chatId, senderId, botId) {
             const pIds = [p.id, p.lid, p.phoneNumber, p.jid].filter(Boolean); 
             let isSenderMatch = false;
             let isBotMatch = false;
-
             for (const pId of pIds) {
                 const pBase = pId.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
                 if (pId === senderId || pBase === senderBase) isSenderMatch = true;
                 if (pId === botId || pBase === botBase) isBotMatch = true;
             }
-
             const isAdmin = (p.admin === 'admin' || p.admin === 'superadmin');
             if (isSenderMatch && isAdmin) isSenderAdmin = true;
             if (isBotMatch && isAdmin) isBotAdmin = true;
@@ -91,6 +87,17 @@ const setGlobalMode = (mode) => {
     setGlobalSettings(g);
 };
 
+// 🎯 HELPER: Saves settings directly to the specific bot's session folder
+const saveSessionSetting = (sock, key, value) => {
+    const botNum = sock.user.id.split('@')[0].split(':')[0];
+    const p = path.join(__dirname, 'sessions', botNum, 'settings.json');
+    let s = {};
+    try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
+    s[key] = value;
+    fs.writeFileSync(p, JSON.stringify(s, null, 2));
+    return true;
+};
+
 const commands = [];
 const loadCommands = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -141,6 +148,37 @@ commands.push({
     }
 });
 
+// 🎯 ADDING THE TOGGLE COMMANDS DIRECTLY INTO MESSAGE.JS
+const toggles = [
+    { cmd: "autoread", name: "Auto Read" },
+    { cmd: "autotyping", name: "Auto Typing" },
+    { cmd: "autorecording", name: "Auto Recording" },
+    { cmd: "autoreact", name: "Auto React" },
+    { cmd: "antiedit", name: "Anti-Edit" }
+];
+
+toggles.forEach(t => {
+    commands.push({
+        command: t.cmd,
+        category: "owner",
+        owner: true,
+        execute: async (sock, m, { args, reply }) => {
+            const val = args[0]?.toLowerCase();
+            if (val === 'on') {
+                saveSessionSetting(sock, t.cmd, true);
+                return reply(`✅ *${t.name}* is now ON`);
+            } else if (val === 'off') {
+                saveSessionSetting(sock, t.cmd, false);
+                return reply(`❌ *${t.name}* is now OFF`);
+            } else {
+                const gs = m.globalSettings || {};
+                const current = gs[t.cmd] ? 'ON' : 'OFF';
+                return reply(`⚙️ *${t.name}* is currently *${current}*\n\nUsage: .${t.cmd} on / off`);
+            }
+        }
+    });
+});
+
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
 const deny = {
@@ -166,14 +204,15 @@ module.exports = async (sock, m) => {
         const gs = m.globalSettings || getGlobalSettings();
         
         if (!m.key.fromMe) {
-            // 🎯 DEBUG LOG: Watch the console to see if the toggles are saving correctly!
-            if (gs.autoread || gs.autotyping || gs.autorecording) {
-                console.log(`[AUTO-FEATURES] Read: ${gs.autoread} | Type: ${gs.autotyping} | Rec: ${gs.autorecording}`);
-            }
-
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
-            if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); } catch {} }
-            if (gs.autorecording) { try { await sock.sendPresenceUpdate("recording", m.chat); } catch {} }
+            
+            // 🎯 FORCE A 1.5 SECOND DELAY so the typing/recording status is visible on WhatsApp
+            if (gs.autotyping) { 
+                try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} 
+            }
+            if (gs.autorecording) { 
+                try { await sock.sendPresenceUpdate("recording", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} 
+            }
 
             const prefix = m.prefix || config.prefix || ".";
             const rawTxt = m.text || "";
