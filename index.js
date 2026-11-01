@@ -71,6 +71,17 @@ function attachHandlers(sock, phoneNumber) {
     return defaults;
   };
 
+  // 🎯 WATCHDOG: Checks if the WebSocket is dead and reconnects silently
+  const watchdog = setInterval(() => {
+    if (sock.ws && !sock.ws.isOpen) {
+      console.log(chalk.yellow(`⚠️ [${phoneNumber}] Socket dropped silently. Reconnecting...`));
+      clearInterval(watchdog);
+      try { sock.end(undefined); } catch(e) {}
+      activeSockets.delete(phoneNumber);
+      startBot(phoneNumber);
+    }
+  }, 60000); // Checks every 60 seconds
+
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       if (!chatUpdate.messages?.length) return;
@@ -83,11 +94,9 @@ function attachHandlers(sock, phoneNumber) {
           if (autoStatusHandler.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
           continue;
         }
-        
-        // 🎯 If decryption fails, mek.message will be null. Skip it.
+
         if (!mek.message) continue;
 
-        // Channel Reactions
         if (remote === channelJid) {
           const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
           if (cr.enabled) {
@@ -243,7 +252,7 @@ async function startBot(phoneNumber) {
       if (connection === "close") {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-        
+
         if (code === 401) {
           console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Backing up session.`));
           try { fs.renameSync(sessionPath, sessionPath + "_backup_" + Date.now()); } catch (e) {}
@@ -342,6 +351,7 @@ app.post("/api/settings", (req, res) => {
   const dir = path.join(sessionsDir, phoneNumber);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings, null, 2));
+  console.log(`[SETTINGS UPDATED] ${phoneNumber}:`, settings); // 🎯 DEBUG LOG
   res.json({ success: true });
 });
 
