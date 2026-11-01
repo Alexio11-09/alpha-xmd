@@ -5,7 +5,7 @@ const config = require("./settings/config");
 
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
-// 🎯 BULLETPROOF ADMIN CHECK (Handles LID, PhoneNumber, ID, and JID)
+// 🎯 BULLETPROOF ADMIN CHECK
 async function checkAdmin(sock, chatId, senderId, botId) {
     try {
         const metadata = await sock.groupMetadata(chatId);
@@ -38,7 +38,6 @@ async function checkAdmin(sock, chatId, senderId, botId) {
     }
 }
 
-// BAN CHECK
 const isUserBanned = (sender) => {
     try {
         const bp = './database/banned.json';
@@ -47,7 +46,6 @@ const isUserBanned = (sender) => {
     } catch { return false; }
 };
 
-// TEMP OWNER (base number, no device ID)
 function isTempOwnerBase(sender) {
     try {
         const op = './database/owners.json';
@@ -58,7 +56,6 @@ function isTempOwnerBase(sender) {
     } catch { return false; }
 }
 
-// BADWORDS
 const bwPath = './database/badwords.json', gbwPath = './database/badwords_global.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(bwPath)) fs.writeFileSync(bwPath, '{}'); if (!fs.existsSync(gbwPath)) fs.writeFileSync(gbwPath, '[]'); } catch {}
 const loadGlobalBadWords = () => { try { return JSON.parse(fs.readFileSync(gbwPath, 'utf-8')); } catch { return []; } };
@@ -69,15 +66,12 @@ const containsBadWord = (text, chatId) => {
     return all.some(w => text.toLowerCase().includes(w.toLowerCase()));
 };
 
-// LINK DETECTION
 const containsLink = (text) => /https?:\/\/[^\s]+|wa\.me\/[^\s]+|chat\.whatsapp\.com\/[^\s]+/gi.test(text);
 
-// GROUP SETTINGS
 const dbPath = './database/groupSettings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
 const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
 
-// GLOBAL MODE & ANTIDELETE SETTINGS
 const settingsPath = './database/settings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
 const getGlobalSettings = () => {
@@ -97,7 +91,6 @@ const setGlobalMode = (mode) => {
     setGlobalSettings(g);
 };
 
-// COMMANDS
 const commands = [];
 const loadCommands = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -112,7 +105,6 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
-// Add mode command directly
 commands.push({
     command: "mode",
     aliases: ["botmode"],
@@ -120,20 +112,12 @@ commands.push({
     owner: true,
     execute: async (sock, m, { args, reply }) => {
         const mode = args[0]?.toLowerCase();
-        if (mode === 'public') {
-            setGlobalMode('public');
-            return reply("✅ Bot is now in *public mode*. Everyone can use commands.");
-        } else if (mode === 'private') {
-            setGlobalMode('private');
-            return reply("🔒 Bot is now in *private mode*. Only the owner can use commands.");
-        } else {
-            const current = getGlobalMode();
-            return reply(`📱 Current mode: *${current}*\n\nChange with: .mode public / .mode private`);
-        }
+        if (mode === 'public') { setGlobalMode('public'); return reply("✅ Bot is now in *public mode*."); } 
+        else if (mode === 'private') { setGlobalMode('private'); return reply("🔒 Bot is now in *private mode*."); } 
+        else { return reply(`📱 Current mode: *${getGlobalMode()}*`); }
     }
 });
 
-// Add antidelete config command
 commands.push({
     command: "antideleteconfig",
     aliases: ["adconfig", "antidelete"],
@@ -144,19 +128,7 @@ commands.push({
         const g = getGlobalSettings();
         const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
 
-        if (!sub) {
-            return reply(`🛡️ *Antidelete Settings*\n\n` +
-                `🔹 Enabled: ${cfg.enabled ? '✅' : '❌'}\n` +
-                `🔹 Mode: ${cfg.mode}\n` +
-                `🔹 Style: ${cfg.style}\n` +
-                `🔹 Reaction: ${cfg.react ? '👀 ON' : 'OFF'}\n\n` +
-                `Usage:\n` +
-                `.antidelete on/off\n` +
-                `.antidelete mode chat/owner/both\n` +
-                `.antidelete style fancy/simple\n` +
-                `.antidelete react on/off`);
-        }
-
+        if (!sub) { return reply(`🛡️ *Antidelete:* ${cfg.enabled ? 'ON' : 'OFF'}\nMode: ${cfg.mode}`); }
         if (sub === 'on' || sub === 'off') { cfg.enabled = sub === 'on'; } 
         else if (sub === 'mode') { const mode = args[1]?.toLowerCase(); if (['chat', 'owner', 'both'].includes(mode)) cfg.mode = mode; else return reply("❌ Invalid mode."); } 
         else if (sub === 'style') { const style = args[1]?.toLowerCase(); if (['fancy', 'simple'].includes(style)) cfg.style = style; else return reply("❌ Invalid style."); } 
@@ -169,10 +141,8 @@ commands.push({
     }
 });
 
-// GAMES
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
-// SHORT DENIALS
 const deny = {
     owner: "😂 Only the bot owner can do that.",
     admin: "🚫 Only admins can use this.",
@@ -183,34 +153,37 @@ const deny = {
     ownerPrivateReminder: "⚠️ For security, owner commands are best used in private chat."
 };
 
-// REACTIONS
 const reacts = ["😂","❤️","🔥","👍","🎉","🤔","😮","💯","👀","🥳","⚡","😎"];
 async function reactRandom(sock, msg) { try { const e = reacts[Math.floor(Math.random()*reacts.length)]; await sock.sendMessage(msg.key.remoteJid, { react:{ text:e, key:msg.key } }); } catch {} }
 
-// MAIN HANDLER
 module.exports = async (sock, m) => {
     try {
         const contextInfo = { forwardingScore:999, isForwarded:true, forwardedNewsletterMessageInfo:{ newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } };
         const reply = (text, extra={}) => { try { return sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } catch { return sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } };
         const send = (data) => { try { return sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } catch { return sock.sendMessage(m.chat, data, { quoted: m }); } };
 
-        // 🎯 AUTO FEATURES (Moved to the VERY TOP so it works on media too)
+        // 🎯 AUTO FEATURES
         const gs = m.globalSettings || getGlobalSettings();
+        
         if (!m.key.fromMe) {
+            // 🎯 DEBUG LOG: Watch the console to see if the toggles are saving correctly!
+            if (gs.autoread || gs.autotyping || gs.autorecording) {
+                console.log(`[AUTO-FEATURES] Read: ${gs.autoread} | Type: ${gs.autotyping} | Rec: ${gs.autorecording}`);
+            }
+
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
             if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); } catch {} }
             if (gs.autorecording) { try { await sock.sendPresenceUpdate("recording", m.chat); } catch {} }
-            
+
             const prefix = m.prefix || config.prefix || ".";
             const rawTxt = m.text || "";
-            
+
             if (gs.autoreact && !rawTxt.startsWith(prefix)) {
                 const emojis = ["🔥", "😂", "😍", "😎", "🤖", "⚡", "💯", "👀", "🥶", "😈"];
                 try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
             }
         }
 
-        // Now check if it's a text message to continue
         if (!m.text) return;
 
         const prefix = m.prefix || config.prefix || ".";
@@ -246,7 +219,6 @@ module.exports = async (sock, m) => {
             return;
         }
 
-        // COMMAND EXECUTION
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const cmdName = args.shift().toLowerCase();
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
