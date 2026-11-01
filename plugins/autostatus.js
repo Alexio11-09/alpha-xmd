@@ -1,17 +1,43 @@
 const fs = require('fs'), path = require('path'), configPath = path.join(__dirname, '../database/autoStatus.json');
 fs.existsSync(path.join(__dirname, '../database')) || fs.mkdirSync(path.join(__dirname, '../database'), { recursive: true });
-fs.existsSync(configPath) || fs.writeFileSync(configPath, JSON.stringify({ enabled: false, reactOn: false, reactEmoji: '🔥' }));
+
+// 🎯 Default random emojis array
+const defaultEmojis = ['🔥', '❤️', '😂', '😮', '😢', '🙏', '👏', '💯', '✨', '💚', '⚡', '👀'];
+
+if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify({ enabled: false, reactOn: false, reactEmoji: 'random', reactEmojis: defaultEmojis }, null, 2));
+}
+
 global.statusCache || (global.statusCache = new Map());
 
-function getConfig() { try { return JSON.parse(fs.readFileSync(configPath)) } catch { return { enabled: false, reactOn: false, reactEmoji: '🔥' } } }
+function getConfig() { 
+    try { 
+        const c = JSON.parse(fs.readFileSync(configPath));
+        if (!c.reactEmojis) c.reactEmojis = defaultEmojis;
+        return c;
+    } catch { 
+        return { enabled: false, reactOn: false, reactEmoji: 'random', reactEmojis: defaultEmojis }; 
+    } 
+}
+
 function saveConfig(d) { fs.writeFileSync(configPath, JSON.stringify(d, null, 2)) }
 function isAutoStatusEnabled() { return getConfig().enabled }
 function isReactEnabled() { return getConfig().reactOn }
-function getReactEmoji() { return getConfig().reactEmoji || '🔥' }
 
 async function reactToStatus(s, m) {
   if (!isReactEnabled()) return;
-  const e = getReactEmoji();
+  
+  const conf = getConfig();
+  let e;
+  
+  // 🎯 Pick a random emoji if set to 'random', otherwise use the custom one
+  if (conf.reactEmoji && conf.reactEmoji !== 'random') {
+      e = conf.reactEmoji;
+  } else {
+      const emojis = conf.reactEmojis || defaultEmojis;
+      e = emojis[Math.floor(Math.random() * emojis.length)];
+  }
+
   const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
   if (!p) return;
 
@@ -24,7 +50,12 @@ async function reactToStatus(s, m) {
     ]);
     console.log(`✅ Status reacted with ${e}`);
   } catch (err) {
-    console.log(`❌ Status react failed: ${err.message}`);
+    // 🎯 Clean up timeout errors so the console stays clean
+    if (err.message === 'timeout') {
+        console.log(`⏳ Status react skipped: WhatsApp timeout (rate limit)`);
+    } else {
+        console.log(`❌ Status react failed: ${err.message}`);
+    }
   }
 }
 
@@ -45,7 +76,11 @@ async function handleStatusUpdate(s, st) {
   try {
     await s.readMessages([m.key]);
     console.log(`👁️ Status viewed from ${p}`);
+    
+    // 🎯 WAIT 1.5 SECONDS BEFORE REACTING (Fixes the timeout error)
+    await new Promise(r => setTimeout(r, 1500));
     await reactToStatus(s, m);
+    
   } catch (err) {
     if (err.message?.includes('rate-overlimit')) {
       await new Promise(r => setTimeout(r, 2000));
@@ -61,7 +96,9 @@ module.exports = [{
   owner: true,
   execute: async (s, m, { args, reply }) => {
     const c = getConfig(), a = args[0]?.toLowerCase();
-    if (!a) return reply(`📱 *Auto Status*\n👁️ View: ${c.enabled ? 'ON ✅' : 'OFF ❌'}\n💫 React: ${c.reactOn ? 'ON ✅' : 'OFF ❌'}\n❤️ Emoji: ${c.reactEmoji || '🔥'}\n\n.autostatus on/off\n.autostatus react on/off\n.autostatus emoji 😍`);
+    
+    if (!a) return reply(`📱 *Auto Status*\n👁️ View: ${c.enabled ? 'ON ✅' : 'OFF ❌'}\n💫 React: ${c.reactOn ? 'ON ✅' : 'OFF ❌'}\n❤️ Emoji: ${c.reactEmoji === 'random' ? 'Random 🎲' : c.reactEmoji}\n\n.autostatus on/off\n.autostatus react on/off\n.autostatus emoji 😍 (or type "random")`);
+    
     if (a === 'on') { c.enabled = true; saveConfig(c); reply('✅ Auto status view enabled!') }
     else if (a === 'off') { c.enabled = false; saveConfig(c); reply('❌ Auto status view disabled!') }
     else if (a === 'react') {
@@ -71,7 +108,7 @@ module.exports = [{
       else reply('❌ Use: .autostatus react on/off');
     }
     else if (a === 'emoji') {
-      if (!args[1]) return reply('❌ Provide an emoji!');
+      if (!args[1]) return reply('❌ Provide an emoji or type "random"!');
       c.reactEmoji = args[1];
       saveConfig(c);
       reply(`✅ Emoji set to: ${args[1]}`);
