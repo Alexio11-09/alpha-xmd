@@ -292,7 +292,12 @@ module.exports = async (sock, m) => {
         const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: isSenderAdmin, isBotAdmin: isBotAdmin, config, prefix };
 
         if (command.owner && !isOwner) return reply(deny.owner);
-        if (command.owner && isOwner && m.isGroup) await reply(deny.ownerPrivateReminder);
+        
+        // 🎯 FIXED: Allow .block and .unblock in groups without the private chat warning
+        if (command.owner && isOwner && m.isGroup && command.command !== 'block' && command.command !== 'unblock') {
+            await reply(deny.ownerPrivateReminder);
+        }
+        
         if (command.group === false && m.isGroup) return reply(deny.private);
         if (command.group && !m.isGroup) return reply(deny.group);
 
