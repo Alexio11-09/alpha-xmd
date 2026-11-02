@@ -206,7 +206,6 @@ module.exports = async (sock, m) => {
         if (!m.key.fromMe) {
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
             
-            // 🎯 FORCE A 1.5 SECOND DELAY so the typing/recording status is visible on WhatsApp
             if (gs.autotyping) { 
                 try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} 
             }
