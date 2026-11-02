@@ -25,7 +25,7 @@ module.exports=[
 {command:"join",aliases:["enter"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ Link?");let code=a[0].split('/').pop().replace(/\?.*/,'');try{r(`✅ Joined: ${await s.groupAcceptInvite(code)}`)}catch(e){r(`❌ ${e.message}`)}}},
 {command:"leave",aliases:["exit"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!m.isGroup)return r("❌ Groups only.");if(a[0]==='all'){let chats=Object.keys(await s.groupFetchAllParticipating()),ok=0;for(let c of chats){try{await s.groupLeave(c);ok++}catch{}}r(`✅ Left ${ok} groups.`)}else{try{await s.groupLeave(m.chat)}catch(e){r(`❌ ${e.message}`)}}}},
 
-// 🎯 TRIPLE-FALLBACK BLOCK COMMAND
+// 🎯 THE FIXED BLOCK COMMAND (Extracts LID from Group Metadata)
 {command:"block",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
     let target;
     if (m.isGroup) {
@@ -38,27 +38,40 @@ module.exports=[
     
     if(!target || target === s.user.id) return r("❌ Invalid target.");
     
-    try {
-        await s.updateBlockStatus(target, "block");
-        r(`🚫 Successfully blocked @${target.split('@')[0]}`);
-    } catch(e1) {
+    let blockJid = target;
+    
+    // 🎯 If in a group, extract the LID directly from the participant list
+    if (m.isGroup) {
         try {
-            const pnJid = target.split('@')[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-            await s.updateBlockStatus(pnJid, "block");
-            r(`🚫 Successfully blocked @${pnJid.split('@')[0]}`);
-        } catch(e2) {
-            try {
-                if (typeof s.getPNForLID === 'function' && target.includes('@lid')) {
-                    const pn = await s.getPNForLID(target);
-                    if (pn) {
-                        await s.updateBlockStatus(pn, "block");
-                        return r(`🚫 Successfully blocked @${pn.split('@')[0]}`);
-                    }
-                }
-                r(`❌ Failed to block: ${e2.message}`);
-            } catch(e3) {
-                r(`❌ Failed to block: ${e3.message}`);
+            const metadata = await s.groupMetadata(m.chat);
+            const targetNum = target.split('@')[0].replace(/[^0-9]/g, '');
+            const participant = metadata.participants.find(p => {
+                const pId = p.id ? p.id.split('@')[0].replace(/[^0-9]/g, '') : '';
+                const pNum = p.phoneNumber ? p.phoneNumber.split('@')[0].replace(/[^0-9]/g, '') : '';
+                const pLid = p.lid ? p.lid.split('@')[0].replace(/[^0-9]/g, '') : '';
+                return pId === targetNum || pNum === targetNum || pLid === targetNum;
+            });
+            
+            if (participant) {
+                // Use the LID if available, otherwise use the participant ID
+                if (participant.lid) blockJid = participant.lid;
+                else if (participant.id) blockJid = participant.id;
             }
+        } catch (e) {
+            console.log("Block Error: Could not fetch group metadata", e.message);
+        }
+    }
+
+    try {
+        await s.updateBlockStatus(blockJid, "block");
+        r(`🚫 Successfully blocked @${target.split('@')[0]}`);
+    } catch(e) {
+        // Fallback: If LID fails, try blocking with the raw target
+        try {
+            await s.updateBlockStatus(target, "block");
+            r(`🚫 Successfully blocked @${target.split('@')[0]}`);
+        } catch(e2) {
+            r(`❌ Failed to block: ${e2.message}`);
         }
     }
 }},
@@ -75,14 +88,32 @@ module.exports=[
     
     if(!target) return r("❌ Invalid target.");
     
+    let unblockJid = target;
+    
+    if (m.isGroup) {
+        try {
+            const metadata = await s.groupMetadata(m.chat);
+            const targetNum = target.split('@')[0].replace(/[^0-9]/g, '');
+            const participant = metadata.participants.find(p => {
+                const pId = p.id ? p.id.split('@')[0].replace(/[^0-9]/g, '') : '';
+                const pNum = p.phoneNumber ? p.phoneNumber.split('@')[0].replace(/[^0-9]/g, '') : '';
+                const pLid = p.lid ? p.lid.split('@')[0].replace(/[^0-9]/g, '') : '';
+                return pId === targetNum || pNum === targetNum || pLid === targetNum;
+            });
+            if (participant) {
+                if (participant.lid) unblockJid = participant.lid;
+                else if (participant.id) unblockJid = participant.id;
+            }
+        } catch (e) {}
+    }
+    
     try {
-        await s.updateBlockStatus(target, "unblock");
+        await s.updateBlockStatus(unblockJid, "unblock");
         r(`✅ Successfully unblocked @${target.split('@')[0]}`);
     } catch(e) {
         try {
-            const pnJid = target.split('@')[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-            await s.updateBlockStatus(pnJid, "unblock");
-            r(`✅ Successfully unblocked @${pnJid.split('@')[0]}`);
+            await s.updateBlockStatus(target, "unblock");
+            r(`✅ Successfully unblocked @${target.split('@')[0]}`);
         } catch(e2) {
             r(`❌ Failed to unblock: ${e2.message}`);
         }
