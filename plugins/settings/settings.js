@@ -1,52 +1,94 @@
-const fs=require('fs'),R=a=>a[Math.floor(Math.random()*a.length)],fail=["👾 Oops","💥 Failed","😅 Broke"],guide=(c,u)=>R([`🧐 Use *${u}*`,`🤔 Try *${u}*`,`😜 Right *${u}*`]);
-const p='./database/settings.json';if(!fs.existsSync('./database'))fs.mkdirSync('./database',{recursive:!0});if(!fs.existsSync(p))fs.writeFileSync(p,'{"global":{}}');
-const load=()=>{try{return JSON.parse(fs.readFileSync(p))}catch{return{global:{}}}},save=d=>fs.writeFileSync(p,JSON.stringify(d,null,2)),getG=()=>load().global||{},setG=d=>{let s=load();s.global={...getG(),...d};save(s)};
-module.exports=[
-{command:"autoread",aliases:["read"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autoread:!0});r(R(["📖 ON"]))}else if(c==='off'){setG({autoread:!1});r(R(["😴 OFF"]))}else r(`📊 *Auto‑Read:* ${getG().autoread?'ON':'OFF'}\n.autoread on/off`)}},
-{command:"autotyping",aliases:["typing"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autotyping:!0});r(R(["⌨️ ON"]))}else if(c==='off'){setG({autotyping:!1});r(R(["🤐 OFF"]))}else r(`📊 *Auto‑Typing:* ${getG().autotyping?'ON':'OFF'}\n.autotyping on/off`)}},
-{command:"autorecording",aliases:["recording"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autorecording:!0});r(R(["🎤 ON"]))}else if(c==='off'){setG({autorecording:!1});r(R(["⏹️ OFF"]))}else r(`📊 *Auto‑Recording:* ${getG().autorecording?'ON':'OFF'}\n.autorecording on/off`)}},
-{command:"autoreact",aliases:["react"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autoreact:!0});r(R(["😍 ON"]))}else if(c==='off'){setG({autoreact:!1});r(R(["😑 OFF"]))}else r(`📊 *Auto‑React:* ${getG().autoreact?'ON':'OFF'}\n.autoreact on/off`)}},
-{command:"autoviewstatus",aliases:["autoviewstat"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autoviewstatus:!0});r(R(["👁️ ON"]))}else if(c==='off'){setG({autoviewstatus:!1});r(R(["🙈 OFF"]))}else r(`📊 *Auto‑View Status:* ${getG().autoviewstatus?'ON':'OFF'}\n.autoviewstatus on/off`)}},
-{command:"autoreactstatus",aliases:["autoreactstat"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autoreactstatus:!0});r(R(["❤️ ON"]))}else if(c==='off'){setG({autoreactstatus:!1});r(R(["😑 OFF"]))}else r(`📊 *Auto‑React Status:* ${getG().autoreactstatus?'ON':'OFF'}\n.autoreactstatus on/off`)}},
-{command:"autostatus",aliases:["autostat"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let cfg=getG().autostatus||{enabled:!1,messages:[],interval:60},c=a[0]?.toLowerCase();if(!c){return r(`🔄 *Auto‑Status Config*\nStatus: ${cfg.enabled?'✅':'❌'}\nInterval: ${cfg.interval} min\nMessages: ${cfg.messages.length?cfg.messages.join(' | '):'None'}\n.autostatus on/off/add/remove/interval/list`)}if(c==='on')cfg.enabled=!0;else if(c==='off')cfg.enabled=!1;else if(c==='add'){let t=a.slice(1).join(' ');if(!t)return r("❌ Provide text");cfg.messages.push(t);r(`✅ Added: "${t}"`)}else if(c==='remove'){let i=parseInt(a[1]);if(isNaN(i)||i<1||i>cfg.messages.length)return r("❌ Invalid index");let rem=cfg.messages.splice(i-1,1);r(`✅ Removed: "${rem[0]}"`)}else if(c==='interval'){let m=parseInt(a[1]);if(isNaN(m)||m<1)return r("❌ Provide minutes");cfg.interval=m;r(`⏱️ Interval set to ${m} min`)}else if(c==='list'){if(!cfg.messages.length)return r("📭 No messages");r(`📋 *Messages*\n${cfg.messages.map((x,i)=>`${i+1}. ${x}`).join('\n')}`)}else return r("❌ Unknown option");setG({autostatus:cfg});r(`✅ Updated`)}},
-{command:"antidelete",aliases:["antidel","adconfig"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let g=getG(),ad=g.antidelete||{enabled:!1,mode:'chat',style:'fancy',react:!0},sub=a[0]?.toLowerCase();if(!sub)return r(`🛡️ *Antidelete*\nEnabled: ${ad.enabled?'✅':'❌'}\nMode: ${ad.mode}\nStyle: ${ad.style}\nReact: ${ad.react?'👀':'OFF'}\n.antidelete on/off/mode/style/react`);if(sub==='on'||sub==='off')ad.enabled=sub==='on';else if(sub==='mode'){let m=a[1]?.toLowerCase();if(['chat','owner','both'].includes(m))ad.mode=m;else return r("❌ Invalid mode")}else if(sub==='style'){let s=a[1]?.toLowerCase();if(['fancy','simple'].includes(s))ad.style=s;else return r("❌ Invalid style")}else if(sub==='react'){let rc=a[1]?.toLowerCase();if(rc==='on')ad.react=!0;else if(rc==='off')ad.react=!1;else return r("❌ Use react on/off")}else return r("❌ Unknown option");setG({antidelete:ad});r(`✅ Antidelete updated`)}},
-{command:"antiedit",aliases:["antieditmsg"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({antiedit:!0});r("✏️ ON")}else if(c==='off'){setG({antiedit:!1});r("❌ OFF")}else r(`📊 *Anti‑Edit:* ${getG().antiedit?'ON':'OFF'}\n.antiedit on/off`)}},
-{command:"setprefix",aliases:["prefix"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r(guide("setprefix",".setprefix !"));let pf=a[0];setG({prefix:pf});try{let cfg=require('./settings/config');cfg.prefix=pf;delete require.cache[require.resolve('./settings/config')];r(R([`✅ Prefix changed to *${pf}*`]))}catch{r(R([`✅ Prefix set to *${pf}* in settings. Restart to apply.`]))}}},
-{command:"resetprefix",aliases:["defaultprefix"],category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{setG({prefix:'.'});try{let cfg=require('./settings/config');cfg.prefix='.';delete require.cache[require.resolve('./settings/config')];r(R(["🔄 Back to dot"]))}catch{r(R(["🔄 Reset to dot in settings. Restart."]))}}},
-{command:"setname",aliases:["botname"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r(guide("setname",".setname My Bot"));try{await s.updateProfileName(a.join(" "));r(R(["✅ Name updated"]))}catch{r("❌ Failed")}}},
-{command:"setbio",aliases:["status","about"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r(guide("setbio",".setbio I'm cool"));try{await s.updateProfileStatus(a.join(" "));r(R(["📝 Bio set"]))}catch{r("❌ Failed")}}},
-{command:"setpp",aliases:["setprofile","botpp"],category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{if(!m.quoted)return r(guide("setpp",".setpp (reply image)"));try{let buf=await s.downloadMediaMessage(m.quoted);await s.updateProfilePicture(s.user.id,buf);r(R(["🖼️ PP updated"]))}catch{r("❌ Failed")}}},
-{command:"settings",aliases:["config","botsettings"],category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{let cfg=getG(),ad=cfg.antidelete||{},cr=cfg.chreact||{},as=cfg.autostatus||{};let txt=`⚙️ *Bot Settings*\n\n`+
-`📖 Auto‑Read: ${cfg.autoread?'✅':'❌'}\n⌨️ Auto‑Typing: ${cfg.autotyping?'✅':'❌'}\n🎤 Auto‑Recording: ${cfg.autorecording?'✅':'❌'}\n😍 Auto‑React: ${cfg.autoreact?'✅':'❌'}\n`+
-`👁️ Auto‑View Status: ${cfg.autoviewstatus?'✅':'❌'}\n❤️ Auto‑React Status: ${cfg.autoreactstatus?'✅':'❌'}\n🔄 Auto‑Status: ${as.enabled?'✅':'❌'}\n`+
-`🛡️ Anti‑Delete: ${ad.enabled?'✅':'❌'}\n💬 Channel‑React: ${cr.enabled?'✅':'❌'}\n✏️ Anti‑Edit: ${cfg.antiedit?'✅':'❌'}\n🟢 Always Online: ${cfg.alwaysonline?'✅':'❌'}\n`+
-`🕐 Fake Last Seen: ${cfg.fakelastseen?'✅':'❌'}\n🔧 Prefix: ${cfg.prefix||'.'}`;r(txt)}},
-{command:"chreact",aliases:["channelreact","autoreactchannel"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let g=getG(),cr=g.chreact||{enabled:!1,emojis:['💬']},sub=a[0]?.toLowerCase();if(!sub)return r(`💬 *Channel Auto‑React*\nStatus: ${cr.enabled?'✅':'❌'}\nEmojis: ${cr.emojis.join(' ')}\n.chreact on/off/set <emojis>`);if(sub==='on'||sub==='off')cr.enabled=sub==='on';else if(sub==='set'){if(!a[1])return r("❌ Provide emojis");let em=args.slice(1).join('').match(/\p{Extended_Pictographic}/gu)||[];if(!em.length)return r("❌ No valid emoji");cr.emojis=em.slice(0,5)}else return r("❌ Unknown option");setG({chreact:cr});r(`✅ Updated. Status: ${cr.enabled?'ON':'OFF'}, Emojis: ${cr.emojis.join(' ')}`)}},
-{command:"setstatusemoji",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setstatusemoji 👍");let em=args.join('').match(/\p{Extended_Pictographic}/gu)||[];if(!em.length)return r("❌ Provide valid emoji");setG({statusReactEmoji:em[0]});r(`✅ Status react emoji set to ${em[0]}`)}},
-{command:"setmenu",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setmenu <menu text>");setG({menuText:a.join(" ")});r("✅ Menu text updated")}},
-{command:"setmenuimage",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setmenuimage <url>");setG({menuImage:a[0]});r("✅ Menu image updated")}},
-{command:"setownername",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setownername <name>");setG({ownerName:a.join(" ")});r("✅ Owner name updated")}},
-{command:"setownernumber",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setownernumber <number>");setG({ownerNumber:a[0].replace(/[^0-9]/g,'')});r("✅ Owner number updated")}},
-{command:"setwarn",aliases:["setwarning"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let n=parseInt(a[0]);if(isNaN(n)||n<1)return r("❌ Provide max warnings number");setG({maxWarnings:n});r(`✅ Max warnings set to ${n}`)}},
-{command:"listwarn",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let g=getG();r(`📊 Max warnings: ${g.maxWarnings||3}`)}},
-{command:"alwaysonline",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({alwaysonline:!0});r("🟢 Always Online enabled")}else if(c==='off'){setG({alwaysonline:!1});r("🔴 Always Online disabled")}else r(`📊 Always Online: ${getG().alwaysonline?'✅ ON':'❌ OFF'}\n.alwaysonline on/off`)}},
-{command:"fakelastseen",aliases:["fls","fakelast"],category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){let v=a[1]||'3years';setG({fakelastseen:!0,fakelastseenValue:v});r(`🕐 Fake last seen enabled — showing "${v}"`)}else if(c==='off'){setG({fakelastseen:!1});r("✅ Fake last seen disabled — back to normal")}else{let g=getG();r(`🕐 *Fake Last Seen:* ${g.fakelastseen?'✅ ON':'❌ OFF'}\nValue: ${g.fakelastseenValue||'3years'}\n\n.fakelastseen on/off [3years|6months|3months|1year]`)}}},
-{command:"antibug",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({antibug:!0});r("✅ Anti‑bug ON")}else if(c==='off'){setG({antibug:!1});r("❌ OFF")}else r(`📊 Anti‑bug: ${getG().antibug?'ON':'OFF'}`)}},
-{command:"antiviewonce",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({antiviewonce:!0});r("✅ Anti‑view‑once ON")}else if(c==='off'){setG({antiviewonce:!1});r("❌ OFF")}else r(`📊 Anti‑View‑once: ${getG().antiviewonce?'ON':'OFF'}`)}},
-{command:"autobio",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autobio:!0});r("✅ Autobio ON")}else if(c==='off'){setG({autobio:!1});r("❌ OFF")}else r(`📊 Autobio: ${getG().autobio?'ON':'OFF'}`)}},
-{command:"autoblock",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let c=a[0]?.toLowerCase();if(c==='on'){setG({autoblock:!0});r("✅ Autoblock ON")}else if(c==='off'){setG({autoblock:!1});r("❌ OFF")}else r(`📊 Autoblock: ${getG().autoblock?'ON':'OFF'}`)}},
-{command:"setcontextlink",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setcontextlink <url>");setG({contextLink:a[0]});r("✅ Context link updated")}},
-{command:"setfont",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setfont <font name>");setG({font:a.join(" ")});r("✅ Font updated")}},
-{command:"setstickerauthor",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setstickerauthor <author>");setG({stickerAuthor:a.join(" ")});r("✅ Sticker author updated")}},
-{command:"setstickerpackname",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setstickerpackname <name>");setG({stickerPack:a.join(" ")});r("✅ Sticker pack name updated")}},
-{command:"settimezone",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .settimezone Africa/Harare");setG({timezone:a[0]});r(`✅ Timezone set to ${a[0]}`)}},
-{command:"setwatermark",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setwatermark <text>");setG({watermark:a.join(" ")});r("✅ Watermark updated")}},
-{command:"setwelcome",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setwelcome <text>");setG({welcomeMsg:a.join(" ")});r("✅ Welcome message updated")}},
-{command:"setgoodbye",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ .setgoodbye <text>");setG({goodbyeMsg:a.join(" ")});r("✅ Goodbye message updated")}},
-{command:"showwelcome",category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{let g=getG();r(`📋 Current welcome: ${g.welcomeMsg||'Welcome @user! 🎉'}`)}},
-{command:"showgoodbye",category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{let g=getG();r(`📋 Current goodbye: ${g.goodbyeMsg||'Goodbye @user! 👋'}`)}},
-{command:"testwelcome",category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{let g=getG();await s.sendMessage(m.chat,{text:g.welcomeMsg?.replace(/@user/g,m.sender.split('@')[0])||'Welcome!'},{quoted:m})}},
-{command:"testgoodbye",category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{let g=getG();await s.sendMessage(m.chat,{text:g.goodbyeMsg?.replace(/@user/g,m.sender.split('@')[0])||'Goodbye!'},{quoted:m})}},
-{command:"statusdelay",category:"settings",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let n=parseInt(a[0]);if(isNaN(n)||n<1)return r("❌ Provide seconds");setG({statusDelay:n});r(`✅ Status delay set to ${n}s`)}},
-{command:"statussettings",category:"settings",owner:!0,execute:async(s,m,{reply:r})=>{let g=getG();r(`📊 *Status Settings*\nAutoview: ${g.autoviewstatus?'✅':'❌'}\nAutoreact: ${g.autoreactstatus?'✅':'❌'}\nDelay: ${g.statusDelay||0}s\nEmoji: ${g.statusReactEmoji||'🔥❤️😂'}`)}},
+const fs = require('fs');
+const path = require('path');
+
+const saveSessionSetting = (sock, key, value) => {
+    const botNum = sock.user.id.split('@')[0].split(':')[0];
+    const p = path.join(__dirname, '..', 'sessions', botNum, 'settings.json');
+    let s = {};
+    try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
+    s[key] = value;
+    fs.writeFileSync(p, JSON.stringify(s, null, 2));
+    return true;
+};
+
+const getSessionSettings = (sock) => {
+    const botNum = sock.user.id.split('@')[0].split(':')[0];
+    const p = path.join(__dirname, '..', 'sessions', botNum, 'settings.json');
+    try { if(fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
+    return {};
+};
+
+const settingsPath = path.join(__dirname, '..', 'database', 'settings.json');
+const getGlobalSettings = () => {
+    try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
+};
+const setGlobalSettings = (newGlobal) => {
+    try {
+        const s = JSON.parse(fs.readFileSync(settingsPath));
+        s.global = newGlobal;
+        fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
+    } catch {}
+};
+
+const toggles = [
+    { cmd: "autoread", name: "Auto Read" },
+    { cmd: "autotyping", name: "Auto Typing" },
+    { cmd: "autorecording", name: "Auto Recording" },
+    { cmd: "autoreact", name: "Auto React" },
+    { cmd: "antiedit", name: "Anti-Edit" },
+    { cmd: "autosticker", name: "Auto Sticker" },
+    { cmd: "autovoice", name: "Auto Voice" },
+    { cmd: "dmblocker", name: "DM Blocker" },
+    { cmd: "antispam", name: "Anti-Spam" },
+    { cmd: "chatbot", name: "Chatbot" }
 ];
+
+const commands = toggles.map(t => ({
+    command: t.cmd, category: "settings", owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const val = args[0]?.toLowerCase();
+        if (val === 'on') {
+            saveSessionSetting(sock, t.cmd, true);
+            return reply(`✅ *${t.name}* is now ON`);
+        } else if (val === 'off') {
+            saveSessionSetting(sock, t.cmd, false);
+            return reply(`❌ *${t.name}* is now OFF`);
+        } else {
+            const s = getSessionSettings(sock);
+            return reply(`⚙️ *${t.name}* is currently *${s[t.cmd] ? 'ON' : 'OFF'}*\n\nUsage: .${t.cmd} on / off`);
+        }
+    }
+}));
+
+commands.push({
+    command: "mode", aliases: ["botmode"], category: "settings", owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const mode = args[0]?.toLowerCase();
+        const g = getGlobalSettings();
+        if (mode === 'public') { g.mode = 'public'; setGlobalSettings(g); return reply("✅ Bot is now in *public mode*."); } 
+        else if (mode === 'private') { g.mode = 'private'; setGlobalSettings(g); return reply("🔒 Bot is now in *private mode*."); } 
+        else { return reply(`📱 Current mode: *${g.mode || 'public'}*`); }
+    }
+});
+
+commands.push({
+    command: "antideleteconfig", aliases: ["adconfig", "antidelete"], category: "settings", owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const sub = args[0]?.toLowerCase();
+        const g = getGlobalSettings();
+        const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+
+        if (!sub) { return reply(`🛡️ *Antidelete:* ${cfg.enabled ? 'ON' : 'OFF'}\nMode: ${cfg.mode}`); }
+        if (sub === 'on' || sub === 'off') { cfg.enabled = sub === 'on'; } 
+        else if (sub === 'mode') { const mode = args[1]?.toLowerCase(); if (['chat', 'owner', 'both'].includes(mode)) cfg.mode = mode; else return reply("❌ Invalid mode."); } 
+        else if (sub === 'style') { const style = args[1]?.toLowerCase(); if (['fancy', 'simple'].includes(style)) cfg.style = style; else return reply("❌ Invalid style."); } 
+        else if (sub === 'react') { const react = args[1]?.toLowerCase(); if (react === 'on') cfg.react = true; else if (react === 'off') cfg.react = false; else return reply("❌ Use: react on/off"); } 
+        else { return reply("❌ Unknown option."); }
+
+        g.antidelete = cfg;
+        setGlobalSettings(g);
+        reply(`✅ Antidelete updated!`);
+    }
+});
+
+module.exports = commands;
