@@ -111,7 +111,6 @@ module.exports = async (sock, m) => {
 
         const gs = m.globalSettings || getGlobalSettings();
         
-        // --- AUTO FEATURES ---
         if (!m.key.fromMe) {
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
             if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} }
@@ -128,7 +127,6 @@ module.exports = async (sock, m) => {
 
         const prefix = m.prefix || config.prefix || ".";
         
-        // --- MODERATION ---
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat);
@@ -157,7 +155,6 @@ module.exports = async (sock, m) => {
             return;
         }
 
-        // --- COMMAND EXECUTION ---
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const cmdName = args.shift().toLowerCase();
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
