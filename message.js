@@ -1,4 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
+// © 2026 Alpha - MESSAGE HANDLER (ENGINE)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -72,29 +72,7 @@ try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: 
 const getGlobalSettings = () => {
     try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
 };
-const setGlobalSettings = (newGlobal) => {
-    try {
-        const s = JSON.parse(fs.readFileSync(settingsPath));
-        s.global = newGlobal;
-        fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
-    } catch {}
-};
 const getGlobalMode = () => getGlobalSettings().mode || 'public';
-const setGlobalMode = (mode) => {
-    const g = getGlobalSettings();
-    g.mode = mode;
-    setGlobalSettings(g);
-};
-
-const saveSessionSetting = (sock, key, value) => {
-    const botNum = sock.user.id.split('@')[0].split(':')[0];
-    const p = path.join(__dirname, 'sessions', botNum, 'settings.json');
-    let s = {};
-    try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
-    s[key] = value;
-    fs.writeFileSync(p, JSON.stringify(s, null, 2));
-    return true;
-};
 
 const commands = [];
 const loadCommands = (dir) => {
@@ -109,64 +87,6 @@ const loadCommands = (dir) => {
     }
 };
 loadCommands(path.join(__dirname, "plugins"));
-
-commands.push({
-    command: "mode", aliases: ["botmode"], category: "owner", owner: true,
-    execute: async (sock, m, { args, reply }) => {
-        const mode = args[0]?.toLowerCase();
-        if (mode === 'public') { setGlobalMode('public'); return reply("✅ Bot is now in *public mode*."); } 
-        else if (mode === 'private') { setGlobalMode('private'); return reply("🔒 Bot is now in *private mode*."); } 
-        else { return reply(`📱 Current mode: *${getGlobalMode()}*`); }
-    }
-});
-
-commands.push({
-    command: "antideleteconfig", aliases: ["adconfig", "antidelete"], category: "owner", owner: true,
-    execute: async (sock, m, { args, reply }) => {
-        const sub = args[0]?.toLowerCase();
-        const g = getGlobalSettings();
-        const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
-
-        if (!sub) { return reply(`🛡️ *Antidelete:* ${cfg.enabled ? 'ON' : 'OFF'}\nMode: ${cfg.mode}`); }
-        if (sub === 'on' || sub === 'off') { cfg.enabled = sub === 'on'; } 
-        else if (sub === 'mode') { const mode = args[1]?.toLowerCase(); if (['chat', 'owner', 'both'].includes(mode)) cfg.mode = mode; else return reply("❌ Invalid mode."); } 
-        else if (sub === 'style') { const style = args[1]?.toLowerCase(); if (['fancy', 'simple'].includes(style)) cfg.style = style; else return reply("❌ Invalid style."); } 
-        else if (sub === 'react') { const react = args[1]?.toLowerCase(); if (react === 'on') cfg.react = true; else if (react === 'off') cfg.react = false; else return reply("❌ Use: react on/off"); } 
-        else { return reply("❌ Unknown option."); }
-
-        g.antidelete = cfg;
-        setGlobalSettings(g);
-        reply(`✅ Antidelete updated!`);
-    }
-});
-
-const toggles = [
-    { cmd: "autoread", name: "Auto Read" },
-    { cmd: "autotyping", name: "Auto Typing" },
-    { cmd: "autorecording", name: "Auto Recording" },
-    { cmd: "autoreact", name: "Auto React" },
-    { cmd: "antiedit", name: "Anti-Edit" }
-];
-
-toggles.forEach(t => {
-    commands.push({
-        command: t.cmd, category: "owner", owner: true,
-        execute: async (sock, m, { args, reply }) => {
-            const val = args[0]?.toLowerCase();
-            if (val === 'on') {
-                saveSessionSetting(sock, t.cmd, true);
-                return reply(`✅ *${t.name}* is now ON`);
-            } else if (val === 'off') {
-                saveSessionSetting(sock, t.cmd, false);
-                return reply(`❌ *${t.name}* is now OFF`);
-            } else {
-                const gs = m.globalSettings || {};
-                const current = gs[t.cmd] ? 'ON' : 'OFF';
-                return reply(`⚙️ *${t.name}* is currently *${current}*\n\nUsage: .${t.cmd} on / off`);
-            }
-        }
-    });
-});
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
@@ -191,6 +111,7 @@ module.exports = async (sock, m) => {
 
         const gs = m.globalSettings || getGlobalSettings();
         
+        // --- AUTO FEATURES ---
         if (!m.key.fromMe) {
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
             if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} }
@@ -207,6 +128,7 @@ module.exports = async (sock, m) => {
 
         const prefix = m.prefix || config.prefix || ".";
         
+        // --- MODERATION ---
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat);
@@ -235,6 +157,7 @@ module.exports = async (sock, m) => {
             return;
         }
 
+        // --- COMMAND EXECUTION ---
         const args = m.text.slice(prefix.length).trim().split(/ +/);
         const cmdName = args.shift().toLowerCase();
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
@@ -270,7 +193,6 @@ module.exports = async (sock, m) => {
 
         if (command.owner && !isOwner) return reply(deny.owner);
         
-        // 🎯 ADDED clear/purge to the allowed list here
         if (command.owner && isOwner && m.isGroup && !['block', 'unblock', 'tostatus', 'toviewonce', 'vv2', 'clear', 'purge'].includes(command.command)) {
             await reply(deny.ownerPrivateReminder);
         }
