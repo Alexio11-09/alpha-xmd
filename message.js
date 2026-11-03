@@ -5,7 +5,6 @@ const config = require("./settings/config");
 
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
-// 🎯 BULLETPROOF ADMIN CHECK
 async function checkAdmin(sock, chatId, senderId, botId) {
     try {
         const metadata = await sock.groupMetadata(chatId);
@@ -87,7 +86,6 @@ const setGlobalMode = (mode) => {
     setGlobalSettings(g);
 };
 
-// 🎯 HELPER: Saves settings directly to the specific bot's session folder
 const saveSessionSetting = (sock, key, value) => {
     const botNum = sock.user.id.split('@')[0].split(':')[0];
     const p = path.join(__dirname, 'sessions', botNum, 'settings.json');
@@ -113,10 +111,7 @@ const loadCommands = (dir) => {
 loadCommands(path.join(__dirname, "plugins"));
 
 commands.push({
-    command: "mode",
-    aliases: ["botmode"],
-    category: "owner",
-    owner: true,
+    command: "mode", aliases: ["botmode"], category: "owner", owner: true,
     execute: async (sock, m, { args, reply }) => {
         const mode = args[0]?.toLowerCase();
         if (mode === 'public') { setGlobalMode('public'); return reply("✅ Bot is now in *public mode*."); } 
@@ -126,10 +121,7 @@ commands.push({
 });
 
 commands.push({
-    command: "antideleteconfig",
-    aliases: ["adconfig", "antidelete"],
-    category: "owner",
-    owner: true,
+    command: "antideleteconfig", aliases: ["adconfig", "antidelete"], category: "owner", owner: true,
     execute: async (sock, m, { args, reply }) => {
         const sub = args[0]?.toLowerCase();
         const g = getGlobalSettings();
@@ -148,7 +140,6 @@ commands.push({
     }
 });
 
-// 🎯 ADDING THE TOGGLE COMMANDS DIRECTLY INTO MESSAGE.JS
 const toggles = [
     { cmd: "autoread", name: "Auto Read" },
     { cmd: "autotyping", name: "Auto Typing" },
@@ -159,9 +150,7 @@ const toggles = [
 
 toggles.forEach(t => {
     commands.push({
-        command: t.cmd,
-        category: "owner",
-        owner: true,
+        command: t.cmd, category: "owner", owner: true,
         execute: async (sock, m, { args, reply }) => {
             const val = args[0]?.toLowerCase();
             if (val === 'on') {
@@ -200,22 +189,14 @@ module.exports = async (sock, m) => {
         const reply = (text, extra={}) => { try { return sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } catch { return sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } };
         const send = (data) => { try { return sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } catch { return sock.sendMessage(m.chat, data, { quoted: m }); } };
 
-        // 🎯 AUTO FEATURES
         const gs = m.globalSettings || getGlobalSettings();
         
         if (!m.key.fromMe) {
             if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
-            
-            if (gs.autotyping) { 
-                try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} 
-            }
-            if (gs.autorecording) { 
-                try { await sock.sendPresenceUpdate("recording", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} 
-            }
-
+            if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} }
+            if (gs.autorecording) { try { await sock.sendPresenceUpdate("recording", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} }
             const prefix = m.prefix || config.prefix || ".";
             const rawTxt = m.text || "";
-
             if (gs.autoreact && !rawTxt.startsWith(prefix)) {
                 const emojis = ["🔥", "😂", "😍", "😎", "🤖", "⚡", "💯", "👀", "🥶", "😈"];
                 try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
@@ -229,18 +210,15 @@ module.exports = async (sock, m) => {
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat);
-                
                 if (containsBadWord(m.text, m.chat)) {
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
                     return;
                 }
-                
                 if (gsets.antilink) {
                     const mode = gsets.antilinkMode || 'admins';
                     const action = gsets.antilinkAction || 'delete';
                     let allowed = (mode === 'admins' && m.isAdmin) || (mode === 'owner' && m.isOwner);
-                    
                     if (!allowed && containsLink(m.text)) {
                         if (action === 'delete') {
                             if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
@@ -264,7 +242,7 @@ module.exports = async (sock, m) => {
 
         const botNum = clean(sock.user.id.split('@')[0].split(':')[0]);
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
-        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender);
+        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender) || m.key.fromMe;
 
         if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) return;
 
@@ -275,7 +253,6 @@ module.exports = async (sock, m) => {
 
         let isSenderAdmin = false;
         let isBotAdmin = false;
-        
         if (m.isGroup) {
             const adminStatus = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
             isSenderAdmin = adminStatus.isSenderAdmin;
@@ -293,8 +270,8 @@ module.exports = async (sock, m) => {
 
         if (command.owner && !isOwner) return reply(deny.owner);
         
-        // 🎯 FIXED: Allow .block and .unblock in groups without the private chat warning
-        if (command.owner && isOwner && m.isGroup && command.command !== 'block' && command.command !== 'unblock') {
+        // 🎯 ADDED clear/purge to the allowed list here
+        if (command.owner && isOwner && m.isGroup && !['block', 'unblock', 'tostatus', 'toviewonce', 'vv2', 'clear', 'purge'].includes(command.command)) {
             await reply(deny.ownerPrivateReminder);
         }
         
