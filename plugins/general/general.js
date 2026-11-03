@@ -772,8 +772,3 @@ ${config.settings.footer}
         }
     }
 ];
-```Everything is perfectly separated now. 
-1. **`.block` / `.unblock`** = Owner commands (blocks the number on WhatsApp).
-2. **`.ban` / `.unban`** = Group commands (mutes the user in the group, bot deletes their messages).
-3. **Tools** = Exactly the new code you provided.
-4. **Menu** = Fully updated to match.
