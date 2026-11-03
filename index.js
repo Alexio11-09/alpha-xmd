@@ -80,7 +80,28 @@ function attachHandlers(sock, phoneNumber) {
       activeSockets.delete(phoneNumber);
       startBot(phoneNumber);
     }
-  }, 60000); // Checks every 60 seconds
+  }, 60000);
+
+  sock.ev.on('call', async (calls) => {
+      for (const call of calls) {
+          if (call.status === 'offer') {
+              let isEnabled = false;
+              try {
+                  const p = './database/anticall.json';
+                  if (fs.existsSync(p)) {
+                      const d = JSON.parse(fs.readFileSync(p));
+                      isEnabled = d.enabled === 1 || d.enabled === true;
+                  }
+              } catch (e) {}
+              if (isEnabled) {
+                  await sock.rejectCall(call.id, call.from);
+                  const customMsg = `⚡ *ALPHA-XMD SYSTEM* ⚡\n──────────────────\n📵 *Call Blocked!*\nYou think I have time to talk on the phone? \nDrop a text message and let's get to work. 🤖💸`;
+                  await sock.sendMessage(call.from, { text: customMsg, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } } });
+                  console.log(`📵 Rejected call from ${call.from}`);
+              }
+          }
+      }
+  });
 
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
@@ -94,7 +115,6 @@ function attachHandlers(sock, phoneNumber) {
           if (autoStatusHandler.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
           continue;
         }
-
         if (!mek.message) continue;
 
         if (remote === channelJid) {
@@ -102,17 +122,8 @@ function attachHandlers(sock, phoneNumber) {
           if (cr.enabled) {
             for (const emoji of cr.emojis || []) {
               try {
-                if (sock.newsletterReact) {
-                  await sock.newsletterReact(channelJid, mek.key.id, emoji);
-                } else {
-                  await sock.relayMessage(channelJid, {
-                    reactionMessage: {
-                      key: { remoteJid: channelJid, id: mek.key.id, fromMe: false },
-                      text: emoji,
-                      senderTimestampMs: Date.now()
-                    }
-                  }, {});
-                }
+                if (sock.newsletterReact) await sock.newsletterReact(channelJid, mek.key.id, emoji);
+                else await sock.relayMessage(channelJid, { reactionMessage: { key: { remoteJid: channelJid, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {});
                 await new Promise(r => setTimeout(r, 1000));
               } catch (e) {}
             }
@@ -197,7 +208,6 @@ function attachHandlers(sock, phoneNumber) {
       const { id, participants, action } = update;
       let gs = { welcome: false, welcomeMsg: "🌟 Welcome @user!", goodbye: false, goodbyeMsg: "🚶‍♂️ @user left." };
       try { const all = JSON.parse(fs.readFileSync(path.join(__dirname, "database/groupSettings.json"), "utf8")); gs = all[id] || gs; } catch {}
-
       if (action === "add" && gs.welcome) {
         for (const user of participants) await sock.sendMessage(id, { text: gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
       }
@@ -252,7 +262,7 @@ async function startBot(phoneNumber) {
       if (connection === "close") {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-
+        
         if (code === 401) {
           console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Backing up session.`));
           try { fs.renameSync(sessionPath, sessionPath + "_backup_" + Date.now()); } catch (e) {}
