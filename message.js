@@ -41,6 +41,16 @@ const isUserBanned = (sender) => {
     } catch { return false; }
 };
 
+// 🎯 GROUP BANS CHECK
+const isGroupBanned = (chatId, sender) => {
+    try {
+        const p = './database/groupBans.json';
+        if (!fs.existsSync(p)) return false;
+        const bans = JSON.parse(fs.readFileSync(p));
+        return bans[chatId] && bans[chatId].includes(sender);
+    } catch { return false; }
+};
+
 function isTempOwnerBase(sender) {
     try {
         const op = './database/owners.json';
@@ -130,6 +140,13 @@ module.exports = async (sock, m) => {
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat);
+                
+                // 🎯 ENFORCE GROUP BANS HERE
+                if (isGroupBanned(m.chat, m.sender)) {
+                    if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
+                    return;
+                }
+
                 if (containsBadWord(m.text, m.chat)) {
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
