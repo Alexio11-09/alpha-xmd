@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (PRIORITY ORDER MENU)
+// © 2026 Alpha - GENERAL COMMANDS (FULL SYNCHRONIZED MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -88,32 +88,30 @@ module.exports = [
 │ • .shutdown
 │ • .eval
 │ • .bc
-│ • .bcgc
 │ • .join
 │ • .leave
 │ • .block
 │ • .unblock
 │ • .blocklist
 │ • .pm
-│ • .banuser
-│ • .unbanuser
-│ • .banlist
 │ • .addowner
 │ • .delowner
 │ • .owners
-│ • .mode
+│ • .getchannel
 │ • .anticall
 │ • .poststatus
 │ • .cleartmp
 │ • .clearsession
 │ • .sudo
-│ • .antiblock
 │ • .clear
-│ • .vv2
 │ • .tostatus
 │ • .toviewonce
 │ • .save
 │ • .delete
+│ • .hack
+│ • .autobio
+│ • .disk
+│ • .deljunk
 ╰────────────⬣
 
 ╭───〔 👥 GROUP 〕───⬣
@@ -131,59 +129,55 @@ module.exports = [
 │ • .welcome on/off
 │ • .goodbye on/off
 │ • .antilink
-│ • .antispam
-│ • .antibadword
-│ • .antibot
-│ • .antitag
-│ • .antisticker
 │ • .antidemote
+│ • .antisticker
+│ • .antitag
 │ • .poll
 │ • .listadmin
 │ • .tagadmin
-│ • .tagnotadmin
 │ • .vcf
 │ • .promoteall
 │ • .demoteall
-│ • .kickall
-│ • .approveall
 │ • .kickinactive
-│ • .setgname
-│ • .setgdesc
-│ • .setgpp
-│ • .warn
-│ • .warnings
-│ • .resetwarn
-│ • .requestlist
-│ • .rejectall
-│ • .newgc
-│ • .online
-│ • .staff
-│ • .myactivity
-│ • .rank
+│ • .approveall
+│ • .approve
+│ • .disapproveall
 │ • .invite
-│ • .listactive
-│ • .listinactive
-│ • .totalmembers
-│ • .topmembers
-│ • .mediatag
+│ • .gcstatus
 │ • .getname
 │ • .getdeskgc
 │ • .getppgc
-│ • .svcontact
-│ • .opengroup
-│ • .closegroup
-│ • .approve
-│ • .reject
-│ • .disapproveall
+│ • .listactive
+│ • .listinactive
+│ • .totalmembers
 │ • .addcode
 │ • .delcode
 │ • .listcode
-│ • .allow
-│ • .delallowed
-│ • .listallowed
-│ • .editsettings
 │ • .removes
-│ • .gcstatus
+│ • .mediatag
+│ • .ban
+│ • .unban
+│ • .banlist
+╰────────────⬣
+
+╭───〔 ⚙️ SETTINGS 〕───⬣
+│ • .mode
+│ • .autoread
+│ • .autotyping
+│ • .autorecording
+│ • .autoreact
+│ • .antiedit
+│ • .antidelete
+│ • .autoreply
+│ • .autosticker
+│ • .autovoice
+│ • .dmblocker
+│ • .antispam
+│ • .chatbot
+│ • .autosavestatus
+│ • .lastseen
+│ • .ppprivacy
+│ • .readreceipts
 ╰────────────⬣
 
 ╭───〔 📥 DOWNLOADER 〕───⬣
@@ -208,57 +202,38 @@ module.exports = [
 │ • .shazam
 ╰────────────⬣
 
-╭───〔 ⚙️ SETTINGS 〕───⬣
-│ • .autoread
-│ • .autotyping
-│ • .autorecording
-│ • .autoreact
-│ • .autoreactstatus
-│ • .autoviewstatus
-│ • .autostatus
-│ • .antidelete
-│ • .antiedit
-│ • .autoreply
-│ • .autosticker
-│ • .autovoice
-│ • .dmblocker
-│ • .autosavestatus
-│ • .autobio
-│ • .autoblock
-│ • .lastseen
-│ • .ppprivacy
-│ • .readreceipts
-│ • .alwaysonline
-│ • .fakelastseen
-│ • .antibug
-│ • .antiviewonce
-│ • .setpp
-│ • .setbio
-│ • .setname
-│ • .setprefix
-│ • .resetprefix
-│ • .chreact
-│ • .setcontextlink
-│ • .setfont
-│ • .setmenu
-│ • .setmenuimage
-│ • .setownername
-│ • .setownernumber
-│ • .setstatusemoji
-│ • .setstickerauthor
-│ • .setstickerpackname
-│ • .settimezone
-│ • .setwarn
-│ • .setwatermark
-│ • .setwelcome
-│ • .setgoodbye
-│ • .showwelcome
-│ • .showgoodbye
-│ • .testwelcome
-│ • .testgoodbye
-│ • .statusdelay
-│ • .statussettings
-│ • .listwarn
+╭───〔 ⚙️ TOOLS & UTILITIES 〕───⬣
+│ • .calc
+│ • .qr
+│ • .tts
+│ • .time
+│ • .sticker
+│ • .toimg
+│ • .getpp
+│ • .getid
+│ • .getlink
+│ • .translate
+│ • .weather
+│ • .lyrics
+│ • .removebg
+│ • .tomp3
+│ • .vv
+│ • .url
+│ • .img
+│ • .take
+│ • .steal
+│ • .blur
+│ • .attp
+│ • .ttp
+│ • .ss
+│ • .stickertelegram
+│ • .imgscan
+│ • .tovideo
+│ • .toppt
+│ • .topdf
+│ • .smeme
+│ • .wasted
+│ • .font
 ╰────────────⬣
 
 ╭───〔 🤖 AI & IMAGE GEN 〕───⬣
@@ -281,29 +256,6 @@ module.exports = [
 │ • .cartoon
 │ • .seedream
 │ • .toghibili
-╰────────────⬣
-
-╭───〔 🔧 UTILITIES 〕───⬣
-│ • .tinyurl
-│ • .fliptext
-│ • .genpass
-│ • .device
-│ • .browse
-│ • .fancy
-│ • .font
-│ • .carbon
-│ • .obfuscate
-│ • .calc
-│ • .qr
-│ • .tts
-│ • .translate
-│ • .weather
-│ • .tozip
-│ • .styletext
-│ • .readmore
-│ • .ngldm
-│ • .webzip
-│ • .disk
 ╰────────────⬣
 
 ╭───〔 🔍 SEARCH 〕───⬣
@@ -752,7 +704,6 @@ ${config.settings.footer}
                 const baileys = await import('@whiskeysockets/baileys');
                 const sessionPath = path.join(process.cwd(), 'sessions', rawNumber);
                 
-                // Clean up any previous failed attempts
                 if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true });
                 fs.mkdirSync(sessionPath, { recursive: true });
 
@@ -792,7 +743,6 @@ ${config.settings.footer}
                         }, 3000);
                     }
                     
-                    // 🎯 EXACT SAME LOGIC AS YOUR WORKING WEBSITE API
                     if (connection === "open") { 
                         reply(`🎉 Successfully connected +${rawNumber}!\n\nYour bot is now starting... You will receive a startup message shortly.`);
                         setTimeout(() => {
@@ -822,3 +772,8 @@ ${config.settings.footer}
         }
     }
 ];
+```Everything is perfectly separated now. 
+1. **`.block` / `.unblock`** = Owner commands (blocks the number on WhatsApp).
+2. **`.ban` / `.unban`** = Group commands (mutes the user in the group, bot deletes their messages).
+3. **Tools** = Exactly the new code you provided.
+4. **Menu** = Fully updated to match.
