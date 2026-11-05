@@ -1,30 +1,49 @@
 const fs = require('fs');
 const path = require('path');
 
+// 🎯 FIXED: Uses process.cwd() and creates folder if it doesn't exist
 const saveSessionSetting = (sock, key, value) => {
-    const botNum = sock.user.id.split('@')[0].split(':')[0];
-    const p = path.join(__dirname, '..', 'sessions', botNum, 'settings.json');
-    let s = {};
-    try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
-    s[key] = value;
-    fs.writeFileSync(p, JSON.stringify(s, null, 2));
-    return true;
+    try {
+        const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const dir = path.join(process.cwd(), 'sessions', botNum);
+        
+        // Create folder if it doesn't exist
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        
+        const p = path.join(dir, 'settings.json');
+        let s = {};
+        try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
+        s[key] = value;
+        fs.writeFileSync(p, JSON.stringify(s, null, 2));
+        return true;
+    } catch (e) {
+        console.error("Save Error:", e);
+        return false;
+    }
 };
 
 const getSessionSettings = (sock) => {
-    const botNum = sock.user.id.split('@')[0].split(':')[0];
-    const p = path.join(__dirname, '..', 'sessions', botNum, 'settings.json');
-    try { if(fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
+    try {
+        const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const p = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
+        if(fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch(e){}
     return {};
 };
 
-const settingsPath = path.join(__dirname, '..', 'database', 'settings.json');
+// 🎯 FIXED: Uses process.cwd() for global settings too
+const settingsPath = path.join(process.cwd(), 'database', 'settings.json');
 const getGlobalSettings = () => {
-    try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
+    try { 
+        if (!fs.existsSync(settingsPath)) return {};
+        const s = JSON.parse(fs.readFileSync(settingsPath)); 
+        return s.global || {}; 
+    } catch { return {}; }
 };
 const setGlobalSettings = (newGlobal) => {
     try {
-        const s = JSON.parse(fs.readFileSync(settingsPath));
+        let s = {};
+        if (fs.existsSync(settingsPath)) s = JSON.parse(fs.readFileSync(settingsPath));
         s.global = newGlobal;
         fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
     } catch {}
@@ -48,10 +67,12 @@ const commands = toggles.map(t => ({
     execute: async (sock, m, { args, reply }) => {
         const val = args[0]?.toLowerCase();
         if (val === 'on') {
-            saveSessionSetting(sock, t.cmd, true);
+            const ok = saveSessionSetting(sock, t.cmd, true);
+            if (!ok) return reply("❌ Failed to save setting.");
             return reply(`✅ *${t.name}* is now ON`);
         } else if (val === 'off') {
-            saveSessionSetting(sock, t.cmd, false);
+            const ok = saveSessionSetting(sock, t.cmd, false);
+            if (!ok) return reply("❌ Failed to save setting.");
             return reply(`❌ *${t.name}* is now OFF`);
         } else {
             const s = getSessionSettings(sock);
