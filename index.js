@@ -62,6 +62,7 @@ function rateLimiter(req, res, next) {
 
 function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
+  const channelName = config().newsletter.name;
   const sessionSettingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
 
   const loadGlobalSettings = () => {
@@ -69,6 +70,56 @@ function attachHandlers(sock, phoneNumber) {
     try { if(fs.existsSync(sessionSettingsPath)) return { ...defaults, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; } catch {}
     return defaults;
   };
+
+  // 🎯 ANTI-CALL LISTENER (Custom Message with Channel UI)
+  sock.ev.on("call", async (calls) => {
+    try {
+        const anticallPath = path.join(process.cwd(), 'database', 'anticall.json');
+        let config = { enabled: 0, block: 0 };
+        
+        if (fs.existsSync(anticallPath)) {
+            try { config = JSON.parse(fs.readFileSync(anticallPath, 'utf8')); } catch(e) {}
+        }
+
+        if (config.enabled === 1 || config.enabled === true) {
+            for (const call of calls) {
+                if (call.status === "offer") {
+                    // 1. Reject the call immediately
+                    await sock.rejectCall(call.id, call.from);
+                    
+                    // 2. Check Mode
+                    if (config.block === 1 || config.block === true) {
+                        // Mode: BLOCK
+                        try {
+                            await sock.updateBlockStatus(call.from, "block");
+                            console.log(`🚫 Rejected & Blocked caller ${call.from}`);
+                        } catch (e) {}
+                    } else {
+                        // Mode: WARN (Your Custom Message)
+                        const customMsg = `⚡ *ALPHA-XMD SYSTEM* ⚡\n──────────────────\n📵 *Call Blocked!*\nYou think I have time to talk on the phone? \nDrop a text message and let's get to work. 🤖💸`;
+                        
+                        // 🎯 SENDING WITH CHANNEL UI
+                        await sock.sendMessage(call.from, { 
+                            text: customMsg,
+                            contextInfo: {
+                                forwardingScore: 999,
+                                isForwarded: true,
+                                forwardedNewsletterMessageInfo: {
+                                    newsletterJid: channelJid,
+                                    newsletterName: channelName
+                                }
+                            }
+                        });
+                        console.log(`📵 Rejected caller ${call.from} (Sent custom warning)`);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.log("Anti-call error:", e.message);
+    }
+  });
+  // 🎯 END OF ANTI-CALL LISTENER
 
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
@@ -224,7 +275,6 @@ async function startBot(phoneNumber) {
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 15000,
       
-      // 🎯 RAM SAVER 1: Prevents loading entire chat history into RAM
       syncFullHistory: false, 
       getMessage: async () => { return { conversation: '' }; },
     });
@@ -237,7 +287,6 @@ async function startBot(phoneNumber) {
       if (connection === "open") console.log(chalk.green(`✅ [${phoneNumber}] Bot Connected!`));
       
       if (connection === "close") {
-        // 🎯 RAM SAVER 2: Destroys the old socket and removes listeners to prevent "Ghost Socket" memory leaks
         try {
             sock.ev.removeAllListeners();
             sock.end(undefined);
@@ -286,7 +335,7 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
 
   const tempSock = baileys.default({
     version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"),
-    syncFullHistory: false, // 🎯 RAM SAVER
+    syncFullHistory: false, 
   });
 
   tempSock.ev.on("creds.update", saveCreds);
@@ -380,17 +429,15 @@ app.post("/api/settings", (req, res) => {
     }
     console.log("✅ All loaded.");
 
-    // 🎯 RAM SAVER 3 & AUTO-RESTART WATCHDOG
     setInterval(() => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
       
-      // If memory exceeds 450MB, force exit. OptikLink will auto-restart the server instantly.
       if (used > 450) {
         console.log(`⚠️ Memory limit reached (${Math.round(used)}MB). Restarting bot to prevent crash...`);
         process.exit(1); 
       }
-    }, 60000); // Checks every 60 seconds
+    }, 60000); 
 
   });
 })();
