@@ -115,8 +115,6 @@ function attachHandlers(sock, phoneNumber) {
           console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${msgText.substring(0, 30)}`);
         }
 
-        // 🎯 REMOVED THE fromMe CONTINUE BLOCK HERE!
-
         const m = await smsg(sock, mek);
         m.prefix = globalSettings.prefix;
         m.globalSettings = globalSettings; 
@@ -334,9 +332,12 @@ app.get("/api/settings", (req, res) => {
 app.post("/api/settings", (req, res) => {
   const { phoneNumber, settings } = req.body;
   const dir = path.join(sessionsDir, phoneNumber);
+  
+  // 🎯 FIXED: Create directory if it doesn't exist before writing
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings, null, 2));
-  console.log(`[WEBSITE SAVED] ${phoneNumber}:`, settings); // DEBUG LOG
+  
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(settings, null, 2));
+  console.log(`[WEBSITE SAVED] ${phoneNumber}:`, settings); 
   res.json({ success: true });
 });
 
