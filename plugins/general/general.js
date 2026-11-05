@@ -18,13 +18,11 @@ function runtime(seconds) {
     return `${d}d ${h}h ${m}m ${s}s`;
 }
 
-// 🎯 THE FORCING WAY: Extracts hidden LIDs using group metadata
 const getCountry = async (m, sock) => {
     try {
         let targetJid = m.sender;
         let cleanNumber = targetJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 
-        // If the number is too short or ends with @lid, it's a hidden ID. We must resolve it!
         if (targetJid.includes('@lid') || cleanNumber.length < 9) {
             if (m.isGroup) {
                 try {
@@ -41,10 +39,8 @@ const getCountry = async (m, sock) => {
             }
         }
 
-        // If it's still short, we can't determine it
         if (cleanNumber.length < 9) return "Unknown 🌍";
 
-        // Use awesome-phonenumber to get the country
         const PhoneNumber = require('awesome-phonenumber');
         const pn = PhoneNumber('+' + cleanNumber);
         
@@ -84,8 +80,6 @@ module.exports = [
                 const date = now.toLocaleDateString();
                 const pushname = m.pushName || "User";
                 const uptime = runtime(process.uptime());
-                
-                // 🎯 FORCE AWAIT FOR COUNTRY
                 const country = await getCountry(m, sock);
 
                 const menu = `
@@ -238,6 +232,7 @@ module.exports = [
 │ • .toimg
 │ • .getpp
 │ • .getpp2
+│ • .setpp
 │ • .getid
 │ • .getlink
 │ • .translate
