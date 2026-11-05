@@ -67,7 +67,8 @@ const dbPath = './database/groupSettings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
 const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
 
-const settingsPath = './database/settings.json';
+// 🎯 FIXED PATHS FOR GLOBAL SETTINGS
+const settingsPath = path.join(process.cwd(), 'database', 'settings.json');
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
 const getGlobalSettings = () => {
     try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
@@ -80,24 +81,24 @@ const setGlobalSettings = (newGlobal) => {
     } catch {}
 };
 const getGlobalMode = () => getGlobalSettings().mode || 'public';
-const setGlobalMode = (mode) => {
-    const g = getGlobalSettings();
-    g.mode = mode;
-    setGlobalSettings(g);
-};
 
+// 🎯 FIXED: Uses process.cwd() to guarantee it saves to the ROOT sessions folder
 const saveSessionSetting = (sock, key, value) => {
     try {
         const botNum = sock.user.id.split('@')[0].split(':')[0];
-        const dir = path.join(__dirname, 'sessions', botNum);
+        const dir = path.join(process.cwd(), 'sessions', botNum); 
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        
         const p = path.join(dir, 'settings.json');
         let s = {};
         try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
         s[key] = value;
         fs.writeFileSync(p, JSON.stringify(s, null, 2));
         return true;
-    } catch(e) { return false; }
+    } catch(e) { 
+        console.log("Save error:", e); 
+        return false; 
+    }
 };
 
 const commands = [];
@@ -112,65 +113,10 @@ const loadCommands = (dir) => {
         }
     }
 };
+// This loads plugins/settings.js which handles the toggles!
 loadCommands(path.join(__dirname, "plugins"));
 
-commands.push({
-    command: "mode", aliases: ["botmode"], category: "owner", owner: true,
-    execute: async (sock, m, { args, reply }) => {
-        const mode = args[0]?.toLowerCase();
-        if (mode === 'public') { setGlobalMode('public'); return reply("✅ Bot is now in *public mode*."); } 
-        else if (mode === 'private') { setGlobalMode('private'); return reply("🔒 Bot is now in *private mode*."); } 
-        else { return reply(`📱 Current mode: *${getGlobalMode()}*`); }
-    }
-});
-
-commands.push({
-    command: "antideleteconfig", aliases: ["adconfig", "antidelete"], category: "owner", owner: true,
-    execute: async (sock, m, { args, reply }) => {
-        const sub = args[0]?.toLowerCase();
-        const g = getGlobalSettings();
-        const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
-
-        if (!sub) { return reply(`🛡️ *Antidelete:* ${cfg.enabled ? 'ON' : 'OFF'}\nMode: ${cfg.mode}`); }
-        if (sub === 'on' || sub === 'off') { cfg.enabled = sub === 'on'; } 
-        else if (sub === 'mode') { const mode = args[1]?.toLowerCase(); if (['chat', 'owner', 'both'].includes(mode)) cfg.mode = mode; else return reply("❌ Invalid mode."); } 
-        else if (sub === 'style') { const style = args[1]?.toLowerCase(); if (['fancy', 'simple'].includes(style)) cfg.style = style; else return reply("❌ Invalid style."); } 
-        else if (sub === 'react') { const react = args[1]?.toLowerCase(); if (react === 'on') cfg.react = true; else if (react === 'off') cfg.react = false; else return reply("❌ Use: react on/off"); } 
-        else { return reply("❌ Unknown option."); }
-
-        g.antidelete = cfg;
-        setGlobalSettings(g);
-        reply(`✅ Antidelete updated!`);
-    }
-});
-
-const toggles = [
-    { cmd: "autoread", name: "Auto Read" },
-    { cmd: "autotyping", name: "Auto Typing" },
-    { cmd: "autorecording", name: "Auto Recording" },
-    { cmd: "autoreact", name: "Auto React" },
-    { cmd: "antiedit", name: "Anti-Edit" }
-];
-
-toggles.forEach(t => {
-    commands.push({
-        command: t.cmd, category: "owner", owner: true,
-        execute: async (sock, m, { args, reply }) => {
-            const val = args[0]?.toLowerCase();
-            if (val === 'on') {
-                saveSessionSetting(sock, t.cmd, true);
-                return reply(`✅ *${t.name}* is now ON`);
-            } else if (val === 'off') {
-                saveSessionSetting(sock, t.cmd, false);
-                return reply(`❌ *${t.name}* is now OFF`);
-            } else {
-                const gs = m.globalSettings || {};
-                const current = gs[t.cmd] ? 'ON' : 'OFF';
-                return reply(`⚙️ *${t.name}* is currently *${current}*\n\nUsage: .${t.cmd} on / off`);
-            }
-        }
-    });
-});
+// 🎯 REMOVED DUPLICATE TOGGLES FROM HERE SO THEY DON'T CLASH WITH settings.js
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
@@ -190,12 +136,27 @@ async function reactRandom(sock, msg) { try { const e = reacts[Math.floor(Math.r
 module.exports = async (sock, m) => {
     try {
         const contextInfo = { forwardingScore:999, isForwarded:true, forwardedNewsletterMessageInfo:{ newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } };
-        const reply = (text, extra={}) => { try { return sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } catch { return sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } };
-        const send = (data) => { try { return sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } catch { return sock.sendMessage(m.chat, data, { quoted: m }); } };
-
-        // 🎯 AUTO FEATURES (Now runs on ALL messages for testing)
-        const gs = m.globalSettings || getGlobalSettings();
         
+        const reply = async (text, extra={}) => { 
+            try { return await sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } 
+            catch (e) { 
+                try { return await sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } catch (e2) { console.log("Reply error:", e2.message); } 
+            } 
+        };
+        
+        const send = async (data) => { 
+            try { return await sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } 
+            catch (e) { 
+                try { return await sock.sendMessage(m.chat, data, { quoted: m }); } catch(e2) { console.log("Send error:", e2.message); } 
+            } 
+        };
+
+        // 🎯 FIXED: Using process.cwd() to find the correct settings file for reading
+        const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const sessionSettingsPath = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
+        let gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: "." };
+        try { if(fs.existsSync(sessionSettingsPath)) gs = { ...gs, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; } catch {}
+
         if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
         
         if (gs.autotyping) { 
@@ -205,7 +166,6 @@ module.exports = async (sock, m) => {
                 await new Promise(r => setTimeout(r, 3000)); 
             } catch(e){} 
         }
-        
         if (gs.autorecording) { 
             try { 
                 await sock.presenceSubscribe(m.chat);
@@ -260,7 +220,6 @@ module.exports = async (sock, m) => {
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
 
-        const botNum = clean(sock.user.id.split('@')[0].split(':')[0]);
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
         const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender);
 
@@ -297,7 +256,7 @@ module.exports = async (sock, m) => {
         await command.execute(sock, m, ctx);
     } catch (err) {
         console.log("🔥 HANDLER ERROR:", err);
-        try { await sock.sendMessage(m.chat, { text: "🤖 Error. Try again later." }, { quoted: m }); } catch {}
+        try { await sock.sendMessage(m.chat, { text: `🤖 Error: ${err.message}` }, { quoted: m }); } catch {}
     }
 };
 
