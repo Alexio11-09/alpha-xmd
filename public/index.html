@@ -46,7 +46,14 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:24px 5
 
 .res{display:none;margin-top:24px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.2);padding:24px;border-radius:16px;text-align:center;animation:fi .3s}
 @keyframes fi{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-.code{font-size:38px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:8px;color:var(--pri);margin:16px 0;text-shadow:0 0 30px var(--pri-glow)}
+
+/* 🎯 UPDATED CODE AREA WITH COPY BUTTON */
+.code-container{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0;}
+.code{font-size:38px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:8px;color:var(--pri);text-shadow:0 0 30px var(--pri-glow);}
+.copy-btn{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--pri);padding:10px;border-radius:8px;cursor:pointer;transition:.3s;display:flex;align-items:center;justify-content:center;}
+.copy-btn:hover{background:rgba(0,255,136,.2);transform:translateY(-2px)}
+.copy-btn svg{width:22px;height:22px;}
+
 .mg{display:none;margin-top:24px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);padding:24px;border-radius:16px;text-align:center}
 .bd{background:transparent;border:1px solid #ef4444;color:#ef4444;margin-top:16px;padding:12px;font-size:14px}
 .bd:hover{background:rgba(239,68,68,.1);box-shadow:none}
@@ -125,7 +132,13 @@ input:checked+.sl:before{transform:translateX(20px)}
 
     <div class="res" id="res-b">
       <p style="font-size:13px;color:var(--mut)">Enter in WhatsApp > Linked Devices</p>
-      <div class="code" id="cd">----</div>
+      <!-- 🎯 ADDED COPY BUTTON HERE -->
+      <div class="code-container">
+          <div class="code" id="cd">----</div>
+          <button class="copy-btn" onclick="copyCode()" title="Copy Code">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+      </div>
     </div>
 
     <div class="mg" id="mg-b">
@@ -221,6 +234,24 @@ alert(d.error||"Failed to generate code.");b.disabled=false;bt.innerText="Genera
 }catch(e){
 alert("Network Error. Try again.");b.disabled=false;bt.innerText="Generate Code";sp.style.display="none";
 }
+}
+
+// 🎯 COPY FUNCTION FOR WEBSITE
+function copyCode(){
+    const code = document.getElementById('cd').innerText;
+    if(code === '----') return;
+    navigator.clipboard.writeText(code).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        btn.style.color = "#fff";
+        btn.style.background = "var(--pri)";
+        setTimeout(() => { 
+            btn.innerHTML = originalHTML; 
+            btn.style.color = "var(--pri)";
+            btn.style.background = "rgba(0,255,136,.1)";
+        }, 2000);
+    }).catch(err => alert("Failed to copy: " + err));
 }
 
 async function openSettings(){
