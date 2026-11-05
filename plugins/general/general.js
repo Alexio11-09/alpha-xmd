@@ -168,6 +168,7 @@ module.exports = [
 │ • .getname
 │ • .getdeskgc
 │ • .getppgc
+│ • .setppgc
 │ • .listactive
 │ • .listinactive
 │ • .totalmembers
