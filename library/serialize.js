@@ -35,14 +35,17 @@ const smsg = async (sock, m) => {
         if (m.msg?.contextInfo?.quotedMessage) {
             const quoted = m.msg.contextInfo.quotedMessage;
             const type = getContentType(quoted);
+            const quotedSender = m.msg.contextInfo.participant; // 🎯 The person you replied to
 
             m.quoted = {
                 message: quoted,
                 mtype: type,
                 msg: quoted[type],
+                sender: quotedSender, // 🎯 ADDED THIS: Now the bot knows who you replied to!
                 key: {
                     id: m.msg.contextInfo.stanzaId,
-                    remoteJid: m.chat
+                    remoteJid: m.chat,
+                    participant: quotedSender
                 }
             };
 
