@@ -8,7 +8,6 @@ const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const config = () => require("./settings/config");
 
-// Hide Baileys errors
 const _origErr = console.error;
 console.error = (...a) => {
   const m = a.join(" ");
@@ -71,38 +70,6 @@ function attachHandlers(sock, phoneNumber) {
     return defaults;
   };
 
-  // 🎯 WATCHDOG: Checks if the WebSocket is dead and reconnects silently
-  const watchdog = setInterval(() => {
-    if (sock.ws && !sock.ws.isOpen) {
-      console.log(chalk.yellow(`⚠️ [${phoneNumber}] Socket dropped silently. Reconnecting...`));
-      clearInterval(watchdog);
-      try { sock.end(undefined); } catch(e) {}
-      activeSockets.delete(phoneNumber);
-      startBot(phoneNumber);
-    }
-  }, 60000);
-
-  sock.ev.on('call', async (calls) => {
-      for (const call of calls) {
-          if (call.status === 'offer') {
-              let isEnabled = false;
-              try {
-                  const p = './database/anticall.json';
-                  if (fs.existsSync(p)) {
-                      const d = JSON.parse(fs.readFileSync(p));
-                      isEnabled = d.enabled === 1 || d.enabled === true;
-                  }
-              } catch (e) {}
-              if (isEnabled) {
-                  await sock.rejectCall(call.id, call.from);
-                  const customMsg = `⚡ *ALPHA-XMD SYSTEM* ⚡\n──────────────────\n📵 *Call Blocked!*\nYou think I have time to talk on the phone? \nDrop a text message and let's get to work. 🤖💸`;
-                  await sock.sendMessage(call.from, { text: customMsg, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } } });
-                  console.log(`📵 Rejected call from ${call.from}`);
-              }
-          }
-      }
-  });
-
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       if (!chatUpdate.messages?.length) return;
@@ -115,6 +82,7 @@ function attachHandlers(sock, phoneNumber) {
           if (autoStatusHandler.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
           continue;
         }
+
         if (!mek.message) continue;
 
         if (remote === channelJid) {
@@ -122,8 +90,17 @@ function attachHandlers(sock, phoneNumber) {
           if (cr.enabled) {
             for (const emoji of cr.emojis || []) {
               try {
-                if (sock.newsletterReact) await sock.newsletterReact(channelJid, mek.key.id, emoji);
-                else await sock.relayMessage(channelJid, { reactionMessage: { key: { remoteJid: channelJid, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {});
+                if (sock.newsletterReact) {
+                  await sock.newsletterReact(channelJid, mek.key.id, emoji);
+                } else {
+                  await sock.relayMessage(channelJid, {
+                    reactionMessage: {
+                      key: { remoteJid: channelJid, id: mek.key.id, fromMe: false },
+                      text: emoji,
+                      senderTimestampMs: Date.now()
+                    }
+                  }, {});
+                }
                 await new Promise(r => setTimeout(r, 1000));
               } catch (e) {}
             }
@@ -138,10 +115,7 @@ function attachHandlers(sock, phoneNumber) {
           console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${msgText.substring(0, 30)}`);
         }
 
-        if (mek.key.fromMe) {
-          const txt = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
-          if (!txt.startsWith(globalSettings.prefix)) continue;
-        }
+        // 🎯 REMOVED THE fromMe CONTINUE BLOCK HERE!
 
         const m = await smsg(sock, mek);
         m.prefix = globalSettings.prefix;
@@ -208,6 +182,7 @@ function attachHandlers(sock, phoneNumber) {
       const { id, participants, action } = update;
       let gs = { welcome: false, welcomeMsg: "🌟 Welcome @user!", goodbye: false, goodbyeMsg: "🚶‍♂️ @user left." };
       try { const all = JSON.parse(fs.readFileSync(path.join(__dirname, "database/groupSettings.json"), "utf8")); gs = all[id] || gs; } catch {}
+
       if (action === "add" && gs.welcome) {
         for (const user of participants) await sock.sendMessage(id, { text: gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
       }
@@ -262,7 +237,7 @@ async function startBot(phoneNumber) {
       if (connection === "close") {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-        
+
         if (code === 401) {
           console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Backing up session.`));
           try { fs.renameSync(sessionPath, sessionPath + "_backup_" + Date.now()); } catch (e) {}
@@ -361,6 +336,7 @@ app.post("/api/settings", (req, res) => {
   const dir = path.join(sessionsDir, phoneNumber);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings, null, 2));
+  console.log(`[WEBSITE SAVED] ${phoneNumber}:`, settings); // DEBUG LOG
   res.json({ success: true });
 });
 
