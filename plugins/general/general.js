@@ -18,21 +18,46 @@ function runtime(seconds) {
     return `${d}d ${h}h ${m}m ${s}s`;
 }
 
-const getCountry = (jid) => {
-    if (!jid) return "Unknown 🌍";
+// 🎯 THE FORCING WAY: Extracts hidden LIDs using group metadata
+const getCountry = async (m, sock) => {
     try {
+        let targetJid = m.sender;
+        let cleanNumber = targetJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+
+        // If the number is too short or ends with @lid, it's a hidden ID. We must resolve it!
+        if (targetJid.includes('@lid') || cleanNumber.length < 9) {
+            if (m.isGroup) {
+                try {
+                    const metadata = await sock.groupMetadata(m.chat);
+                    const participant = metadata.participants.find(p => p.id === targetJid || p.lid === targetJid);
+                    if (participant) {
+                        if (participant.phoneNumber) {
+                            cleanNumber = participant.phoneNumber.split('@')[0].replace(/[^0-9]/g, '');
+                        } else if (participant.jid && !participant.jid.includes('@lid')) {
+                            cleanNumber = participant.jid.split('@')[0].replace(/[^0-9]/g, '');
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+
+        // If it's still short, we can't determine it
+        if (cleanNumber.length < 9) return "Unknown 🌍";
+
+        // Use awesome-phonenumber to get the country
         const PhoneNumber = require('awesome-phonenumber');
-        let number = jid.replace(/[^0-9]/g, '');
-        const pn = PhoneNumber('+' + number);
-        if (pn.getRegionCode()) {
+        const pn = PhoneNumber('+' + cleanNumber);
+        
+        if (pn.isValid() && pn.getRegionCode()) {
             const country = pn.getCountry();
             const flag = pn.getRegionCode().toUpperCase().replace(/./g, char =>
                 String.fromCodePoint(char.charCodeAt(0) + 127397)
             );
             return `${country} ${flag}`;
         }
+        
         return "Unknown 🌍";
-    } catch {
+    } catch (e) {
         return "Unknown 🌍";
     }
 };
@@ -59,7 +84,9 @@ module.exports = [
                 const date = now.toLocaleDateString();
                 const pushname = m.pushName || "User";
                 const uptime = runtime(process.uptime());
-                const country = getCountry((m.sender || "").replace(/[^0-9]/g, ""));
+                
+                // 🎯 FORCE AWAIT FOR COUNTRY
+                const country = await getCountry(m, sock);
 
                 const menu = `
 ╭───〔 ${config.settings.title} 〕───⬣
@@ -210,6 +237,7 @@ module.exports = [
 │ • .sticker
 │ • .toimg
 │ • .getpp
+│ • .getpp2
 │ • .getid
 │ • .getlink
 │ • .translate
@@ -218,6 +246,7 @@ module.exports = [
 │ • .removebg
 │ • .tomp3
 │ • .vv
+│ • .vv2
 │ • .url
 │ • .img
 │ • .take
