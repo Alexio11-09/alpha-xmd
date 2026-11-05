@@ -1,4 +1,4 @@
-// © 2026 Alpha - MESSAGE HANDLER (ENGINE)
+// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
@@ -41,16 +41,6 @@ const isUserBanned = (sender) => {
     } catch { return false; }
 };
 
-// 🎯 GROUP BANS CHECK
-const isGroupBanned = (chatId, sender) => {
-    try {
-        const p = './database/groupBans.json';
-        if (!fs.existsSync(p)) return false;
-        const bans = JSON.parse(fs.readFileSync(p));
-        return bans[chatId] && bans[chatId].includes(sender);
-    } catch { return false; }
-};
-
 function isTempOwnerBase(sender) {
     try {
         const op = './database/owners.json';
@@ -82,7 +72,33 @@ try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: 
 const getGlobalSettings = () => {
     try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
 };
+const setGlobalSettings = (newGlobal) => {
+    try {
+        const s = JSON.parse(fs.readFileSync(settingsPath));
+        s.global = newGlobal;
+        fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
+    } catch {}
+};
 const getGlobalMode = () => getGlobalSettings().mode || 'public';
+const setGlobalMode = (mode) => {
+    const g = getGlobalSettings();
+    g.mode = mode;
+    setGlobalSettings(g);
+};
+
+const saveSessionSetting = (sock, key, value) => {
+    try {
+        const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const dir = path.join(__dirname, 'sessions', botNum);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const p = path.join(dir, 'settings.json');
+        let s = {};
+        try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
+        s[key] = value;
+        fs.writeFileSync(p, JSON.stringify(s, null, 2));
+        return true;
+    } catch(e) { return false; }
+};
 
 const commands = [];
 const loadCommands = (dir) => {
@@ -97,6 +113,64 @@ const loadCommands = (dir) => {
     }
 };
 loadCommands(path.join(__dirname, "plugins"));
+
+commands.push({
+    command: "mode", aliases: ["botmode"], category: "owner", owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const mode = args[0]?.toLowerCase();
+        if (mode === 'public') { setGlobalMode('public'); return reply("✅ Bot is now in *public mode*."); } 
+        else if (mode === 'private') { setGlobalMode('private'); return reply("🔒 Bot is now in *private mode*."); } 
+        else { return reply(`📱 Current mode: *${getGlobalMode()}*`); }
+    }
+});
+
+commands.push({
+    command: "antideleteconfig", aliases: ["adconfig", "antidelete"], category: "owner", owner: true,
+    execute: async (sock, m, { args, reply }) => {
+        const sub = args[0]?.toLowerCase();
+        const g = getGlobalSettings();
+        const cfg = g.antidelete || { enabled: false, mode: 'chat', style: 'fancy', react: true };
+
+        if (!sub) { return reply(`🛡️ *Antidelete:* ${cfg.enabled ? 'ON' : 'OFF'}\nMode: ${cfg.mode}`); }
+        if (sub === 'on' || sub === 'off') { cfg.enabled = sub === 'on'; } 
+        else if (sub === 'mode') { const mode = args[1]?.toLowerCase(); if (['chat', 'owner', 'both'].includes(mode)) cfg.mode = mode; else return reply("❌ Invalid mode."); } 
+        else if (sub === 'style') { const style = args[1]?.toLowerCase(); if (['fancy', 'simple'].includes(style)) cfg.style = style; else return reply("❌ Invalid style."); } 
+        else if (sub === 'react') { const react = args[1]?.toLowerCase(); if (react === 'on') cfg.react = true; else if (react === 'off') cfg.react = false; else return reply("❌ Use: react on/off"); } 
+        else { return reply("❌ Unknown option."); }
+
+        g.antidelete = cfg;
+        setGlobalSettings(g);
+        reply(`✅ Antidelete updated!`);
+    }
+});
+
+const toggles = [
+    { cmd: "autoread", name: "Auto Read" },
+    { cmd: "autotyping", name: "Auto Typing" },
+    { cmd: "autorecording", name: "Auto Recording" },
+    { cmd: "autoreact", name: "Auto React" },
+    { cmd: "antiedit", name: "Anti-Edit" }
+];
+
+toggles.forEach(t => {
+    commands.push({
+        command: t.cmd, category: "owner", owner: true,
+        execute: async (sock, m, { args, reply }) => {
+            const val = args[0]?.toLowerCase();
+            if (val === 'on') {
+                saveSessionSetting(sock, t.cmd, true);
+                return reply(`✅ *${t.name}* is now ON`);
+            } else if (val === 'off') {
+                saveSessionSetting(sock, t.cmd, false);
+                return reply(`❌ *${t.name}* is now OFF`);
+            } else {
+                const gs = m.globalSettings || {};
+                const current = gs[t.cmd] ? 'ON' : 'OFF';
+                return reply(`⚙️ *${t.name}* is currently *${current}*\n\nUsage: .${t.cmd} on / off`);
+            }
+        }
+    });
+});
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
@@ -119,43 +193,52 @@ module.exports = async (sock, m) => {
         const reply = (text, extra={}) => { try { return sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } catch { return sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } };
         const send = (data) => { try { return sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } catch { return sock.sendMessage(m.chat, data, { quoted: m }); } };
 
+        // 🎯 AUTO FEATURES (Now runs on ALL messages for testing)
         const gs = m.globalSettings || getGlobalSettings();
         
-        if (!m.key.fromMe) {
-            if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
-            if (gs.autotyping) { try { await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} }
-            if (gs.autorecording) { try { await sock.sendPresenceUpdate("recording", m.chat); await new Promise(r => setTimeout(r, 1500)); } catch {} }
-            const prefix = m.prefix || config.prefix || ".";
-            const rawTxt = m.text || "";
-            if (gs.autoreact && !rawTxt.startsWith(prefix)) {
-                const emojis = ["🔥", "😂", "😍", "😎", "🤖", "⚡", "💯", "👀", "🥶", "😈"];
-                try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
-            }
+        if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
+        
+        if (gs.autotyping) { 
+            try { 
+                await sock.presenceSubscribe(m.chat);
+                await sock.sendPresenceUpdate("composing", m.chat); 
+                await new Promise(r => setTimeout(r, 3000)); 
+            } catch(e){} 
+        }
+        
+        if (gs.autorecording) { 
+            try { 
+                await sock.presenceSubscribe(m.chat);
+                await sock.sendPresenceUpdate("recording", m.chat); 
+                await new Promise(r => setTimeout(r, 3000)); 
+            } catch(e){} 
+        }
+
+        const prefix = m.prefix || config.prefix || ".";
+        const rawTxt = m.text || "";
+
+        if (gs.autoreact && !rawTxt.startsWith(prefix)) {
+            const emojis = ["🔥", "😂", "😍", "😎", "🤖", "⚡", "💯", "👀", "🥶", "😈"];
+            try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
         }
 
         if (!m.text) return;
 
-        const prefix = m.prefix || config.prefix || ".";
-        
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat);
                 
-                // 🎯 ENFORCE GROUP BANS HERE
-                if (isGroupBanned(m.chat, m.sender)) {
-                    if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
-                    return;
-                }
-
                 if (containsBadWord(m.text, m.chat)) {
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
                     return;
                 }
+                
                 if (gsets.antilink) {
                     const mode = gsets.antilinkMode || 'admins';
                     const action = gsets.antilinkAction || 'delete';
                     let allowed = (mode === 'admins' && m.isAdmin) || (mode === 'owner' && m.isOwner);
+                    
                     if (!allowed && containsLink(m.text)) {
                         if (action === 'delete') {
                             if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
@@ -179,7 +262,7 @@ module.exports = async (sock, m) => {
 
         const botNum = clean(sock.user.id.split('@')[0].split(':')[0]);
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
-        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender) || m.key.fromMe;
+        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender);
 
         if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) return;
 
@@ -190,6 +273,7 @@ module.exports = async (sock, m) => {
 
         let isSenderAdmin = false;
         let isBotAdmin = false;
+        
         if (m.isGroup) {
             const adminStatus = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
             isSenderAdmin = adminStatus.isSenderAdmin;
@@ -206,11 +290,7 @@ module.exports = async (sock, m) => {
         const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: isSenderAdmin, isBotAdmin: isBotAdmin, config, prefix };
 
         if (command.owner && !isOwner) return reply(deny.owner);
-        
-        if (command.owner && isOwner && m.isGroup && !['block', 'unblock', 'tostatus', 'toviewonce', 'vv2', 'clear', 'purge'].includes(command.command)) {
-            await reply(deny.ownerPrivateReminder);
-        }
-        
+        if (command.owner && isOwner && m.isGroup) await reply(deny.ownerPrivateReminder);
         if (command.group === false && m.isGroup) return reply(deny.private);
         if (command.group && !m.isGroup) return reply(deny.group);
 
