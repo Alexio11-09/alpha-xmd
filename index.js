@@ -223,7 +223,10 @@ async function startBot(phoneNumber) {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 15000,
-      syncFullHistory: false,
+      
+      // 🎯 RAM SAVER 1: Prevents loading entire chat history into RAM
+      syncFullHistory: false, 
+      getMessage: async () => { return { conversation: '' }; },
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -232,7 +235,14 @@ async function startBot(phoneNumber) {
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect } = update;
       if (connection === "open") console.log(chalk.green(`✅ [${phoneNumber}] Bot Connected!`));
+      
       if (connection === "close") {
+        // 🎯 RAM SAVER 2: Destroys the old socket and removes listeners to prevent "Ghost Socket" memory leaks
+        try {
+            sock.ev.removeAllListeners();
+            sock.end(undefined);
+        } catch (e) {}
+
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
 
@@ -276,6 +286,7 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
 
   const tempSock = baileys.default({
     version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"),
+    syncFullHistory: false, // 🎯 RAM SAVER
   });
 
   tempSock.ev.on("creds.update", saveCreds);
@@ -333,7 +344,6 @@ app.post("/api/settings", (req, res) => {
   const { phoneNumber, settings } = req.body;
   const dir = path.join(sessionsDir, phoneNumber);
   
-  // 🎯 FIXED: Create directory if it doesn't exist before writing
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   
   fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(settings, null, 2));
@@ -369,5 +379,18 @@ app.post("/api/settings", (req, res) => {
       }
     }
     console.log("✅ All loaded.");
+
+    // 🎯 RAM SAVER 3 & AUTO-RESTART WATCHDOG
+    setInterval(() => {
+      const used = process.memoryUsage().heapUsed / 1024 / 1024;
+      console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
+      
+      // If memory exceeds 450MB, force exit. OptikLink will auto-restart the server instantly.
+      if (used > 450) {
+        console.log(`⚠️ Memory limit reached (${Math.round(used)}MB). Restarting bot to prevent crash...`);
+        process.exit(1); 
+      }
+    }, 60000); // Checks every 60 seconds
+
   });
 })();
