@@ -35,7 +35,18 @@ module.exports=[
 {command:"bothosting",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("🖥️ Coming soon.")}},
 {command:"webzip",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("📦 Dev.")}},
 {command:"antiblock",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antiblock.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ ${d.enabled?'ON':'OFF'}`)}}},
-{command:"autobio",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{r(a[0]==='on'?"Autobio ON":"Autobio OFF")}},
+{command:"autobio",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
+    const p='./database/autobio.json';
+    if(!fs.existsSync(p))fs.writeFileSync(p,'{"enabled":0}');
+    let c=a[0]?.toLowerCase();
+    if(c==='on'||c==='off'){
+        fs.writeFileSync(p,JSON.stringify({enabled:c==='on'?1:0}));
+        r(`📝 Autobio ${c.toUpperCase()}`);
+    }else{
+        let d=JSON.parse(fs.readFileSync(p));
+        r(`📝 Autobio is ${d.enabled?'ON':'OFF'}`);
+    }
+}},
 {command:"deljunk",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{let t=os.tmpdir(),c=0;fs.readdirSync(t).forEach(f=>{if(f.startsWith('junk_')){fs.rmSync(path.join(t,f),{recursive:1,force:1});c++}});r(`🗑️ ${c} files`)}catch{r("❌ Failed")}}},
 {command:"disk",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{r(`💾 ${exec('df -h /').toString()}`)}catch{r("❌ Failed")}}},
 {command:"tostatus",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!m.quoted)return r("❌ Reply to a message/status to post.");try{const q=m.quoted,type=Object.keys(q.message)[0],sjl=[s.user.id];if(type==='conversation'||type==='extendedTextMessage'){const txt=q.text||q.message?.conversation||q.message?.extendedTextMessage?.text||a.join(' ');if(!txt)return r("❌ No text.");await s.sendMessage('status@broadcast',{text:txt,backgroundColor:'#000000'},{statusJidList:sjl});return r("✅ Text posted!")}if(type==='imageMessage'){const st=await downloadContentFromMessage(q.message.imageMessage,'image');let b=Buffer.from([]);for await(const c of st)b=Buffer.concat([b,c]);await s.sendMessage('status@broadcast',{image:b,caption:a.join(' ')},{statusJidList:sjl});return r("✅ Image posted!")}if(type==='videoMessage'){const st=await downloadContentFromMessage(q.message.videoMessage,'video');let b=Buffer.from([]);for await(const c of st)b=Buffer.concat([b,c]);await s.sendMessage('status@broadcast',{video:b,caption:a.join(' ')},{statusJidList:sjl});return r("✅ Video posted!")}return r("❌ Unsupported type.")}catch(e){return r(`❌ Failed: ${e.message}`)}}},
@@ -45,5 +56,80 @@ module.exports=[
 {command:"lastseen",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("👀 .wastalk")}},
 {command:"ppprivacy",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("🔒 Can't change")}},
 {command:"readreceipts",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{r(a[0]==='on'?"ON":"OFF")}},
-{command:"delete",aliases:["del"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{if(!m.quoted||(!m.isBotAdmin&&!m.isAdmin))return;try{await s.sendMessage(m.chat,{delete:m.quoted.key});r("🗑️ Deleted")}catch{}}}
+{command:"delete",aliases:["del"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{if(!m.quoted||(!m.isBotAdmin&&!m.isAdmin))return;try{await s.sendMessage(m.chat,{delete:m.quoted.key});r("🗑️ Deleted")}catch{}}},
+{command:"antigroupmention",aliases:["antigm"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antigroupmention.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ Antigroupmention ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ Antigroupmention is ${d.enabled?'ON':'OFF'}`)}}},
+{command:"antibot",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antibot.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🤖 Antibot ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🤖 Antibot is ${d.enabled?'ON':'OFF'}`)}}},
+{command:"antiforeign",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antiforeign.json';if(!a[0])return r("Usage: .antiforeign on/off\n.antiforeign +233");let c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🚫 Antiforeign ${c.toUpperCase()}`)}else if(c.startsWith('+')){fs.writeFileSync(p,`{"enabled":1,"code":"${c.replace('+','')}"}`);r(`🚫 Antiforeign enabled for +${c.replace('+','')}`)}else{r(`❌ Invalid input.`)}}},
+{command:"channel",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
+    if(!a[0]) return r("Usage:\n.channel react <link>\n.channel vote <link> <option_number>\n.channel automation <link> on/off");
+    const sub = a[0].toLowerCase();
+    const link = a[1];
+    if(!link) return r("❌ Provide a channel link.");
+    
+    let jid = null, msgId = null;
+    const parts = link.split('/');
+    if (parts.length >= 6) { jid = parts[4] + '@newsletter'; msgId = parts[5]; }
+    else if (parts.length === 5) { jid = parts[4] + '@newsletter'; }
+    else return r("❌ Invalid channel link format.");
+
+    if (sub === 'react') {
+        if (!msgId) return r("❌ You must provide an update link (with the message ID at the end).");
+        try {
+            const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
+            for (const e of emojis) {
+                if (s.newsletterReact) {
+                    await s.newsletterReact(jid, msgId, e);
+                } else {
+                    await s.relayMessage(jid, {
+                        reactionMessage: {
+                            key: { remoteJid: jid, id: msgId, fromMe: false },
+                            text: e,
+                            senderTimestampMs: Date.now()
+                        }
+                    }, {});
+                }
+                await new Promise(res => setTimeout(res, 1000));
+            }
+            return r("✅ Reacted to the channel post!");
+        } catch (e) { return r(`❌ Failed to react: ${e.message}`); }
+    }
+
+    if (sub === 'vote') {
+        if (!msgId) return r("❌ You must provide a poll update link.");
+        const optIndex = parseInt(a[2]);
+        if (isNaN(optIndex)) return r("❌ Provide a valid option number (e.g., 1 for first option).");
+        
+        try {
+            if (global.pollCache && global.pollCache.has(msgId)) {
+                const pollMsg = global.pollCache.get(msgId);
+                const options = pollMsg.message.pollCreationMessage.options;
+                if (optIndex < 1 || optIndex > options.length) return r("❌ Invalid option number.");
+                const selectedOption = options[optIndex - 1].optionName;
+                
+                await s.sendMessage(jid, { 
+                    pollUpdateMessage: { 
+                        pollCreationMessageKey: pollMsg.key, 
+                        vote: { [selectedOption]: 1 } 
+                    } 
+                });
+                return r(`✅ Voted for *${selectedOption}*!`);
+            } else {
+                return r("❌ Poll not found in cache. The bot must see the poll when it's posted to cache it. Please try again after the bot caches a new poll.");
+            }
+        } catch (e) { return r(`❌ Failed to vote: ${e.message}`); }
+    }
+
+    if (sub === 'automation') {
+        const status = a[2]?.toLowerCase();
+        if (status !== 'on' && status !== 'off') return r("❌ Use on/off.");
+        const p = './database/channel_automation.json';
+        let db = {};
+        if (fs.existsSync(p)) { try { db = JSON.parse(fs.readFileSync(p)); } catch(e){} }
+        if (status === 'on') { db[jid] = true; r(`✅ Automation ON for this channel.`); }
+        else { delete db[jid]; r(`✅ Automation OFF for this channel.`); }
+        fs.writeFileSync(p, JSON.stringify(db, null, 2));
+        return;
+    }
+    return r("❌ Unknown subcommand. Use react, vote, or automation.");
+}}
 ];
