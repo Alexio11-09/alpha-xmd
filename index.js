@@ -35,6 +35,13 @@ const activeSockets = new Map();
 const store = new Map(); 
 let baileys;
 
+global.pollCache = new Map();
+setInterval(() => {
+    store.clear();
+    global.pollCache.clear();
+    console.log("🧹 Cleared message cache to free RAM.");
+}, 30 * 60 * 1000); 
+
 let autoStatusHandler; try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
 
 let messageHandler; 
@@ -71,55 +78,54 @@ function attachHandlers(sock, phoneNumber) {
     return defaults;
   };
 
-  // 🎯 ANTI-CALL LISTENER (Custom Message with Channel UI)
+  const updateAutobio = async () => {
+    try {
+        const p = path.join(process.cwd(), 'database', 'autobio.json');
+        if (fs.existsSync(p)) {
+            const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
+            if (cfg.enabled === 1) {
+                const bios = [
+                    "⚡ Built different. Type .menu or get left behind.",
+                    "🥶 I don't do small talk. Drop a command or drop off.",
+                    "🛑 Zero tolerance for nonsense. Play stupid games, win stupid prizes.",
+                    "💼 Efficiency is my only language. Say less.",
+                    "🤖 I run on code, not your opinions.",
+                    "🧊 Cold hearted, flawless execution. Powered by Alpha.",
+                    "📵 Call me? I'll block you. Text me if you're serious.",
+                    "👑 The system doesn't sleep, and neither does the grind.",
+                    "⚙️ Programmed for perfection. I'm not here to make friends.",
+                    "🔇 Actions over words. .menu is all you need to know."
+                ];
+                const newBio = bios[Math.floor(Math.random() * bios.length)];
+                await sock.updateProfileStatus(newBio);
+            }
+        }
+    } catch(e) {}
+  };
+
+  setInterval(updateAutobio, 60 * 60 * 1000);
+  setTimeout(updateAutobio, 5000);
+
   sock.ev.on("call", async (calls) => {
     try {
         const anticallPath = path.join(process.cwd(), 'database', 'anticall.json');
         let config = { enabled: 0, block: 0 };
-        
-        if (fs.existsSync(anticallPath)) {
-            try { config = JSON.parse(fs.readFileSync(anticallPath, 'utf8')); } catch(e) {}
-        }
-
-        if (config.enabled === 1 || config.enabled === true) {
+        if (fs.existsSync(anticallPath)) { try { config = JSON.parse(fs.readFileSync(anticallPath, 'utf8')); } catch(e) {} }
+        if (config.enabled === 1) {
             for (const call of calls) {
                 if (call.status === "offer") {
-                    // 1. Reject the call immediately
                     await sock.rejectCall(call.id, call.from);
-                    
-                    // 2. Check Mode
-                    if (config.block === 1 || config.block === true) {
-                        // Mode: BLOCK
-                        try {
-                            await sock.updateBlockStatus(call.from, "block");
-                            console.log(`🚫 Rejected & Blocked caller ${call.from}`);
-                        } catch (e) {}
+                    if (config.block === 1) {
+                        try { await sock.updateBlockStatus(call.from, "block"); } catch (e) {}
                     } else {
-                        // Mode: WARN (Your Custom Message)
                         const customMsg = `⚡ *ALPHA-XMD SYSTEM* ⚡\n──────────────────\n📵 *Call Blocked!*\nYou think I have time to talk on the phone? \nDrop a text message and let's get to work. 🤖💸`;
-                        
-                        // 🎯 SENDING WITH CHANNEL UI
-                        await sock.sendMessage(call.from, { 
-                            text: customMsg,
-                            contextInfo: {
-                                forwardingScore: 999,
-                                isForwarded: true,
-                                forwardedNewsletterMessageInfo: {
-                                    newsletterJid: channelJid,
-                                    newsletterName: channelName
-                                }
-                            }
-                        });
-                        console.log(`📵 Rejected caller ${call.from} (Sent custom warning)`);
+                        await sock.sendMessage(call.from, { text: customMsg, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: channelName } } });
                     }
                 }
             }
         }
-    } catch (e) {
-        console.log("Anti-call error:", e.message);
-    }
+    } catch (e) {}
   });
-  // 🎯 END OF ANTI-CALL LISTENER
 
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
@@ -131,39 +137,81 @@ function attachHandlers(sock, phoneNumber) {
 
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
-          continue;
         }
 
         if (!mek.message) continue;
 
-        if (remote === channelJid) {
-          const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
-          if (cr.enabled) {
-            for (const emoji of cr.emojis || []) {
-              try {
-                if (sock.newsletterReact) {
-                  await sock.newsletterReact(channelJid, mek.key.id, emoji);
-                } else {
-                  await sock.relayMessage(channelJid, {
-                    reactionMessage: {
-                      key: { remoteJid: channelJid, id: mek.key.id, fromMe: false },
-                      text: emoji,
-                      senderTimestampMs: Date.now()
-                    }
-                  }, {});
-                }
-                await new Promise(r => setTimeout(r, 1000));
-              } catch (e) {}
+        const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+        const isCmd = messageText.startsWith(globalSettings.prefix);
+
+        if (remote && remote.endsWith('@newsletter')) {
+            if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) {
+                global.pollCache.set(mek.key.id, mek);
             }
-          }
-          continue;
+
+            let autoReactChannels = {};
+            try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
+            
+            if (autoReactChannels[remote]) {
+                const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
+                (async () => {
+                    for (let e of emojis) {
+                        try { 
+                            if (sock.newsletterReact) {
+                                await sock.newsletterReact(remote, mek.key.id, e); 
+                            } else {
+                                await sock.relayMessage(remote, {
+                                    reactionMessage: {
+                                        key: { remoteJid: remote, id: mek.key.id, fromMe: false },
+                                        text: e,
+                                        senderTimestampMs: Date.now()
+                                    }
+                                }, {});
+                            }
+                        } catch (err) { break; }
+                        await new Promise(r => setTimeout(r, 1500));
+                    }
+                })();
+            } else if (isCmd) {
+                try { 
+                    if (sock.newsletterReact) {
+                        await sock.newsletterReact(remote, mek.key.id, "⚡"); 
+                    } else {
+                        await sock.relayMessage(remote, {
+                            reactionMessage: {
+                                key: { remoteJid: remote, id: mek.key.id, fromMe: false },
+                                text: "⚡",
+                                senderTimestampMs: Date.now()
+                            }
+                        }, {});
+                    }
+                } catch(e) {}
+            } else {
+                const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
+                if (cr.enabled) {
+                  for (const emoji of cr.emojis || []) {
+                    try { 
+                        if (sock.newsletterReact) {
+                            await sock.newsletterReact(remote, mek.key.id, emoji); 
+                        } else {
+                            await sock.relayMessage(remote, {
+                                reactionMessage: {
+                                    key: { remoteJid: remote, id: mek.key.id, fromMe: false },
+                                    text: emoji,
+                                    senderTimestampMs: Date.now()
+                                }
+                            }, {});
+                        }
+                        await new Promise(r => setTimeout(r, 1000)); 
+                    } catch (e) {}
+                  }
+                }
+            }
         }
 
-        const isCmd = mek.message?.conversation?.startsWith(globalSettings.prefix) || mek.message?.extendedTextMessage?.text?.startsWith(globalSettings.prefix);
         if (isCmd) {
-          const msgText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || '[Media]';
           const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown';
-          console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${msgText.substring(0, 30)}`);
+          console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`);
         }
 
         const m = await smsg(sock, mek);
@@ -231,6 +279,39 @@ function attachHandlers(sock, phoneNumber) {
       const { id, participants, action } = update;
       let gs = { welcome: false, welcomeMsg: "🌟 Welcome @user!", goodbye: false, goodbyeMsg: "🚶‍♂️ @user left." };
       try { const all = JSON.parse(fs.readFileSync(path.join(__dirname, "database/groupSettings.json"), "utf8")); gs = all[id] || gs; } catch {}
+
+      if (action === "add") {
+        for (const user of participants) {
+            let isAntibot = false;
+            try { if(fs.existsSync('./database/antibot.json')) isAntibot = JSON.parse(fs.readFileSync('./database/antibot.json')).enabled === 1; } catch{}
+            if (isAntibot) {
+                const pInfo = gs.participants?.find(p => p.id === user) || {};
+                const name = pInfo.notify || pInfo.name || "";
+                if (name.toLowerCase().includes('bot') || name.toLowerCase().includes('baileys')) {
+                    await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{});
+                    await sock.sendMessage(id, { text: `🤖 Removed a bot: ${name}` });
+                    continue;
+                }
+            }
+
+            let isAntiforeign = false, foreignCode = "";
+            try { 
+                if(fs.existsSync('./database/antiforeign.json')) {
+                    const a = JSON.parse(fs.readFileSync('./database/antiforeign.json'));
+                    isAntiforeign = a.enabled === 1;
+                    foreignCode = a.code || "";
+                }
+            } catch{}
+            if (isAntiforeign && foreignCode) {
+                const num = user.split('@')[0];
+                if (num.startsWith(foreignCode)) {
+                    await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{});
+                    await sock.sendMessage(id, { text: `🚫 Kicked @${num} (Foreign number: +${foreignCode})`, mentions: [user] });
+                    continue;
+                }
+            }
+        }
+      }
 
       if (action === "add" && gs.welcome) {
         for (const user of participants) await sock.sendMessage(id, { text: gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
@@ -433,7 +514,7 @@ app.post("/api/settings", (req, res) => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
       
-      if (used > 450) {
+      if (used > 380) {
         console.log(`⚠️ Memory limit reached (${Math.round(used)}MB). Restarting bot to prevent crash...`);
         process.exit(1); 
       }
