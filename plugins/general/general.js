@@ -131,6 +131,7 @@ module.exports = [
 │ • .delete
 │ • .hack
 │ • .autobio
+│ • .channel
 │ • .disk
 │ • .deljunk
 ╰────────────⬣
