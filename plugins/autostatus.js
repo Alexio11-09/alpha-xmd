@@ -1,7 +1,6 @@
 const fs = require('fs'), path = require('path'), configPath = path.join(__dirname, '../database/autoStatus.json');
 fs.existsSync(path.join(__dirname, '../database')) || fs.mkdirSync(path.join(__dirname, '../database'), { recursive: true });
 
-// 🎯 Default random emojis array
 const defaultEmojis = ['🔥', '❤️', '😂', '😮', '😢', '🙏', '👏', '💯', '✨', '💚', '⚡', '👀'];
 
 if (!fs.existsSync(configPath)) {
@@ -24,39 +23,35 @@ function saveConfig(d) { fs.writeFileSync(configPath, JSON.stringify(d, null, 2)
 function isAutoStatusEnabled() { return getConfig().enabled }
 function isReactEnabled() { return getConfig().reactOn }
 
-async function reactToStatus(s, m) {
-  if (!isReactEnabled()) return;
-  
-  const conf = getConfig();
-  let e;
-  
-  // 🎯 Pick a random emoji if set to 'random', otherwise use the custom one
-  if (conf.reactEmoji && conf.reactEmoji !== 'random') {
-      e = conf.reactEmoji;
-  } else {
-      const emojis = conf.reactEmojis || defaultEmojis;
-      e = emojis[Math.floor(Math.random() * emojis.length)];
-  }
+// 🎯 THE KNIGHTBOT REACTION METHOD (The secret sauce)
+async function reactToStatus(s, statusKey) {
+    if (!isReactEnabled()) return;
+    
+    const conf = getConfig();
+    let e = (conf.reactEmoji && conf.reactEmoji !== 'random') ? conf.reactEmoji : (conf.reactEmojis || defaultEmojis)[Math.floor(Math.random() * (conf.reactEmojis || defaultEmojis).length)];
 
-  const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
-  if (!p) return;
-
-  try {
-    await Promise.race([
-      s.sendMessage('status@broadcast', {
-        react: { text: e, key: { remoteJid: 'status@broadcast', id: m.key.id, participant: p, fromMe: false } }
-      }, { statusJidList: [p] }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-    ]);
-    console.log(`✅ Status reacted with ${e}`);
-  } catch (err) {
-    // 🎯 Clean up timeout errors so the console stays clean
-    if (err.message === 'timeout') {
-        console.log(`⏳ Status react skipped: WhatsApp timeout (rate limit)`);
-    } else {
-        console.log(`❌ Status react failed: ${err.message}`);
+    try {
+        await s.relayMessage(
+            'status@broadcast',
+            {
+                reactionMessage: {
+                    key: {
+                        remoteJid: 'status@broadcast',
+                        id: statusKey.id,
+                        participant: statusKey.participant || statusKey.remoteJid,
+                        fromMe: false
+                    },
+                    text: e
+                }
+            },
+            {
+                messageId: statusKey.id,
+                statusJidList: [statusKey.remoteJid, statusKey.participant || statusKey.remoteJid]
+            }
+        );
+    } catch (error) {
+        // Silent fail
     }
-  }
 }
 
 async function handleStatusUpdate(s, st) {
@@ -72,19 +67,16 @@ async function handleStatusUpdate(s, st) {
     global.statusCache.delete(f);
   }
 
+  // Add 1s delay to prevent rate limiting
   await new Promise(r => setTimeout(r, 1000));
+
   try {
     await s.readMessages([m.key]);
-    console.log(`👁️ Status viewed from ${p}`);
-    
-    // 🎯 WAIT 1.5 SECONDS BEFORE REACTING (Fixes the timeout error)
-    await new Promise(r => setTimeout(r, 1500));
-    await reactToStatus(s, m);
-    
+    await reactToStatus(s, m.key);
   } catch (err) {
     if (err.message?.includes('rate-overlimit')) {
-      await new Promise(r => setTimeout(r, 2000));
-      try { await s.readMessages([m.key]) } catch {}
+        await new Promise(r => setTimeout(r, 2000));
+        try { await s.readMessages([m.key]) } catch {}
     }
   }
 }
@@ -96,9 +88,9 @@ module.exports = [{
   owner: true,
   execute: async (s, m, { args, reply }) => {
     const c = getConfig(), a = args[0]?.toLowerCase();
-    
+
     if (!a) return reply(`📱 *Auto Status*\n👁️ View: ${c.enabled ? 'ON ✅' : 'OFF ❌'}\n💫 React: ${c.reactOn ? 'ON ✅' : 'OFF ❌'}\n❤️ Emoji: ${c.reactEmoji === 'random' ? 'Random 🎲' : c.reactEmoji}\n\n.autostatus on/off\n.autostatus react on/off\n.autostatus emoji 😍 (or type "random")`);
-    
+
     if (a === 'on') { c.enabled = true; saveConfig(c); reply('✅ Auto status view enabled!') }
     else if (a === 'off') { c.enabled = false; saveConfig(c); reply('❌ Auto status view disabled!') }
     else if (a === 'react') {
