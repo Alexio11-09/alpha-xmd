@@ -3,188 +3,376 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha-XMD | Next-Gen WhatsApp Bot</title>
+<title>Alpha-XMD | Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/css/intlTelInput.css">
 <style>
-:root{--bg:#050505;--card:#0f0f11;--brd:#27272a;--txt:#fff;--mut:#a1a1aa;--pri:#00ff88;--pri-glow:rgba(0,255,136,.15)}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;position:relative}
-h1,h2,h3,h4,.brand{font-family:'Space Grotesk',sans-serif}
+:root {
+    --bg: #050505;
+    --sidebar-bg: #0a0a0c;
+    --card-bg: rgba(20, 20, 25, 0.6);
+    --brd: rgba(255, 255, 255, 0.08);
+    --txt: #ffffff;
+    --mut: #a1a1aa;
+    --pri: #00ff88;
+    --pri-glow: rgba(0, 255, 136, 0.15);
+    --danger: #ef4444;
+}
 
-.mesh{position:absolute;width:600px;height:600px;background:radial-gradient(circle,var(--pri-glow) 0%,transparent 60%);top:-200px;left:-200px;filter:blur(60px);z-index:0;pointer-events:none}
-.mesh2{position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(124,58,237,.1) 0%,transparent 60%);bottom:-100px;right:-100px;filter:blur(60px);z-index:0;pointer-events:none}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    overflow: hidden; /* Prevent body scroll, let main area scroll */
+}
+h1, h2, h3, h4, .brand { font-family: 'Space Grotesk', sans-serif; }
 
-nav{display:flex;justify-content:space-between;align-items:center;padding:24px 5%;border-bottom:1px solid rgba(255,255,255,.05);position:relative;z-index:10;backdrop-filter:blur(10px)}
-.brand{font-weight:700;font-size:20px;display:flex;align-items:center;gap:10px;letter-spacing:-.5px}
-.brand img{width:32px;height:32px;border-radius:8px}
-.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--pri);background:rgba(0,255,136,.1);padding:6px 14px;border-radius:20px;border:1px solid rgba(0,255,136,.2)}
-.dot{width:6px;height:6px;background:var(--pri);border-radius:50%;box-shadow:0 0 10px var(--pri);animation:pl 2s infinite}
-@keyframes pl{0%,100%{opacity:1}50%{opacity:.4}}
+/* 🎯 SIDEBAR */
+.sidebar {
+    width: 260px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--brd);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    z-index: 10;
+}
+.brand-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+}
+.brand-area img { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--brd); }
+.nav-links { display: flex; flex-direction: column; gap: 8px; }
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: var(--mut);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.3s;
+    text-decoration: none;
+}
+.nav-item:hover, .nav-item.active {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--txt);
+}
+.nav-item.active {
+    background: var(--pri-glow);
+    color: var(--pri);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+}
+.nav-item svg { width: 20px; height: 20px; }
 
-.hero{display:grid;grid-template-columns:1.1fr 1fr;gap:60px;align-items:center;max-width:1100px;margin:0 auto;padding:80px 5%;position:relative;z-index:10}
-.tag{display:inline-block;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:.5px;margin-bottom:20px;color:var(--mut)}
-.hero h1{font-size:52px;line-height:1.1;font-weight:700;margin-bottom:20px;letter-spacing:-1.5px}
-.hero h1 span{color:var(--pri);text-shadow:0 0 20px var(--pri-glow)}
-.hero p{font-size:17px;color:var(--mut);line-height:1.6;margin-bottom:35px;max-width:480px}
-.f-badges{display:flex;gap:20px;flex-wrap:wrap}
-.f-badge{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500}
-.f-badge svg{color:var(--pri)}
+/* 🎯 MAIN AREA */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+    position: relative;
+}
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 40px;
+    border-bottom: 1px solid var(--brd);
+    background: rgba(5, 5, 5, 0.8);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--pri);
+    background: var(--pri-glow);
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 255, 136, 0.2);
+}
+.dot { width: 8px; height: 8px; background: var(--pri); border-radius: 50%; box-shadow: 0 0 10px var(--pri); animation: pl 2s infinite; }
+@keyframes pl { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-.card{background:rgba(15,15,17,.7);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:32px;box-shadow:0 30px 60px rgba(0,0,0,.5);position:relative;animation:float 6s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)}
-.card h3{font-size:20px;margin-bottom:24px;display:flex;align-items:center;gap:10px}
+.page-content {
+    padding: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    display: none; /* Hidden by default */
+}
+.page-content.active { display: block; animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-.in-group{margin-bottom:20px}
-.in-group label{display:block;font-size:12px;color:var(--mut);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.btn{width:100%;padding:16px;background:var(--pri);color:#000;border:none;border-radius:12px;font-size:16px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:.3s;display:flex;justify-content:center;align-items:center;gap:10px}
-.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px var(--pri-glow)}
-.btn:disabled{background:#333;color:#888;cursor:not-allowed;transform:none;box-shadow:none}
-.sp{display:none;width:18px;height:18px;border:2px solid rgba(0,0,0,.3);border-radius:50%;border-top-color:#000;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* 🎯 STATS GRID */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--brd);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(20px);
+}
+.stat-card h4 { font-size: 14px; color: var(--mut); margin-bottom: 12px; font-weight: 500; }
+.stat-card .value { font-size: 28px; font-weight: 700; color: var(--txt); }
+.stat-card .value span { font-size: 14px; color: var(--pri); margin-left: 8px; }
 
-.res{display:none;margin-top:24px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.2);padding:24px;border-radius:16px;text-align:center;animation:fi .3s}
-@keyframes fi{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+/* 🎯 CARDS */
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--brd);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 24px;
+}
+.card h3 { font-size: 20px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+.card p.subtitle { font-size: 14px; color: var(--mut); margin-bottom: 24px; }
 
-/* 🎯 CODE AREA WITH COPY BUTTON */
-.code-container{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0;}
-.code{font-size:38px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:8px;color:var(--pri);text-shadow:0 0 30px var(--pri-glow);}
-.copy-btn{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--pri);padding:10px;border-radius:8px;cursor:pointer;transition:.3s;display:flex;align-items:center;justify-content:center;}
-.copy-btn:hover{background:rgba(0,255,136,.2);transform:translateY(-2px)}
-.copy-btn svg{width:22px;height:22px;}
+/* 🎯 FORMS & BUTTONS */
+.in-group { margin-bottom: 20px; }
+.in-group label { display: block; font-size: 13px; color: var(--mut); margin-bottom: 8px; font-weight: 500; }
+.btn {
+    padding: 14px 24px;
+    background: var(--pri);
+    color: #000;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px var(--pri-glow); }
+.btn:disabled { background: #333; color: #888; cursor: not-allowed; transform: none; box-shadow: none; }
 
-.mg{display:none;margin-top:24px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);padding:24px;border-radius:16px;text-align:center}
-.bd{background:transparent;border:1px solid #ef4444;color:#ef4444;margin-top:16px;padding:12px;font-size:14px}
-.bd:hover{background:rgba(239,68,68,.1);box-shadow:none}
+/* CODE BOX */
+.code-container { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.code-box {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    font-size: 32px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 6px;
+    color: var(--pri);
+    text-shadow: 0 0 20px var(--pri-glow);
+}
+.copy-btn {
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    color: var(--pri);
+    padding: 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.copy-btn:hover { background: rgba(0, 255, 136, 0.2); transform: translateY(-2px); }
+.copy-btn svg { width: 24px; height: 24px; }
 
-/* SETTINGS MODAL */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);backdrop-filter:blur(5px);z-index:1000;display:none;justify-content:center;align-items:center;opacity:0;transition:.3s}
-.modal.show{display:flex;opacity:1}
-.m-box{background:var(--card);border:1px solid var(--brd);width:90%;max-width:400px;border-radius:16px;padding:24px;transform:translateY(20px);transition:.3s}
-.modal.show .m-box{transform:translateY(0)}
-.m-box h3{margin-bottom:20px;font-size:18px}
-.set-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-.set-item:last-child{border-bottom:none}
-.set-name{font-size:14px;font-weight:500}
-.ts{position:relative;width:44px;height:24px}
-.ts input{opacity:0;width:0;height:0}
-.sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#3f3f46;transition:.4s;border-radius:24px}
-.sl:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;transition:.4s;border-radius:50%}
-input:checked+.sl{background:var(--pri)}
-input:checked+.sl:before{transform:translateX(20px)}
+/* SETTINGS GRID */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+.set-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--brd);
+    border-radius: 12px;
+}
+.set-name { font-size: 14px; font-weight: 500; }
+.ts { position: relative; width: 44px; height: 24px; }
+.ts input { opacity: 0; width: 0; height: 0; }
+.sl { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #3f3f46; transition: .4s; border-radius: 24px; }
+.sl:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; transition: .4s; border-radius: 50%; }
+input:checked + .sl { background: var(--pri); }
+input:checked + .sl:before { transform: translateX(20px); }
 
-/* Intl-Tel-Input Override */
+/* INTL TEL OVERRIDE */
 .iti { width: 100%; display: block; }
 .iti__flag-container { background: rgba(0,0,0,.5) !important; border-radius: 12px 0 0 12px !important; }
 .iti__selected-flag { background: transparent !important; padding: 0 16px !important; }
 .iti__selected-dial-code { color: #fff !important; font-family: 'Space Grotesk', sans-serif !important; font-size: 15px !important; margin-left: 8px !important; }
 .iti__arrow { border-top-color: #fff !important; }
-.iti__country-list { background: var(--card) !important; border: 1px solid var(--brd) !important; border-radius: 8px !important; color: #fff !important; box-shadow: 0 10px 30px rgba(0,0,0,.5) !important; width: 300px !important; }
+.iti__country-list { background: var(--sidebar-bg) !important; border: 1px solid var(--brd) !important; border-radius: 8px !important; color: #fff !important; box-shadow: 0 10px 30px rgba(0,0,0,.5) !important; width: 300px !important; z-index: 9999 !important; }
 .iti__country.iti__highlight { background: rgba(255,255,255,.1) !important; }
 .iti__dial-code { color: var(--mut) !important; }
-.iti__search-input { background: rgba(0,0,0,.5) !important; color: #fff !important; border: 1px solid var(--brd) !important; border-radius: 6px !important; padding: 10px !important; margin: 10px !important; width: calc(100% - 20px) !important; outline: none !important; }
-.iti__search-input::placeholder { color: #52525b !important; }
 #phone { width: 100%; padding: 16px 16px 16px 90px !important; background: rgba(0,0,0,.5) !important; border: 1px solid rgba(255,255,255,.1) !important; border-radius: 12px !important; color: #fff !important; font-size: 16px !important; outline: none !important; font-family: 'Space Grotesk', sans-serif !important; letter-spacing: 1px; transition: .3s; }
 #phone:focus { border-color: var(--pri) !important; box-shadow: 0 0 20px var(--pri-glow) !important; }
 
-@media(max-width:900px){
-.hero{grid-template-columns:1fr;text-align:center;gap:40px;padding:40px 5%}
-.hero h1{font-size:40px}
-.hero p{margin:0 auto 30px}
-.f-badges{justify-content:center}
+/* RESPONSIVE */
+@media(max-width: 768px) {
+    body { flex-direction: column; overflow-y: auto; }
+    .sidebar { width: 100%; padding: 16px; flex-direction: row; justify-content: space-between; align-items: center; gap: 0; border-right: none; border-bottom: 1px solid var(--brd); position: sticky; top: 0; z-index: 100; }
+    .nav-links { flex-direction: row; overflow-x: auto; gap: 8px; }
+    .nav-item span { display: none; }
+    .main-content { height: auto; overflow: visible; }
+    .page-content { padding: 20px; }
+    .top-bar { padding: 16px 20px; }
 }
 </style>
 </head>
 <body>
 
-<div class="mesh"></div>
-<div class="mesh2"></div>
-
-<nav>
-  <div class="brand"><img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg"> Alpha-XMD</div>
-  <div class="status"><div class="dot" id="s-dot"></div><span id="s-txt">Connecting...</span></div>
-</nav>
-
-<div class="hero">
-  <div>
-    <div class="tag">SYSTEMS ONLINE</div>
-    <h1>The Ultimate <span>WhatsApp Bot</span> Platform.</h1>
-    <p>Deploy a powerful multi-device WhatsApp bot in seconds. No servers, no coding, no hassle. Just select your country, enter your number, and go.</p>
-    <div class="f-badges">
-      <div class="f-badge"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 99.9% Uptime</div>
-      <div class="f-badge"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Secure Session</div>
+<!-- 🎯 SIDEBAR -->
+<div class="sidebar">
+    <div class="brand-area">
+        <img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg" alt="Logo">
+        <span>Alpha-XMD</span>
     </div>
-  </div>
-
-  <div class="card">
-    <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pri)" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Pairing Code</h3>
-
-    <div class="in-group" id="in-a">
-      <label>Phone Number</label>
-      <input type="tel" id="phone">
+    
+    <div class="nav-links">
+        <a class="nav-item active" onclick="switchTab('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Dashboard</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('pair')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Pairing</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Settings</span>
+        </a>
     </div>
-
-    <button class="btn" id="gen-b" onclick="rc()">
-      <span id="b-txt">Generate Code</span>
-      <div class="sp" id="sp"></div>
-    </button>
-
-    <div class="res" id="res-b">
-      <p style="font-size:13px;color:var(--mut)">Enter in WhatsApp > Linked Devices</p>
-      <!-- COPY BUTTON HERE -->
-      <div class="code-container">
-          <div class="code" id="cd">----</div>
-          <button class="copy-btn" onclick="copyCode()" title="Copy Code">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          </button>
-      </div>
-    </div>
-
-    <div class="mg" id="mg-b">
-      <h3 style="font-size:16px;margin-bottom:5px">Already Connected</h3>
-      <p style="font-size:13px;color:var(--mut)">This number is active in the cloud.</p>
-      <button class="btn bd" onclick="db()">Disconnect Session</button>
-      <button class="btn" style="margin-top:10px; background:rgba(255,255,255,.1); color:#fff;" onclick="openSettings()">⚙️ Manage Settings</button>
-    </div>
-  </div>
 </div>
 
-<!-- SETTINGS MODAL -->
-<div class="modal" id="setModal">
-  <div class="m-box">
-    <h3>Bot Settings</h3>
-    <div class="set-item">
-      <span class="set-name">Auto Read</span>
-      <label class="ts"><input type="checkbox" id="set-autoread"><span class="sl"></span></label>
+<!-- 🎯 MAIN AREA -->
+<div class="main-content">
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <h2 id="page-title">Dashboard</h2>
+        <div class="status-badge"><div class="dot" id="s-dot"></div><span id="s-txt">Connecting...</span></div>
     </div>
-    <div class="set-item">
-      <span class="set-name">Auto Typing</span>
-      <label class="ts"><input type="checkbox" id="set-autotyping"><span class="sl"></span></label>
+
+    <!-- TAB: DASHBOARD -->
+    <div class="page-content active" id="tab-dashboard">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>System Status</h4>
+                <div class="value" style="color: var(--pri);">Online</div>
+            </div>
+            <div class="stat-card">
+                <h4>Active Sessions</h4>
+                <div class="value">1 <span>Linked</span></div>
+            </div>
+            <div class="stat-card">
+                <h4>Ping / Latency</h4>
+                <div class="value">24 <span>ms</span></div>
+            </div>
+            <div class="stat-card">
+                <h4>Uptime</h4>
+                <div class="value">0d 0h <span>0m</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Welcome to Alpha-XMD</h3>
+            <p class="subtitle">Your ultimate WhatsApp automation dashboard. Use the sidebar to pair a new device or manage your bot settings.</p>
+            <button class="btn" onclick="switchTab('pair')">Go to Pairing</button>
+        </div>
     </div>
-    <div class="set-item">
-      <span class="set-name">Auto Recording</span>
-      <label class="ts"><input type="checkbox" id="set-autorecording"><span class="sl"></span></label>
+
+    <!-- TAB: PAIRING -->
+    <div class="page-content" id="tab-pair">
+        <div class="card">
+            <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pri)" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Link Device</h3>
+            <p class="subtitle">Enter your WhatsApp number to generate a pairing code.</p>
+
+            <div class="in-group" id="in-a">
+                <label>Phone Number</label>
+                <input type="tel" id="phone">
+            </div>
+
+            <button class="btn" id="gen-b" onclick="rc()">
+                <span id="b-txt">Generate Code</span>
+                <div class="sp" id="sp" style="display:none; width:18px; height:18px; border:2px solid #000; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></div>
+            </button>
+
+            <div class="res" id="res-b" style="display:none; margin-top:20px;">
+                <p style="font-size:13px;color:var(--mut); margin-bottom:10px;">Enter in WhatsApp > Linked Devices</p>
+                <div class="code-container">
+                    <div class="code-box" id="cd">----</div>
+                    <button class="copy-btn" onclick="copyCode()" title="Copy Code">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mg" id="mg-b" style="display:none; margin-top:20px; text-align:center;">
+                <h3 style="font-size:16px; color:var(--pri); margin-bottom:10px;">Already Connected</h3>
+                <p style="font-size:13px;color:var(--mut); margin-bottom:20px;">This number is active in the cloud.</p>
+                <button class="btn" style="background:transparent; border:1px solid var(--danger); color:var(--danger);" onclick="db()">Disconnect Session</button>
+            </div>
+        </div>
     </div>
-    <div class="set-item">
-      <span class="set-name">Anti-Delete</span>
-      <label class="ts"><input type="checkbox" id="set-antidelete"><span class="sl"></span></label>
+
+    <!-- TAB: SETTINGS -->
+    <div class="page-content" id="tab-settings">
+        <div class="card">
+            <h3>Bot Configuration</h3>
+            <p class="subtitle">Manage your session features and global protections.</p>
+
+            <h4 style="font-size:12px; color:var(--mut); margin-bottom:10px; text-transform:uppercase;">Session Features</h4>
+            <div class="settings-grid" style="margin-bottom:24px;">
+                <div class="set-item"><span class="set-name">Auto Read</span><label class="ts"><input type="checkbox" id="set-autoread"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Auto Typing</span><label class="ts"><input type="checkbox" id="set-autotyping"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Anti-Delete</span><label class="ts"><input type="checkbox" id="set-antidelete"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Anti-Link</span><label class="ts"><input type="checkbox" id="set-antilink"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Auto React</span><label class="ts"><input type="checkbox" id="set-autoreact"><span class="sl"></span></label></div>
+            </div>
+
+            <h4 style="font-size:12px; color:var(--mut); margin-bottom:10px; text-transform:uppercase;">Global Protection</h4>
+            <div class="settings-grid" style="margin-bottom:24px;">
+                <div class="set-item"><span class="set-name">Anti-Call (Warn)</span><label class="ts"><input type="checkbox" id="set-anticall"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Anti-Bot</span><label class="ts"><input type="checkbox" id="set-antibot"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Anti-Group Mention</span><label class="ts"><input type="checkbox" id="set-antigroupmention"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Auto Sticker</span><label class="ts"><input type="checkbox" id="set-autosticker"><span class="sl"></span></label></div>
+                <div class="set-item"><span class="set-name">Auto Bio</span><label class="ts"><input type="checkbox" id="set-autobio"><span class="sl"></span></label></div>
+            </div>
+
+            <button class="btn" onclick="saveSettings()">Save Settings</button>
+        </div>
     </div>
-    <div class="set-item">
-      <span class="set-name">Anti-Edit</span>
-      <label class="ts"><input type="checkbox" id="set-antiedit"><span class="sl"></span></label>
-    </div>
-    <div class="set-item">
-      <span class="set-name">Anti-Link</span>
-      <label class="ts"><input type="checkbox" id="set-antilink"><span class="sl"></span></label>
-    </div>
-    <div class="set-item">
-      <span class="set-name">Auto React</span>
-      <label class="ts"><input type="checkbox" id="set-autoreact"><span class="sl"></span></label>
-    </div>
-    <button class="btn" style="margin-top:20px" onclick="saveSettings()">Save Settings</button>
-    <button class="btn" style="margin-top:10px; background:transparent; color:var(--mut); border:1px solid var(--brd);" onclick="closeSettings()">Close</button>
-  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/intlTelInput.min.js"></script>
@@ -199,44 +387,57 @@ document.addEventListener("DOMContentLoaded", () => {
         separateDialCode: true,
         dropdownContainer: document.body,
     });
+    us(); // Check status on load
 });
 
+// 🎯 TAB SWITCHER LOGIC
+function switchTab(tabId) {
+    document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    event.currentTarget.classList.add('active');
+    
+    const titles = { dashboard: 'Dashboard', pair: 'Pairing System', settings: 'Settings' };
+    document.getElementById('page-title').innerText = titles[tabId];
+}
+
 async function us(){
-try{
-const r=await fetch(AU+"/api/stats",{headers:{'ngrok-skip-browser-warning':'true'}});
-const d=await r.json();
-if(d.status==="online"){
-document.getElementById('s-txt').innerText="Systems Online";
+    try{
+        const r=await fetch(AU+"/api/stats",{headers:{'ngrok-skip-browser-warning':'true'}});
+        const d=await r.json();
+        if(d.status==="online"){
+            document.getElementById('s-txt').innerText="Systems Online";
+        }
+    }catch(e){
+        document.getElementById('s-txt').innerText="Server Offline";
+        document.getElementById('s-txt').style.color="#ef4444";
+        document.getElementById('s-dot').style.background="#ef4444";
+    }
 }
-}catch(e){
-document.getElementById('s-txt').innerText="Server Offline";
-document.getElementById('s-txt').style.color="#ef4444";
-document.getElementById('s-dot').style.background="#ef4444";
-}
-}setInterval(us,15000);us();
+setInterval(us,15000);
 
 async function rc(){
-const p = iti.getNumber().replace("+", ""); 
-if(!iti.isValidNumber()) return alert("Please enter a valid phone number.");
-cp=p;
-const b=document.getElementById('gen-b'),bt=document.getElementById('b-txt'),sp=document.getElementById('sp'),rb=document.getElementById('res-b'),mb=document.getElementById('mg-b'),ia=document.getElementById('in-a');
-b.disabled=true;bt.innerText="Connecting...";sp.style.display="block";rb.style.display="none";mb.style.display="none";
-try{
-const r=await fetch(AU+"/api/pair",{method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},body:JSON.stringify({phoneNumber:p})});
-const d=await r.json();
-if(d.success){
-b.style.display='none';ia.style.display='none';
-if(d.alreadyPaired)mb.style.display='block';
-else{rb.style.display='block';document.getElementById('cd').innerText=d.code}
-}else{
-alert(d.error||"Failed to generate code.");b.disabled=false;bt.innerText="Generate Code";sp.style.display="none";
-}
-}catch(e){
-alert("Network Error. Try again.");b.disabled=false;bt.innerText="Generate Code";sp.style.display="none";
-}
+    const p = iti.getNumber().replace("+", ""); 
+    if(!iti.isValidNumber()) return alert("Please enter a valid phone number.");
+    cp=p;
+    const b=document.getElementById('gen-b'),bt=document.getElementById('b-txt'),sp=document.getElementById('sp'),rb=document.getElementById('res-b'),mb=document.getElementById('mg-b'),ia=document.getElementById('in-a');
+    b.disabled=true;bt.innerText="Connecting...";sp.style.display="block";rb.style.display="none";mb.style.display="none";
+    try{
+        const r=await fetch(AU+"/api/pair",{method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},body:JSON.stringify({phoneNumber:p})});
+        const d=await r.json();
+        if(d.success){
+            b.style.display='none';ia.style.display='none';
+            if(d.alreadyPaired)mb.style.display='block';
+            else{rb.style.display='block';document.getElementById('cd').innerText=d.code}
+        }else{
+            alert(d.error||"Failed to generate code.");b.disabled=false;bt.innerText="Generate Code";sp.style.display="none";
+        }
+    }catch(e){
+        alert("Network Error. Try again.");b.disabled=false;bt.innerText="Generate Code";sp.style.display="none";
+    }
 }
 
-// 🎯 COPY FUNCTION FOR WEBSITE
 function copyCode(){
     const code = document.getElementById('cd').innerText;
     if(code === '----') return;
@@ -244,44 +445,24 @@ function copyCode(){
         const btn = document.querySelector('.copy-btn');
         const originalHTML = btn.innerHTML;
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-        btn.style.color = "#fff";
-        btn.style.background = "var(--pri)";
-        setTimeout(() => { 
-            btn.innerHTML = originalHTML; 
-            btn.style.color = "var(--pri)";
-            btn.style.background = "rgba(0,255,136,.1)";
-        }, 2000);
+        btn.style.color = "#fff"; btn.style.background = "var(--pri)";
+        setTimeout(() => { btn.innerHTML = originalHTML; btn.style.color = "var(--pri)"; btn.style.background = "rgba(0,255,136,.1)"; }, 2000);
     }).catch(err => alert("Failed to copy: " + err));
 }
 
-async function openSettings(){
-    document.getElementById('setModal').classList.add('show');
-    try {
-        const r = await fetch(AU+"/api/settings?phoneNumber="+cp, {headers:{'ngrok-skip-browser-warning':'true'}});
-        const d = await r.json();
-        document.getElementById('set-autoread').checked = d.autoread || false;
-        document.getElementById('set-autotyping').checked = d.autotyping || false;
-        document.getElementById('set-autorecording').checked = d.autorecording || false;
-        document.getElementById('set-antidelete').checked = d.antidelete || false;
-        document.getElementById('set-antiedit').checked = d.antiedit || false;
-        document.getElementById('set-antilink').checked = d.antilink || false;
-        document.getElementById('set-autoreact').checked = d.autoreact || false;
-    } catch(e) {
-        console.error("Failed to load settings", e);
-    }
-}
-
-function closeSettings(){ document.getElementById('setModal').classList.remove('show'); }
-
 async function saveSettings(){
+    if(!cp) return alert("Please pair a number first.");
     const settings = {
         autoread: document.getElementById('set-autoread').checked,
         autotyping: document.getElementById('set-autotyping').checked,
-        autorecording: document.getElementById('set-autorecording').checked,
         antidelete: document.getElementById('set-antidelete').checked,
-        antiedit: document.getElementById('set-antiedit').checked,
         antilink: document.getElementById('set-antilink').checked,
         autoreact: document.getElementById('set-autoreact').checked,
+        anticall: document.getElementById('set-anticall').checked,
+        antibot: document.getElementById('set-antibot').checked,
+        antigroupmention: document.getElementById('set-antigroupmention').checked,
+        autosticker: document.getElementById('set-autosticker').checked,
+        autobio: document.getElementById('set-autobio').checked
     };
     try {
         await fetch(AU+"/api/settings", {
@@ -290,17 +471,15 @@ async function saveSettings(){
             body: JSON.stringify({phoneNumber: cp, settings: settings})
         });
         alert("Settings Saved! The bot will apply them immediately.");
-        closeSettings();
     } catch(e) { alert("Failed to save settings."); }
 }
 
 async function db(){
-if(!confirm("Unlink device?"))return;
-const b=document.querySelector('.bd');b.innerText="Disconnecting...";b.disabled=true;
-try{
-await fetch(AU+"/api/disconnect",{method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},body:JSON.stringify({phoneNumber:cp})});
-window.location.reload();
-}catch(e){alert("Failed.");b.innerText="Disconnect";b.disabled=false}
+    if(!confirm("Unlink device?"))return;
+    try{
+        await fetch(AU+"/api/disconnect",{method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},body:JSON.stringify({phoneNumber:cp})});
+        window.location.reload();
+    }catch(e){alert("Failed to disconnect.");}
 }
 </script>
 </body>
