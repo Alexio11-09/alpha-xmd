@@ -39,7 +39,6 @@ global.pollCache = new Map();
 setInterval(() => {
     store.clear();
     global.pollCache.clear();
-    console.log("🧹 Cleared message cache to free RAM.");
 }, 30 * 60 * 1000); 
 
 let autoStatusHandler; try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
@@ -135,8 +134,12 @@ function attachHandlers(sock, phoneNumber) {
       for (const mek of chatUpdate.messages) {
         const remote = mek.key?.remoteJid;
 
+        // 🎯 STATUS HANDLER (Non-blocking)
         if (remote === "status@broadcast") {
-          if (autoStatusHandler.handleStatusUpdate) await autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] });
+          if (autoStatusHandler.handleStatusUpdate) {
+              autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {});
+          }
+          continue; 
         }
 
         if (!mek.message) continue;
@@ -151,7 +154,7 @@ function attachHandlers(sock, phoneNumber) {
 
             let autoReactChannels = {};
             try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
-            
+
             if (autoReactChannels[remote]) {
                 const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
                 (async () => {
@@ -355,7 +358,7 @@ async function startBot(phoneNumber) {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 15000,
-      
+
       syncFullHistory: false, 
       getMessage: async () => { return { conversation: '' }; },
     });
@@ -366,7 +369,7 @@ async function startBot(phoneNumber) {
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect } = update;
       if (connection === "open") console.log(chalk.green(`✅ [${phoneNumber}] Bot Connected!`));
-      
+
       if (connection === "close") {
         try {
             sock.ev.removeAllListeners();
@@ -473,9 +476,9 @@ app.get("/api/settings", (req, res) => {
 app.post("/api/settings", (req, res) => {
   const { phoneNumber, settings } = req.body;
   const dir = path.join(sessionsDir, phoneNumber);
-  
+
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  
+
   fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(settings, null, 2));
   console.log(`[WEBSITE SAVED] ${phoneNumber}:`, settings); 
   res.json({ success: true });
@@ -513,7 +516,7 @@ app.post("/api/settings", (req, res) => {
     setInterval(() => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
-      
+
       if (used > 380) {
         console.log(`⚠️ Memory limit reached (${Math.round(used)}MB). Restarting bot to prevent crash...`);
         process.exit(1); 
