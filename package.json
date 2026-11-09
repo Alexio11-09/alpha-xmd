@@ -12,6 +12,7 @@
     "@hapi/boom": "^10.0.1",
     "@ngrok/ngrok": "^1.1.0",
     "@pontalabs/ytdl": "^1.0.0",
+    "@raihan07/vidly": "^13.0.3",
     "@supabase/supabase-js": "^2.39.0",
     "@whiskeysockets/baileys": "^7.0.0-rc.14",
     "adm-zip": "^0.5.10",
