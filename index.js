@@ -397,7 +397,18 @@ async function startBot(phoneNumber) {
 
 global.startBot = startBot;
 
-app.get("/api/stats", (req, res) => res.json({ connected: activeSockets.size, status: "online" }));
+// 🎯 REAL STATS API FOR THE NEW DASHBOARD
+app.get("/api/stats", (req, res) => {
+  const used = process.memoryUsage().heapUsed / 1024 / 1024;
+  res.json({ 
+    connected: activeSockets.size, 
+    status: "online",
+    uptime: process.uptime(), // Real uptime in seconds
+    memory: Math.round(used * 100) / 100, // Real RAM usage in MB
+    sessions: activeSockets.size 
+  });
+});
+
 app.get("/api/status", (req, res) => res.json({ connected: activeSockets.has(req.query.phoneNumber) }));
 
 app.post("/api/pair", rateLimiter, async (req, res) => {
