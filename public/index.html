@@ -181,7 +181,7 @@ input:checked + .sl:before { transform: translateX(20px); }
         </div>
     </div>
 
-    <!-- TAB: DASHBOARD (Includes Real Stats, User Info, & Settings) -->
+    <!-- TAB: DASHBOARD -->
     <div class="page-content active" id="tab-dashboard">
         
         <!-- REAL STATS -->
@@ -192,11 +192,11 @@ input:checked + .sl:before { transform: translateX(20px); }
             </div>
             <div class="stat-card">
                 <h4>Uptime</h4>
-                <div class="value" id="stat-uptime">0h 0m</div>
+                <div class="value" id="stat-uptime">N/A</div>
             </div>
             <div class="stat-card">
                 <h4>RAM Usage</h4>
-                <div class="value" id="stat-ram">0 MB</div>
+                <div class="value" id="stat-ram">N/A</div>
             </div>
             <div class="stat-card">
                 <h4>Active Sessions</h4>
@@ -204,19 +204,11 @@ input:checked + .sl:before { transform: translateX(20px); }
             </div>
         </div>
 
-        <!-- USER DETECTION -->
+        <!-- USER DETECTION (Country only) -->
         <div class="stats-grid">
             <div class="stat-card" style="background: rgba(0, 255, 136, 0.05);">
-                <h4>Your IP Address</h4>
-                <div class="value" id="user-ip" style="font-size: 18px;">Detecting...</div>
-            </div>
-            <div class="stat-card" style="background: rgba(0, 255, 136, 0.05);">
-                <h4>Your Country</h4>
+                <h4>Detected Location</h4>
                 <div class="value" id="user-country" style="font-size: 18px;">Detecting...</div>
-            </div>
-            <div class="stat-card" style="background: rgba(0, 255, 136, 0.05);">
-                <h4>Device Battery</h4>
-                <div class="value" id="user-battery" style="font-size: 18px;">Detecting...</div>
             </div>
         </div>
 
@@ -302,29 +294,21 @@ function switchTab(tabId) {
     document.getElementById('page-title').innerText = titles[tabId];
 }
 
-// 🎯 USER DETECTION LOGIC
+// 🎯 USER DETECTION (Country only, auto-selects country code)
 async function detectUser() {
-    // 1. Battery
-    if (navigator.getBattery) {
-        try {
-            const battery = await navigator.getBattery();
-            document.getElementById('user-battery').innerText = `${Math.round(battery.level * 100)}% ${battery.charging ? '(Charging)' : ''}`;
-        } catch(e) { document.getElementById('user-battery').innerText = 'Unavailable'; }
-    } else {
-        document.getElementById('user-battery').innerText = 'Unavailable';
-    }
-
-    // 2. IP & Country
     try {
         const res = await fetch('https://ipwho.is/');
         const data = await res.json();
         if (data.success) {
-            document.getElementById('user-ip').innerText = data.ip;
             document.getElementById('user-country').innerText = `${data.country} ${data.flag?.emoji || ''}`;
+            
+            // 🎯 Automatically set the phone input to the detected country
+            if (iti && data.country_code) {
+                iti.setCountry(data.country_code.toLowerCase());
+            }
         }
     } catch(e) {
-        document.getElementById('user-ip').innerText = 'Hidden';
-        document.getElementById('user-country').innerText = 'Hidden';
+        document.getElementById('user-country').innerText = 'Unknown';
     }
 }
 
@@ -332,15 +316,19 @@ async function detectUser() {
 async function fetchStats() {
     try {
         const r = await fetch(AU + "/api/stats", { headers: { 'ngrok-skip-browser-warning': 'true' } });
+        if (!r.ok) throw new Error("Server Offline");
         const d = await r.json();
         
         if (d.status === "online") {
             document.getElementById('s-txt').innerText = "Systems Online";
-            document.getElementById('stat-ram').innerText = d.memory + " MB";
-            document.getElementById('stat-sessions').innerText = d.sessions;
+            document.getElementById('s-txt').style.color = "var(--pri)";
+            document.getElementById('s-dot').style.background = "var(--pri)";
+            
+            document.getElementById('stat-ram').innerText = (d.memory || 0) + " MB";
+            document.getElementById('stat-sessions').innerText = d.sessions || 0;
             
             // Format Uptime
-            let sec = Math.floor(d.uptime);
+            let sec = Math.floor(d.uptime || 0);
             let hrs = Math.floor(sec / 3600);
             let mins = Math.floor((sec % 3600) / 60);
             document.getElementById('stat-uptime').innerText = `${hrs}h ${mins}m`;
@@ -349,6 +337,10 @@ async function fetchStats() {
         document.getElementById('s-txt').innerText = "Server Offline";
         document.getElementById('s-txt').style.color = "var(--danger)";
         document.getElementById('s-dot').style.background = "var(--danger)";
+        // Prevent ugly NaN/undefined errors when server is down
+        document.getElementById('stat-ram').innerText = "N/A";
+        document.getElementById('stat-sessions').innerText = "0";
+        document.getElementById('stat-uptime').innerText = "N/A";
     }
 }
 
@@ -357,12 +349,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const input = document.querySelector("#phone");
     iti = window.intlTelInput(input, {
         utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/utils.js",
-        initialCountry: "zw",
+        initialCountry: "zw", // Default fallback
         separateDialCode: true,
         dropdownContainer: document.body,
     });
     
-    detectUser();
+    detectUser(); // Detects country and sets it
     fetchStats();
     setInterval(fetchStats, 5000); // Poll real stats every 5 seconds
 });
