@@ -23,12 +23,15 @@ function saveConfig(d) { fs.writeFileSync(configPath, JSON.stringify(d, null, 2)
 function isAutoStatusEnabled() { return getConfig().enabled }
 function isReactEnabled() { return getConfig().reactOn }
 
-// 🎯 THE KNIGHTBOT REACTION METHOD (The secret sauce)
+// 🎯 THE KNIGHTBOT REACTION METHOD (With "Goated alpha" text)
 async function reactToStatus(s, statusKey) {
     if (!isReactEnabled()) return;
     
     const conf = getConfig();
     let e = (conf.reactEmoji && conf.reactEmoji !== 'random') ? conf.reactEmoji : (conf.reactEmojis || defaultEmojis)[Math.floor(Math.random() * (conf.reactEmojis || defaultEmojis).length)];
+
+    // 🎯 The exact text you want to appear with the emoji
+    const finalReaction = `${e} Goated alpha`;
 
     try {
         await s.relayMessage(
@@ -41,7 +44,7 @@ async function reactToStatus(s, statusKey) {
                         participant: statusKey.participant || statusKey.remoteJid,
                         fromMe: false
                     },
-                    text: e
+                    text: finalReaction // 🎯 Sends "🔥 Goated alpha"
                 }
             },
             {
@@ -67,17 +70,26 @@ async function handleStatusUpdate(s, st) {
     global.statusCache.delete(f);
   }
 
-  // Add 1s delay to prevent rate limiting
-  await new Promise(r => setTimeout(r, 1000));
+  // 🎯 1.5 SECOND DELAY BEFORE VIEWING
+  // This ensures WhatsApp fully registers the status so your bot's number 
+  // definitely shows up in the "Viewed by" list.
+  await new Promise(r => setTimeout(r, 1500));
 
+  // 🎯 VIEW THE STATUS
   try {
     await s.readMessages([m.key]);
+  } catch (e) {
+    // Ignore read errors
+  }
+
+  // 🎯 500MS DELAY BEFORE REACTING
+  // Ensures the view packet is processed before the reaction is sent.
+  await new Promise(r => setTimeout(r, 500));
+
+  try {
     await reactToStatus(s, m.key);
   } catch (err) {
-    if (err.message?.includes('rate-overlimit')) {
-        await new Promise(r => setTimeout(r, 2000));
-        try { await s.readMessages([m.key]) } catch {}
-    }
+    // Silent fail
   }
 }
 
