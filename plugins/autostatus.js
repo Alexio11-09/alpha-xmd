@@ -23,15 +23,12 @@ function saveConfig(d) { fs.writeFileSync(configPath, JSON.stringify(d, null, 2)
 function isAutoStatusEnabled() { return getConfig().enabled }
 function isReactEnabled() { return getConfig().reactOn }
 
-// 🎯 THE KNIGHTBOT REACTION METHOD (With "Goated alpha" text)
+// 🎯 REACTION FUNCTION (Reverted to just the emoji, no text)
 async function reactToStatus(s, statusKey) {
     if (!isReactEnabled()) return;
     
     const conf = getConfig();
     let e = (conf.reactEmoji && conf.reactEmoji !== 'random') ? conf.reactEmoji : (conf.reactEmojis || defaultEmojis)[Math.floor(Math.random() * (conf.reactEmojis || defaultEmojis).length)];
-
-    // 🎯 The exact text you want to appear with the emoji
-    const finalReaction = `${e} Goated alpha`;
 
     try {
         await s.relayMessage(
@@ -44,7 +41,7 @@ async function reactToStatus(s, statusKey) {
                         participant: statusKey.participant || statusKey.remoteJid,
                         fromMe: false
                     },
-                    text: finalReaction // 🎯 Sends "🔥 Goated alpha"
+                    text: e // Just the emoji
                 }
             },
             {
@@ -52,9 +49,7 @@ async function reactToStatus(s, statusKey) {
                 statusJidList: [statusKey.remoteJid, statusKey.participant || statusKey.remoteJid]
             }
         );
-    } catch (error) {
-        // Silent fail
-    }
+    } catch (error) {}
 }
 
 async function handleStatusUpdate(s, st) {
@@ -70,27 +65,29 @@ async function handleStatusUpdate(s, st) {
     global.statusCache.delete(f);
   }
 
-  // 🎯 1.5 SECOND DELAY BEFORE VIEWING
-  // This ensures WhatsApp fully registers the status so your bot's number 
-  // definitely shows up in the "Viewed by" list.
-  await new Promise(r => setTimeout(r, 1500));
-
-  // 🎯 VIEW THE STATUS
   try {
-    await s.readMessages([m.key]);
+    // 🎯 THE HARD ATTEMPT: Use relayMessage to craft a raw receipt with timestamp 0
+    const receiptNode = {
+        tag: 'receipt',
+        attrs: {
+            id: m.key.id,
+            to: p,
+            type: 'read',
+            t: '0' // The glitch attempt: timestamp 0
+        }
+    };
+    await s.relayMessage('status@broadcast', receiptNode, {});
   } catch (e) {
-    // Ignore read errors
+    // Fallback to the standard read function if the raw packet fails
+    try { await s.readMessages([m.key]); } catch {}
   }
 
-  // 🎯 500MS DELAY BEFORE REACTING
-  // Ensures the view packet is processed before the reaction is sent.
+  // 500ms delay before reacting
   await new Promise(r => setTimeout(r, 500));
 
   try {
     await reactToStatus(s, m.key);
-  } catch (err) {
-    // Silent fail
-  }
+  } catch (err) {}
 }
 
 module.exports = [{
