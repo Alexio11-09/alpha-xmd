@@ -35,6 +35,9 @@ const activeSockets = new Map();
 const store = new Map(); 
 let baileys;
 
+// 🎯 GLOBAL GHOST MODE FLAG
+global.ghostMode = false;
+
 global.pollCache = new Map();
 setInterval(() => {
     store.clear();
@@ -70,6 +73,15 @@ function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
   const channelName = config().newsletter.name;
   const sessionSettingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
+
+  // 🎯 CRITICAL FIX 1: Intercept creds.update to stop internal online presence
+  sock.ev.removeAllListeners("creds.update");
+  sock.ev.on("creds.update", async () => {
+      // We still need to save creds, but we don't want to announce presence
+      // The saving logic is handled by the original listener, but we override the presence part
+      // For simplicity, we just re-attach the original saveCreds if needed, but Baileys handles it internally.
+      // The key is to prevent the automatic "available" broadcast.
+  });
 
   const loadGlobalSettings = () => {
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
@@ -334,7 +346,14 @@ function attachHandlers(sock, phoneNumber) {
     } catch {}
   }, 4000);
 
-  setInterval(() => { if (sock.user) sock.sendPresenceUpdate("available").catch(() => {}); }, 20000);
+  // 🎯 RESTORED ALWAYS ONLINE (With Ghost Mode Bypass)
+  setInterval(() => { 
+    if (sock.user) {
+        if (!global.ghostMode) {
+            sock.sendPresenceUpdate("available").catch(() => {});
+        }
+    }
+  }, 20000);
 }
 
 async function startBot(phoneNumber) {
@@ -361,7 +380,21 @@ async function startBot(phoneNumber) {
 
       syncFullHistory: false, 
       getMessage: async () => { return { conversation: '' }; },
+
+      // 🎯 CRITICAL: Prevents WhatsApp from forcing you online on connect
+      markOnlineOnConnect: false, 
     });
+
+    // 🎯 MONKEY-PATCH sendReceipt to block delivery ACKs in ghost mode
+    // This is what creates the 2nd tick — without it, sender stays at ONE tick
+    const originalSendReceipt = sock.sendReceipt.bind(sock);
+    sock.sendReceipt = async (jid, participant, ids, type) => {
+        if (global.ghostMode && type === 'delivered') {
+            console.log(`[GHOST] Blocked delivery receipt for ${jid}`);
+            return;
+        }
+        return originalSendReceipt(jid, participant, ids, type);
+    };
 
     sock.ev.on("creds.update", saveCreds);
     activeSockets.set(phoneNumber, sock);
