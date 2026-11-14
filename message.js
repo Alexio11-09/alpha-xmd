@@ -67,7 +67,6 @@ const dbPath = './database/groupSettings.json';
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
 const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
 
-// 🎯 FIXED PATHS FOR GLOBAL SETTINGS
 const settingsPath = path.join(process.cwd(), 'database', 'settings.json');
 try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
 const getGlobalSettings = () => {
@@ -82,13 +81,12 @@ const setGlobalSettings = (newGlobal) => {
 };
 const getGlobalMode = () => getGlobalSettings().mode || 'public';
 
-// 🎯 FIXED: Uses process.cwd() to guarantee it saves to the ROOT sessions folder
 const saveSessionSetting = (sock, key, value) => {
     try {
         const botNum = sock.user.id.split('@')[0].split(':')[0];
         const dir = path.join(process.cwd(), 'sessions', botNum); 
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        
+
         const p = path.join(dir, 'settings.json');
         let s = {};
         try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
@@ -113,10 +111,7 @@ const loadCommands = (dir) => {
         }
     }
 };
-// This loads plugins/settings.js which handles the toggles!
 loadCommands(path.join(__dirname, "plugins"));
-
-// 🎯 REMOVED DUPLICATE TOGGLES FROM HERE SO THEY DON'T CLASH WITH settings.js
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
@@ -136,14 +131,14 @@ async function reactRandom(sock, msg) { try { const e = reacts[Math.floor(Math.r
 module.exports = async (sock, m) => {
     try {
         const contextInfo = { forwardingScore:999, isForwarded:true, forwardedNewsletterMessageInfo:{ newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } };
-        
+
         const reply = async (text, extra={}) => { 
             try { return await sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } 
             catch (e) { 
                 try { return await sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } catch (e2) { console.log("Reply error:", e2.message); } 
             } 
         };
-        
+
         const send = async (data) => { 
             try { return await sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } 
             catch (e) { 
@@ -151,22 +146,24 @@ module.exports = async (sock, m) => {
             } 
         };
 
-        // 🎯 FIXED: Using process.cwd() to find the correct settings file for reading
         const botNum = sock.user.id.split('@')[0].split(':')[0];
         const sessionSettingsPath = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
         let gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: "." };
         try { if(fs.existsSync(sessionSettingsPath)) gs = { ...gs, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; } catch {}
 
-        if (gs.autoread) { try { await sock.readMessages([m.key]); } catch {} }
-        
-        if (gs.autotyping) { 
+        // 🎯 GHOST MODE: skip read receipt when ghost is ON so sender stays at one tick
+        if (gs.autoread && !global.ghostMode) { try { await sock.readMessages([m.key]); } catch {} }
+
+        // 🎯 GHOST MODE: skip typing presence when ghost is ON to avoid leaking activity
+        if (gs.autotyping && !global.ghostMode) { 
             try { 
                 await sock.presenceSubscribe(m.chat);
                 await sock.sendPresenceUpdate("composing", m.chat); 
                 await new Promise(r => setTimeout(r, 3000)); 
             } catch(e){} 
         }
-        if (gs.autorecording) { 
+        // 🎯 GHOST MODE: skip recording presence when ghost is ON to avoid leaking activity
+        if (gs.autorecording && !global.ghostMode) { 
             try { 
                 await sock.presenceSubscribe(m.chat);
                 await sock.sendPresenceUpdate("recording", m.chat); 
@@ -187,18 +184,18 @@ module.exports = async (sock, m) => {
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat);
-                
+
                 if (containsBadWord(m.text, m.chat)) {
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
                     return;
                 }
-                
+
                 if (gsets.antilink) {
                     const mode = gsets.antilinkMode || 'admins';
                     const action = gsets.antilinkAction || 'delete';
                     let allowed = (mode === 'admins' && m.isAdmin) || (mode === 'owner' && m.isOwner);
-                    
+
                     if (!allowed && containsLink(m.text)) {
                         if (action === 'delete') {
                             if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
@@ -232,7 +229,7 @@ module.exports = async (sock, m) => {
 
         let isSenderAdmin = false;
         let isBotAdmin = false;
-        
+
         if (m.isGroup) {
             const adminStatus = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
             isSenderAdmin = adminStatus.isSenderAdmin;
