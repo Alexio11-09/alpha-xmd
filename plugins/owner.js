@@ -47,6 +47,35 @@ module.exports=[
         r(`📝 Autobio is ${d.enabled?'ON':'OFF'}`);
     }
 }},
+{command:"ghost",aliases:["freeze","fakeseen"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
+    const val = a[0]?.toLowerCase();
+    if (val === 'on') {
+        global.ghostMode = true;
+        try {
+            await s.updateLastSeenPrivacy('none').catch(() => {});
+            await s.updateOnlinePrivacy('match_last_seen').catch(() => {});
+            await s.updateReadReceiptsPrivacy('none').catch(() => {}); // 🔥 KILLS BLUE TICKS ACCOUNT-WIDE
+            await s.sendPresenceUpdate('unavailable').catch(() => {});
+            return r(`👻 *Ghost Mode ON*\n\n✅ Last Seen → HIDDEN\n✅ Online → HIDDEN\n✅ Read Receipts → DISABLED (no blue ticks from ANY device)\n✅ Bot stays OFFLINE → sender gets ONE tick\n✅ Bot still replies normally`);
+        } catch (e) {
+            global.ghostMode = false;
+            return r(`❌ Failed to set ghost mode: ${e.message}`);
+        }
+    } else if (val === 'off') {
+        global.ghostMode = false;
+        try {
+            await s.updateLastSeenPrivacy('all').catch(() => {});
+            await s.updateOnlinePrivacy('all').catch(() => {});
+            await s.updateReadReceiptsPrivacy('all').catch(() => {});
+            await s.sendPresenceUpdate('available').catch(() => {});
+            return r(`👻 *Ghost Mode OFF*\n\n✅ Always Online restored\n✅ Last Seen visible\n✅ Read Receipts restored`);
+        } catch (e) {
+            return r(`❌ Failed: ${e.message}`);
+        }
+    } else {
+        return r(`Usage: .ghost on/off\nCurrent: ${global.ghostMode ? 'ON' : 'OFF'}`);
+    }
+}},
 {command:"deljunk",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{let t=os.tmpdir(),c=0;fs.readdirSync(t).forEach(f=>{if(f.startsWith('junk_')){fs.rmSync(path.join(t,f),{recursive:1,force:1});c++}});r(`🗑️ ${c} files`)}catch{r("❌ Failed")}}},
 {command:"disk",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{r(`💾 ${exec('df -h /').toString()}`)}catch{r("❌ Failed")}}},
 {command:"tostatus",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!m.quoted)return r("❌ Reply to a message/status to post.");try{const q=m.quoted,type=Object.keys(q.message)[0],sjl=[s.user.id];if(type==='conversation'||type==='extendedTextMessage'){const txt=q.text||q.message?.conversation||q.message?.extendedTextMessage?.text||a.join(' ');if(!txt)return r("❌ No text.");await s.sendMessage('status@broadcast',{text:txt,backgroundColor:'#000000'},{statusJidList:sjl});return r("✅ Text posted!")}if(type==='imageMessage'){const st=await downloadContentFromMessage(q.message.imageMessage,'image');let b=Buffer.from([]);for await(const c of st)b=Buffer.concat([b,c]);await s.sendMessage('status@broadcast',{image:b,caption:a.join(' ')},{statusJidList:sjl});return r("✅ Image posted!")}if(type==='videoMessage'){const st=await downloadContentFromMessage(q.message.videoMessage,'video');let b=Buffer.from([]);for await(const c of st)b=Buffer.concat([b,c]);await s.sendMessage('status@broadcast',{video:b,caption:a.join(' ')},{statusJidList:sjl});return r("✅ Video posted!")}return r("❌ Unsupported type.")}catch(e){return r(`❌ Failed: ${e.message}`)}}},
