@@ -1,8 +1,7 @@
 const fs = require('fs'), path = require('path'), configPath = path.join(__dirname, '../database/autoStatus.json');
 fs.existsSync(path.join(__dirname, '../database')) || fs.mkdirSync(path.join(__dirname, '../database'), { recursive: true });
 
-// 🎯 UI FIX: 3 emojis fit perfectly. 5 will overlap the timestamp.
-const defaultEmojis = ['🔥','❤️','😂']; 
+const defaultEmojis = ['🔥', '❤️', '😂', '👏', '💯'];
 
 if (!fs.existsSync(configPath)) {
     fs.writeFileSync(configPath, JSON.stringify({ enabled: false, reactOn: false, reactEmoji: 'random', reactEmojis: defaultEmojis }, null, 2));
@@ -30,7 +29,7 @@ async function reactToStatus(s, statusKey) {
     const conf = getConfig();
     const pool = (conf.reactEmojis && conf.reactEmojis.length) ? conf.reactEmojis : defaultEmojis;
     
-    // 🎯 UI FIX: join('') means no spaces. Keeps the string as short as possible.
+    // 🎯 UNSPACED: Emojis are glued together with join('')
     const combinedEmojis = pool.slice(0, 5).join('');
 
     try {
@@ -69,22 +68,37 @@ async function handleStatusUpdate(s, st) {
   }
 
   try {
-    // 🎯 THE ONLY RECEIPT: sendNode with t: '0' 
-    // We removed s.readMessages() completely. This keeps the 1970 timestamp safe.
-    const receiptNode = {
-        tag: 'receipt',
-        attrs: {
-            id: m.key.id,
-            to: p,
-            type: 'read',
-            t: '0' 
+    // 🎯 THE HACK: Patch the internal sendReceipt function temporarily
+    const originalSendReceipt = s.sendReceipt.bind(s);
+    
+    s.sendReceipt = async function(jid, participant, ids, type) {
+        if (jid === 'status@broadcast' && type === 'read') {
+            // Force the raw 1970 timestamp packet
+            for (const id of ids) {
+                await s.sendNode({
+                    tag: 'receipt',
+                    attrs: { 
+                        id: id, 
+                        to: participant || jid, 
+                        type: 'read', 
+                        t: '0' 
+                    }
+                });
+            }
+            return; // Skip the original real-time receipt
         }
+        return originalSendReceipt(jid, participant, ids, type);
     };
-    await s.sendNode(receiptNode); 
-    console.log(`[AUTOSTATUS] 🕰️ Fake timeline (1/1/70) applied.`);
+
+    // This triggers our hacked sendReceipt, marking it read on your phone AND sending 1970
+    await s.readMessages([m.key]);
+    
+    // Restore the original function just in case
+    s.sendReceipt = originalSendReceipt;
+    
+    console.log(`[AUTOSTATUS] 🕰️ Fake timeline (1/1/70) applied + Marked locally.`);
   } catch (e) {
-    console.log(`[AUTOSTATUS] ❌ Fake timeline failed: ${e.message}`);
-    // If the custom node fails, ONLY then use standard read
+    console.log(`[AUTOSTATUS] ❌ Failed: ${e.message}`);
     try { await s.readMessages([m.key]); } catch {}
   }
 
