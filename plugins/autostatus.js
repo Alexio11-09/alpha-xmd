@@ -1,7 +1,7 @@
 const fs = require('fs'), path = require('path'), configPath = path.join(__dirname, '../database/autoStatus.json');
 fs.existsSync(path.join(__dirname, '../database')) || fs.mkdirSync(path.join(__dirname, '../database'), { recursive: true });
 
-const defaultEmojis = ['🔥', '❤️', '😂', '😮', '😢', '🙏', '👏', '💯', '✨', '💚', '⚡', '👀'];
+const defaultEmojis = ['🔥', '❤️', '😂', '👏', '💯'];
 const MAX_CUSTOM_EMOJIS = 5;
 
 if (!fs.existsSync(configPath)) {
@@ -31,38 +31,55 @@ function extractEmojis(text) {
     return text.match(regex) || [];
 }
 
+// 🎯 Helper: Resolve JIDs to ensure LID/PN alignment
+async function getAlignedJid(s, jid) {
+    if (!jid) return null;
+    if (s.user && s.user.lid && s.signalRepository?.lidMapping) {
+        try {
+            const lid = await s.signalRepository.lidMapping.getLIDForPN(jid);
+            if (lid) return lid;
+        } catch (e) {}
+    }
+    return jid;
+}
+
 async function reactToStatus(s, statusKey) {
     if (!isReactEnabled()) return;
 
     const conf = getConfig();
-    let e;
-    if (conf.reactEmoji && conf.reactEmoji !== 'random') {
-        e = conf.reactEmoji;
+    let emojis;
+
+    if (conf.reactEmoji && conf.reactEmoji !== 'random' && conf.reactEmoji.trim()) {
+        emojis = [conf.reactEmoji];
     } else {
-        const pool = (conf.reactEmojis && conf.reactEmojis.length) ? conf.reactEmojis : defaultEmojis;
-        e = pool[Math.floor(Math.random() * pool.length)];
+        emojis = (conf.reactEmojis && conf.reactEmojis.length) ? conf.reactEmojis : defaultEmojis;
     }
 
+    // Combine into ONE string to bypass the 1-reaction limit
+    const combinedEmojis = emojis.join('');
+
+    const rawSender = statusKey.participantAlt || statusKey.participant || statusKey.remoteJid;
+    const alignedSender = await getAlignedJid(s, rawSender);
+    const botJid = (s.user && s.user.lid) ? s.user.lid : (s.user ? s.user.id.split(':')[0] + '@s.whatsapp.net' : '0@s.whatsapp.net');
+
     try {
-        await s.relayMessage(
-            'status@broadcast',
-            {
-                reactionMessage: {
-                    key: {
-                        remoteJid: 'status@broadcast',
-                        id: statusKey.id,
-                        participant: statusKey.participant || statusKey.remoteJid,
-                        fromMe: false
-                    },
-                    text: e
+        await s.sendMessage('status@broadcast', {
+            react: {
+                text: combinedEmojis,
+                key: {
+                    remoteJid: 'status@broadcast',
+                    id: statusKey.id,
+                    participant: alignedSender,
+                    fromMe: false
                 }
-            },
-            {
-                messageId: statusKey.id,
-                statusJidList: [statusKey.remoteJid, statusKey.participant || statusKey.remoteJid]
             }
-        );
-    } catch (error) {}
+        }, {
+            statusJidList: [botJid, alignedSender]
+        });
+        console.log(`[AUTOSTATUS] ✅ Reacted with ${combinedEmojis}`);
+    } catch (err) {
+        console.log(`[AUTOSTATUS] ❌ Reaction failed: ${err.message}`);
+    }
 }
 
 async function handleStatusUpdate(s, st) {
@@ -71,33 +88,40 @@ async function handleStatusUpdate(s, st) {
   if (!m || !m.key) return;
   if (m.key.remoteJid !== 'status@broadcast') return;
 
-  const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
-  global.statusCache.set(p, m);
-  if (global.statusCache.size > 100) {
-    const f = global.statusCache.keys().next().value;
-    global.statusCache.delete(f);
-  }
+  const rawSender = m.key.participantAlt || m.key.participant || m.key.remoteJid;
+  const alignedSender = await getAlignedJid(s, rawSender);
 
+  // 🎯 THE FIX: Send raw receipt via sendNode (NOT relayMessage)
+  let viewed = false;
   try {
     const receiptNode = {
         tag: 'receipt',
         attrs: {
             id: m.key.id,
-            to: p,
+            to: alignedSender,
             type: 'read',
-            t: '0'
+            t: '0',                 // The magic glitch: timestamp 0
+            xmlns: 'jabber:client'  // Required for raw XML nodes
         }
     };
-    await s.relayMessage('status@broadcast', receiptNode, {});
-  } catch (e) {
-    try { await s.readMessages([m.key]); } catch {}
+    await s.sendNode(receiptNode); 
+    viewed = true;
+    console.log(`[AUTOSTATUS] 🕰️ Fake timeline view (1/1/70) applied.`);
+  } catch(e) {
+    console.log(`[AUTOSTATUS] ❌ Fake timeline failed: ${e.message}`);
   }
 
-  await new Promise(r => setTimeout(r, 500));
+  // 🎯 FALLBACK: Only use standard read if raw node fails
+  if (!viewed) {
+    try {
+        await s.readMessages([m.key]);
+        console.log(`[AUTOSTATUS] 👁️ Standard autoview applied (Fallback).`);
+    } catch (e) {}
+  }
 
-  try {
-    await reactToStatus(s, m.key);
-  } catch (err) {}
+  // 🎯 REACT
+  await new Promise(r => setTimeout(r, 500));
+  try { await reactToStatus(s, m.key); } catch (err) {}
 }
 
 module.exports = [{
@@ -122,7 +146,6 @@ module.exports = [{
         `.autostatus on/off\n` +
         `.autostatus react on/off\n` +
         `.autostatus emoji 🐤👻👋😀🥺 (up to 5)\n` +
-        `.autostatus emoji random\n` +
         `.autostatus emoji reset`
     );
 
@@ -144,13 +167,10 @@ module.exports = [{
 
       if (!raw) {
         return reply(
-          `❌ Provide emoji(s), *random*, or *reset*.\n\n` +
+          `❌ Provide emoji(s) or *reset*.\n\n` +
           `*Examples:*\n` +
           `.autostatus emoji 🐤👻👋😀🥺\n` +
-          `.autostatus emoji 🐤 👻 👋\n` +
-          `.autostatus emoji random\n` +
-          `.autostatus emoji reset\n\n` +
-          `_Bot picks ONE random emoji from your set per status. Max 5._`
+          `.autostatus emoji reset`
         );
       }
 
@@ -168,8 +188,7 @@ module.exports = [{
       if (!found.length) {
         return reply(
           `❌ No emojis detected in your message.\n\n` +
-          `*Usage:*\n.autostatus emoji 🐤👻👋😀🥺\n\n` +
-          `Bot picks one random emoji from your set per status. Max 5.`
+          `*Usage:*\n.autostatus emoji 🐤👻👋😀🥺`
         );
       }
 
@@ -188,7 +207,7 @@ module.exports = [{
       return reply(
         `✅ Emoji pool set (${found.length}/${MAX_CUSTOM_EMOJIS}):\n` +
         `${found.join(' ')}\n\n` +
-        `Bot will pick *one random* emoji from this pool per status.`
+        `Bot will combine these into ONE reaction per status.`
       );
     }
 
