@@ -1,4 +1,7 @@
 // © 2026 Alpha. All Rights Reserved.
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); // 🎯 FIXES THE MONGODB ENOTFOUND ERROR
+
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
