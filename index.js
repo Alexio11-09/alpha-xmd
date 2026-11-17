@@ -411,10 +411,23 @@ app.post("/api/settings", (req, res) => {
   console.log("🚀 Starting Alpha Bot Server...");
   const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
 
-  app.listen(PORT, async () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`🌐 Internal API running on port ${PORT}`);
-    try { const ngrok = require("@ngrok/ngrok"); await ngrok.forward({ addr: PORT, authtoken: NGROK_AUTHTOKEN, domain: NGROK_DOMAIN }); } catch (err) {}
-    setInterval(() => { require('http').get(`http://localhost:${PORT}/api/stats`, () => {}).on('error', () => {}); }, 10 * 60 * 1000); 
+    try {
+      const ngrok = require("@ngrok/ngrok");
+      const listener = await ngrok.forward({
+        addr: PORT,
+        authtoken: NGROK_AUTHTOKEN,
+        domain: NGROK_DOMAIN
+      });
+      console.log(`🔗 Ngrok Tunnel Active: ${listener.url()}`);
+    } catch (err) {
+      console.log(`❌ NGROK ERROR: ${err.message}`);
+    }
+
+    setInterval(() => {
+      require('http').get(`http://127.0.0.1:${PORT}/api/stats`, () => {}).on('error', () => {});
+    }, 10 * 60 * 1000); 
     
     setInterval(() => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
