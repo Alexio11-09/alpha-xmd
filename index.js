@@ -1,7 +1,4 @@
 // © 2026 Alpha. All Rights Reserved.
-const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']); // Forces Google DNS to prevent SRV errors
-
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
@@ -9,12 +6,8 @@ const pino = require("pino");
 const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
-const { MongoClient } = require('mongodb');
-const { useMongoDBAuthState } = require('mongo-baileys');
+const { useSQLiteAuthState } = require('@nevi-dev/sqlite-auth'); // 🎯 SQLITE IMPORT
 const config = () => require("./settings/config");
-
-// 🎯 YOUR CORRECTED MONGODB STRING
-const MONGO_URL = "mongodb+srv://Alpha:222Axiom222@alpha-1ck1fbd.mongodb.net/"; 
 
 // 🎯 GLOBAL ERROR CATCHERS
 process.on('uncaughtException', (err) => { console.log('🔥 [UNCAUGHT EXCEPTION] Prevented Crash:', err.message); });
@@ -258,16 +251,16 @@ function attachHandlers(sock, phoneNumber) {
 
 async function startBot(phoneNumber) {
   if (activeSockets.has(phoneNumber)) return; 
-  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber} (MongoDB)`));
+  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber} (SQLite)`));
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
-    const client = new MongoClient(MONGO_URL);
-    await client.connect();
-    const db = client.db("whatsapp_bot");
-    const collection = db.collection("authState");
-
-    const { state, saveCreds } = await useMongoDBAuthState(collection, phoneNumber);
+    
+    // 🎯 SQLITE AUTH STATE
+    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+        dbName: 'auth.db', 
+        cleanOldFiles: true 
+    });
 
     const sock = baileys.default({
       version,
@@ -306,7 +299,6 @@ async function startBot(phoneNumber) {
         try { sock.ev.removeAllListeners(); sock.end(undefined); } catch (e) {}
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-        await client.close();
         
         if (code !== 401) {
           console.log(chalk.yellow(`🔄 [${phoneNumber}] Reconnecting in 5s...`));
@@ -337,12 +329,12 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
-    const client = new MongoClient(MONGO_URL);
-    await client.connect();
-    const db = client.db("whatsapp_bot");
-    const collection = db.collection("authState");
     
-    const { state, saveCreds } = await useMongoDBAuthState(collection, phoneNumber);
+    // 🎯 SQLITE AUTH STATE FOR PAIRING
+    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+        dbName: 'auth.db',
+        cleanOldFiles: true
+    });
 
     const tempSock = baileys.default({
       version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"), syncFullHistory: false
@@ -365,11 +357,11 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
           }
         }, 3000);
       }
-      if (connection === "open") { await client.close(); setTimeout(() => startBot(phoneNumber), 3000); }
+      if (connection === "open") { setTimeout(() => startBot(phoneNumber), 3000); }
       if (connection === "close") {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-        if (code === 515) { await client.close(); setTimeout(() => startBot(phoneNumber), 5000); } 
-        else if (!responded) { responded = true; res.status(500).json({ success: false, error: `Closed (${code})` }); try { tempSock.end(undefined); } catch (e) {} await client.close(); }
+        if (code === 515) { setTimeout(() => startBot(phoneNumber), 5000); } 
+        else if (!responded) { responded = true; res.status(500).json({ success: false, error: `Closed (${code})` }); try { tempSock.end(undefined); } catch (e) {} }
       }
     });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
