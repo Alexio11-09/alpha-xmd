@@ -1,6 +1,6 @@
 // © 2026 Alpha. All Rights Reserved.
 const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']); // 🎯 FIXES THE MONGODB ENOTFOUND ERROR
+dns.setServers(['8.8.8.8', '8.8.4.4']); // Forces Google DNS to prevent SRV errors
 
 const fs = require("fs");
 const path = require("path");
@@ -13,7 +13,7 @@ const { MongoClient } = require('mongodb');
 const { useMongoDBAuthState } = require('mongo-baileys');
 const config = () => require("./settings/config");
 
-// 🎯 YOUR MONGODB STRING
+// 🎯 YOUR CORRECTED MONGODB STRING
 const MONGO_URL = "mongodb+srv://Alpha:222Axiom222@alpha-1ck1fbd.mongodb.net/"; 
 
 // 🎯 GLOBAL ERROR CATCHERS
