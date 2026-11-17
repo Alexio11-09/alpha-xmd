@@ -5,8 +5,8 @@ const express = require("express");
 const pino = require("pino");
 const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
+const baileys = require("@whiskeysockets/baileys");
 const { smsg } = require("./library/serialize");
-const { useSQLiteAuthState } = require('@nevi-dev/sqlite-auth'); // 🎯 SQLITE IMPORT
 const config = () => require("./settings/config");
 
 // 🎯 GLOBAL ERROR CATCHERS
@@ -38,7 +38,6 @@ if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
 
 const activeSockets = new Map();
 const store = new Map(); 
-let baileys;
 
 global.ghostMode = false;
 global.pollCache = new Map();
@@ -251,16 +250,15 @@ function attachHandlers(sock, phoneNumber) {
 
 async function startBot(phoneNumber) {
   if (activeSockets.has(phoneNumber)) return; 
-  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber} (SQLite)`));
+  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber}`));
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
     
-    // 🎯 SQLITE AUTH STATE
-    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
-        dbName: 'auth.db', 
-        cleanOldFiles: true 
-    });
+    // 🎯 MULTI FILE AUTH STATE
+    const sessionDir = path.join(sessionsDir, phoneNumber);
+    if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+    const { state, saveCreds } = await baileys.useMultiFileAuthState(sessionDir);
 
     const sock = baileys.default({
       version,
@@ -322,49 +320,68 @@ app.get("/api/stats", (req, res) => {
 
 app.get("/api/status", (req, res) => res.json({ connected: activeSockets.has(req.query.phoneNumber) }));
 
+// 🎯 NON-BLOCKING PAIR ROUTE TO KEEP WEB DASHBOARD ONLINE
 app.post("/api/pair", rateLimiter, async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber || !/^\d{10,15}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
   if (activeSockets.has(phoneNumber)) return res.json({ success: true, alreadyPaired: true });
 
-  try {
-    const { version } = await baileys.fetchLatestBaileysVersion();
-    
-    // 🎯 SQLITE AUTH STATE FOR PAIRING
-    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
-        dbName: 'auth.db',
-        cleanOldFiles: true
-    });
+  setImmediate(async () => {
+    try {
+      const { version } = await baileys.fetchLatestBaileysVersion();
+      
+      const sessionDir = path.join(sessionsDir, phoneNumber);
+      if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+      const { state, saveCreds } = await baileys.useMultiFileAuthState(sessionDir);
 
-    const tempSock = baileys.default({
-      version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"), syncFullHistory: false
-    });
+      const tempSock = baileys.default({
+        version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"), syncFullHistory: false
+      });
 
-    tempSock.ev.on("creds.update", saveCreds);
-    let responded = false;
+      tempSock.ev.on("creds.update", saveCreds);
+      let responded = false;
 
-    tempSock.ev.on("connection.update", async (update) => {
-      const { connection, lastDisconnect } = update;
-      if (connection === "connecting" && !responded) {
-        setTimeout(async () => {
-          try {
-            const code = await tempSock.requestPairingCode(phoneNumber);
-            const formatted = code.match(/.{1,4}/g)?.join("-") || code;
-            responded = true;
-            res.json({ success: true, phoneNumber, code: formatted });
-          } catch (err) {
-            if(!responded) { responded = true; res.status(500).json({ success: false, error: err.message }); try { tempSock.end(undefined); } catch (e) {} }
+      tempSock.ev.on("connection.update", async (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === "connecting" && !responded) {
+          setTimeout(async () => {
+            try {
+              const code = await tempSock.requestPairingCode(phoneNumber);
+              const formatted = code.match(/.{1,4}/g)?.join("-") || code;
+              responded = true;
+              if (!res.headersSent) {
+                res.json({ success: true, phoneNumber, code: formatted });
+              }
+            } catch (err) {
+              if(!responded) { 
+                responded = true; 
+                if (!res.headersSent) {
+                  res.status(500).json({ success: false, error: err.message });
+                }
+                try { tempSock.end(undefined); } catch (e) {} 
+              }
+            }
+          }, 3000);
+        }
+        if (connection === "open") { setTimeout(() => startBot(phoneNumber), 3000); }
+        if (connection === "close") {
+          const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+          if (code === 515) { setTimeout(() => startBot(phoneNumber), 5000); } 
+          else if (!responded) { 
+            responded = true; 
+            if (!res.headersSent) {
+              res.status(500).json({ success: false, error: `Closed (${code})` });
+            }
+            try { tempSock.end(undefined); } catch (e) {} 
           }
-        }, 3000);
+        }
+      });
+    } catch (err) { 
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: err.message }); 
       }
-      if (connection === "open") { setTimeout(() => startBot(phoneNumber), 3000); }
-      if (connection === "close") {
-        const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-        if (code === 515) { setTimeout(() => startBot(phoneNumber), 5000); } 
-        else if (!responded) { responded = true; res.status(500).json({ success: false, error: `Closed (${code})` }); try { tempSock.end(undefined); } catch (e) {} }
-      }
-    });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    }
+  });
 });
 
 app.post("/api/disconnect", async (req, res) => {
@@ -392,7 +409,6 @@ app.post("/api/settings", (req, res) => {
 
 (async () => {
   console.log("🚀 Starting Alpha Bot Server...");
-  baileys = await import("@whiskeysockets/baileys");
   const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
 
   app.listen(PORT, async () => {
