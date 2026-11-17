@@ -1,5 +1,11 @@
-# Ignore everything in the root
-/*
-# But allow the public folder and the vercel.json file
-!public/
-!vercel.json
+index.js
+message.js
+package.json
+package-lock.json
+database/
+plugins/
+library/
+settings/
+sessions/
+test-menu.mp3
+.npmrc
