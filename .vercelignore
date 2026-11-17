@@ -1,0 +1,4 @@
+# Ignore backend files (everything except the public folder)
+/*
+!public/
+!vercel.json
