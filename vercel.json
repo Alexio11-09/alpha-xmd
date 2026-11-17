@@ -1,7 +1,4 @@
 {
-  "version": 2,
-  "public": true,
   "buildCommand": "echo 'Skipping build'",
-  "outputDirectory": "public",
-  "cleanUrls": true
+  "outputDirectory": "public"
 }
