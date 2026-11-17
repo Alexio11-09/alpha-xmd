@@ -132,7 +132,10 @@ function attachHandlers(sock, phoneNumber) {
           continue; 
         }
         if (!mek.message) continue;
-        const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+        
+        // 🎯 Robust message content extraction for wrapped/ephemeral structures
+        const msgContent = mek.message?.ephemeralMessage?.message || mek.message?.deviceSentMessage?.message || mek.message;
+        const messageText = msgContent?.conversation || msgContent?.extendedTextMessage?.text || msgContent?.imageMessage?.caption || msgContent?.videoMessage?.caption || "";
         const isCmd = messageText.startsWith(globalSettings.prefix);
 
         if (remote && remote.endsWith('@newsletter')) {
@@ -320,7 +323,7 @@ app.get("/api/stats", (req, res) => {
 
 app.get("/api/status", (req, res) => res.json({ connected: activeSockets.has(req.query.phoneNumber) }));
 
-// 🎯 NON-BLOCKING PAIR ROUTE TO KEEP WEB DASHBOARD ONLINE
+// 🎯 NON-BLOCKING PAIR ROUTE WITH PROPER TEMPSOCK HANDOFF
 app.post("/api/pair", rateLimiter, async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber || !/^\d{10,15}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
@@ -363,10 +366,20 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
             }
           }, 3000);
         }
-        if (connection === "open") { setTimeout(() => startBot(phoneNumber), 3000); }
+
+        // 🎯 CLOSE tempSock BEFORE launching the real bot socket
+        if (connection === "open") {
+          console.log(chalk.cyan(`🔗 [${phoneNumber}] Pairing complete, handing off to main socket...`));
+          try { tempSock.ev.removeAllListeners(); tempSock.end(undefined); } catch (e) {}
+          setTimeout(() => startBot(phoneNumber), 2000);
+        }
+
         if (connection === "close") {
           const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-          if (code === 515) { setTimeout(() => startBot(phoneNumber), 5000); } 
+          if (code === 515) { 
+            try { tempSock.ev.removeAllListeners(); tempSock.end(undefined); } catch (e) {}
+            setTimeout(() => startBot(phoneNumber), 3000); 
+          } 
           else if (!responded) { 
             responded = true; 
             if (!res.headersSent) {
