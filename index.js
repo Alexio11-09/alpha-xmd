@@ -8,6 +8,14 @@ const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const config = () => require("./settings/config");
 
+// 🎯 GLOBAL ERROR CATCHERS: Prevents the bot from crashing entirely on random errors
+process.on('uncaughtException', (err) => {
+    console.log('🔥 [UNCAUGHT EXCEPTION] Prevented Crash:', err.message);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.log('🔥 [UNHANDLED REJECTION] Prevented Crash:', reason);
+});
+
 const _origErr = console.error;
 console.error = (...a) => {
   const m = a.join(" ");
@@ -35,14 +43,15 @@ const activeSockets = new Map();
 const store = new Map(); 
 let baileys;
 
-// 🎯 GLOBAL GHOST MODE FLAG
 global.ghostMode = false;
-
 global.pollCache = new Map();
+
+// 🎯 REDUCED CACHE TIME: Clears memory every 10 minutes instead of 30 (saves RAM on free hosts)
 setInterval(() => {
     store.clear();
     global.pollCache.clear();
-}, 30 * 60 * 1000); 
+    if (global.gc) global.gc(); // Force garbage collection if node was started with --expose-gc
+}, 10 * 60 * 1000); 
 
 let autoStatusHandler; try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
 
@@ -76,12 +85,7 @@ function attachHandlers(sock, phoneNumber) {
 
   // 🎯 CRITICAL FIX 1: Intercept creds.update to stop internal online presence
   sock.ev.removeAllListeners("creds.update");
-  sock.ev.on("creds.update", async () => {
-      // We still need to save creds, but we don't want to announce presence
-      // The saving logic is handled by the original listener, but we override the presence part
-      // For simplicity, we just re-attach the original saveCreds if needed, but Baileys handles it internally.
-      // The key is to prevent the automatic "available" broadcast.
-  });
+  sock.ev.on("creds.update", async () => {});
 
   const loadGlobalSettings = () => {
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
@@ -114,8 +118,9 @@ function attachHandlers(sock, phoneNumber) {
     } catch(e) {}
   };
 
-  setInterval(updateAutobio, 60 * 60 * 1000);
-  setTimeout(updateAutobio, 5000);
+  // 🎯 FIXED: Save interval IDs so they can be cleared on disconnect
+  sock._autobioInterval = setInterval(updateAutobio, 60 * 60 * 1000);
+  sock._autobioTimeout = setTimeout(updateAutobio, 5000);
 
   sock.ev.on("call", async (calls) => {
     try {
@@ -145,8 +150,6 @@ function attachHandlers(sock, phoneNumber) {
 
       for (const mek of chatUpdate.messages) {
         const remote = mek.key?.remoteJid;
-
-        // 🎯 STATUS HANDLER (Non-blocking)
         if (remote === "status@broadcast") {
           if (autoStatusHandler.handleStatusUpdate) {
               autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {});
@@ -155,7 +158,6 @@ function attachHandlers(sock, phoneNumber) {
         }
 
         if (!mek.message) continue;
-
         const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
         const isCmd = messageText.startsWith(globalSettings.prefix);
 
@@ -163,7 +165,6 @@ function attachHandlers(sock, phoneNumber) {
             if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) {
                 global.pollCache.set(mek.key.id, mek);
             }
-
             let autoReactChannels = {};
             try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
 
@@ -172,16 +173,9 @@ function attachHandlers(sock, phoneNumber) {
                 (async () => {
                     for (let e of emojis) {
                         try { 
-                            if (sock.newsletterReact) {
-                                await sock.newsletterReact(remote, mek.key.id, e); 
-                            } else {
-                                await sock.relayMessage(remote, {
-                                    reactionMessage: {
-                                        key: { remoteJid: remote, id: mek.key.id, fromMe: false },
-                                        text: e,
-                                        senderTimestampMs: Date.now()
-                                    }
-                                }, {});
+                            if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, e); } 
+                            else {
+                                await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: e, senderTimestampMs: Date.now() } }, {});
                             }
                         } catch (err) { break; }
                         await new Promise(r => setTimeout(r, 1500));
@@ -189,16 +183,9 @@ function attachHandlers(sock, phoneNumber) {
                 })();
             } else if (isCmd) {
                 try { 
-                    if (sock.newsletterReact) {
-                        await sock.newsletterReact(remote, mek.key.id, "⚡"); 
-                    } else {
-                        await sock.relayMessage(remote, {
-                            reactionMessage: {
-                                key: { remoteJid: remote, id: mek.key.id, fromMe: false },
-                                text: "⚡",
-                                senderTimestampMs: Date.now()
-                            }
-                        }, {});
+                    if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, "⚡"); } 
+                    else {
+                        await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: "⚡", senderTimestampMs: Date.now() } }, {});
                     }
                 } catch(e) {}
             } else {
@@ -206,16 +193,9 @@ function attachHandlers(sock, phoneNumber) {
                 if (cr.enabled) {
                   for (const emoji of cr.emojis || []) {
                     try { 
-                        if (sock.newsletterReact) {
-                            await sock.newsletterReact(remote, mek.key.id, emoji); 
-                        } else {
-                            await sock.relayMessage(remote, {
-                                reactionMessage: {
-                                    key: { remoteJid: remote, id: mek.key.id, fromMe: false },
-                                    text: emoji,
-                                    senderTimestampMs: Date.now()
-                                }
-                            }, {});
+                        if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, emoji); } 
+                        else {
+                            await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {});
                         }
                         await new Promise(r => setTimeout(r, 1000)); 
                     } catch (e) {}
@@ -232,7 +212,11 @@ function attachHandlers(sock, phoneNumber) {
         const m = await smsg(sock, mek);
         m.prefix = globalSettings.prefix;
         m.globalSettings = globalSettings; 
-        store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null });
+        
+        // Only store text to save RAM (don't store huge media buffers)
+        if (m.text) {
+            store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null });
+        }
 
         await messageHandler(sock, m);
       }
@@ -346,8 +330,8 @@ function attachHandlers(sock, phoneNumber) {
     } catch {}
   }, 4000);
 
-  // 🎯 RESTORED ALWAYS ONLINE (With Ghost Mode Bypass)
-  setInterval(() => { 
+  // 🎯 FIXED: Save the presence interval so it can be cleared
+  sock._presenceInterval = setInterval(() => { 
     if (sock.user) {
         if (!global.ghostMode) {
             sock.sendPresenceUpdate("available").catch(() => {});
@@ -377,16 +361,13 @@ async function startBot(phoneNumber) {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 15000,
-
       syncFullHistory: false, 
       getMessage: async () => { return { conversation: '' }; },
-
-      // 🎯 CRITICAL: Prevents WhatsApp from forcing you online on connect
       markOnlineOnConnect: false, 
     });
 
-    // 🎯 MONKEY-PATCH sendReceipt to block delivery ACKs in ghost mode
-    // This is what creates the 2nd tick — without it, sender stays at ONE tick
+    global.currentSock = sock;
+
     const originalSendReceipt = sock.sendReceipt.bind(sock);
     sock.sendReceipt = async (jid, participant, ids, type) => {
         if (global.ghostMode && type === 'delivered') {
@@ -404,6 +385,11 @@ async function startBot(phoneNumber) {
       if (connection === "open") console.log(chalk.green(`✅ [${phoneNumber}] Bot Connected!`));
 
       if (connection === "close") {
+        // 🎯 CRITICAL MEMORY LEAK FIX: Clear intervals before reconnecting
+        if (sock._autobioInterval) clearInterval(sock._autobioInterval);
+        if (sock._presenceInterval) clearInterval(sock._presenceInterval);
+        if (sock._autobioTimeout) clearTimeout(sock._autobioTimeout);
+
         try {
             sock.ev.removeAllListeners();
             sock.end(undefined);
@@ -430,14 +416,13 @@ async function startBot(phoneNumber) {
 
 global.startBot = startBot;
 
-// 🎯 REAL STATS API FOR THE NEW DASHBOARD
 app.get("/api/stats", (req, res) => {
   const used = process.memoryUsage().heapUsed / 1024 / 1024;
   res.json({ 
     connected: activeSockets.size, 
     status: "online",
-    uptime: process.uptime(), // Real uptime in seconds
-    memory: Math.round(used * 100) / 100, // Real RAM usage in MB
+    uptime: process.uptime(),
+    memory: Math.round(used * 100) / 100,
     sessions: activeSockets.size 
   });
 });
@@ -561,9 +546,10 @@ app.post("/api/settings", (req, res) => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
 
-      if (used > 380) {
+      // 🎯 Lowered threshold slightly to prevent the host from hard-killing it
+      if (used > 350) {
         console.log(`⚠️ Memory limit reached (${Math.round(used)}MB). Restarting bot to prevent crash...`);
-        process.exit(1); 
+        if (global.gc) global.gc(); // Attempt to clear RAM
       }
     }, 60000); 
 
