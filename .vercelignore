@@ -1,4 +1,5 @@
-# Ignore backend files (everything except the public folder)
+# Ignore everything in the root
 /*
+# But allow the public folder and the vercel.json file
 !public/
 !vercel.json
