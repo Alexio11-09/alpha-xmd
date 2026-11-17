@@ -6,15 +6,16 @@ const pino = require("pino");
 const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
+const { MongoClient } = require('mongodb');
+const { useMongoDBAuthState } = require('mongo-baileys');
 const config = () => require("./settings/config");
 
-// 🎯 GLOBAL ERROR CATCHERS: Prevents the bot from crashing entirely on random errors
-process.on('uncaughtException', (err) => {
-    console.log('🔥 [UNCAUGHT EXCEPTION] Prevented Crash:', err.message);
-});
-process.on('unhandledRejection', (reason, promise) => {
-    console.log('🔥 [UNHANDLED REJECTION] Prevented Crash:', reason);
-});
+// 🎯 YOUR MONGODB STRING
+const MONGO_URL = "mongodb+srv://Alpha:222Axiom222@alpha-1ck1fbd.mongodb.net/"; 
+
+// 🎯 GLOBAL ERROR CATCHERS
+process.on('uncaughtException', (err) => { console.log('🔥 [UNCAUGHT EXCEPTION] Prevented Crash:', err.message); });
+process.on('unhandledRejection', (reason, promise) => { console.log('🔥 [UNHANDLED REJECTION] Prevented Crash:', reason); });
 
 const _origErr = console.error;
 console.error = (...a) => {
@@ -46,11 +47,10 @@ let baileys;
 global.ghostMode = false;
 global.pollCache = new Map();
 
-// 🎯 REDUCED CACHE TIME: Clears memory every 10 minutes instead of 30 (saves RAM on free hosts)
 setInterval(() => {
     store.clear();
     global.pollCache.clear();
-    if (global.gc) global.gc(); // Force garbage collection if node was started with --expose-gc
+    if (global.gc) global.gc(); 
 }, 10 * 60 * 1000); 
 
 let autoStatusHandler; try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
@@ -83,7 +83,6 @@ function attachHandlers(sock, phoneNumber) {
   const channelName = config().newsletter.name;
   const sessionSettingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
 
-  // 🎯 CRITICAL FIX 1: Intercept creds.update to stop internal online presence
   sock.ev.removeAllListeners("creds.update");
   sock.ev.on("creds.update", async () => {});
 
@@ -99,26 +98,13 @@ function attachHandlers(sock, phoneNumber) {
         if (fs.existsSync(p)) {
             const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
             if (cfg.enabled === 1) {
-                const bios = [
-                    "⚡ Built different. Type .menu or get left behind.",
-                    "🥶 I don't do small talk. Drop a command or drop off.",
-                    "🛑 Zero tolerance for nonsense. Play stupid games, win stupid prizes.",
-                    "💼 Efficiency is my only language. Say less.",
-                    "🤖 I run on code, not your opinions.",
-                    "🧊 Cold hearted, flawless execution. Powered by Alpha.",
-                    "📵 Call me? I'll block you. Text me if you're serious.",
-                    "👑 The system doesn't sleep, and neither does the grind.",
-                    "⚙️ Programmed for perfection. I'm not here to make friends.",
-                    "🔇 Actions over words. .menu is all you need to know."
-                ];
-                const newBio = bios[Math.floor(Math.random() * bios.length)];
-                await sock.updateProfileStatus(newBio);
+                const bios = ["⚡ Built different.", "🥶 I don't do small talk.", "🛑 Zero tolerance.", "💼 Efficiency is my only language.", "🤖 I run on code.", "🧊 Cold hearted.", "📵 Call me? I'll block you.", "👑 The system doesn't sleep.", "⚙️ Programmed for perfection.", "🔇 Actions over words."];
+                await sock.updateProfileStatus(bios[Math.floor(Math.random() * bios.length)]);
             }
         }
     } catch(e) {}
   };
 
-  // 🎯 FIXED: Save interval IDs so they can be cleared on disconnect
   sock._autobioInterval = setInterval(updateAutobio, 60 * 60 * 1000);
   sock._autobioTimeout = setTimeout(updateAutobio, 5000);
 
@@ -131,12 +117,8 @@ function attachHandlers(sock, phoneNumber) {
             for (const call of calls) {
                 if (call.status === "offer") {
                     await sock.rejectCall(call.id, call.from);
-                    if (config.block === 1) {
-                        try { await sock.updateBlockStatus(call.from, "block"); } catch (e) {}
-                    } else {
-                        const customMsg = `⚡ *ALPHA-XMD SYSTEM* ⚡\n──────────────────\n📵 *Call Blocked!*\nYou think I have time to talk on the phone? \nDrop a text message and let's get to work. 🤖💸`;
-                        await sock.sendMessage(call.from, { text: customMsg, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: channelName } } });
-                    }
+                    if (config.block === 1) { try { await sock.updateBlockStatus(call.from, "block"); } catch (e) {} } 
+                    else { await sock.sendMessage(call.from, { text: `⚡ *ALPHA-XMD* ⚡\n──────────────────\n📵 *Call Blocked!*\nDrop a text message and let's get to work. 🤖💸`, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: channelName } } }); }
                 }
             }
         }
@@ -151,73 +133,41 @@ function attachHandlers(sock, phoneNumber) {
       for (const mek of chatUpdate.messages) {
         const remote = mek.key?.remoteJid;
         if (remote === "status@broadcast") {
-          if (autoStatusHandler.handleStatusUpdate) {
-              autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {});
-          }
+          if (autoStatusHandler.handleStatusUpdate) { autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {}); }
           continue; 
         }
-
         if (!mek.message) continue;
         const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
         const isCmd = messageText.startsWith(globalSettings.prefix);
 
         if (remote && remote.endsWith('@newsletter')) {
-            if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) {
-                global.pollCache.set(mek.key.id, mek);
-            }
+            if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) { global.pollCache.set(mek.key.id, mek); }
             let autoReactChannels = {};
             try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
-
             if (autoReactChannels[remote]) {
                 const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
                 (async () => {
                     for (let e of emojis) {
-                        try { 
-                            if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, e); } 
-                            else {
-                                await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: e, senderTimestampMs: Date.now() } }, {});
-                            }
-                        } catch (err) { break; }
+                        try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, e); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: e, senderTimestampMs: Date.now() } }, {}); } } catch (err) { break; }
                         await new Promise(r => setTimeout(r, 1500));
                     }
                 })();
             } else if (isCmd) {
-                try { 
-                    if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, "⚡"); } 
-                    else {
-                        await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: "⚡", senderTimestampMs: Date.now() } }, {});
-                    }
-                } catch(e) {}
+                try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, "⚡"); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: "⚡", senderTimestampMs: Date.now() } }, {}); } } catch(e) {}
             } else {
                 const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
                 if (cr.enabled) {
                   for (const emoji of cr.emojis || []) {
-                    try { 
-                        if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, emoji); } 
-                        else {
-                            await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {});
-                        }
-                        await new Promise(r => setTimeout(r, 1000)); 
-                    } catch (e) {}
+                    try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, emoji); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {}); } await new Promise(r => setTimeout(r, 1000)); } catch (e) {}
                   }
                 }
             }
         }
-
-        if (isCmd) {
-          const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown';
-          console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`);
-        }
-
+        if (isCmd) { const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown'; console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`); }
         const m = await smsg(sock, mek);
         m.prefix = globalSettings.prefix;
         m.globalSettings = globalSettings; 
-        
-        // Only store text to save RAM (don't store huge media buffers)
-        if (m.text) {
-            store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null });
-        }
-
+        if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
         await messageHandler(sock, m);
       }
     } catch (err) { console.log("⚠️ Message handler:", err.message); }
@@ -229,11 +179,9 @@ function attachHandlers(sock, phoneNumber) {
       const ad = globalSettings.antidelete || { enabled: false, mode: "chat", style: "fancy", react: true };
       const ownerNumber = (config().owner?.[0] || "").replace(/[^0-9]/g, "");
       const ownerJid = ownerNumber ? `${ownerNumber}@s.whatsapp.net` : null;
-
       for (const update of updates) {
         const oldMsg = store.get(update.key.id);
         if (!oldMsg) continue;
-
         if (update.update?.message === null && ad.enabled) {
           const chat = update.key.remoteJid; if (!chat) continue;
           const isGroup = chat.endsWith("@g.us");
@@ -243,31 +191,22 @@ function attachHandlers(sock, phoneNumber) {
           if (isGroup) { try { const gm = await sock.groupMetadata(chat); chatName = gm.subject; } catch {} }
           const now = new Date();
           const deleted = (oldMsg.text || "Media").replace(/\n/g, "\n│ │ ");
-
-          let text = ad.style === "fancy" 
-            ? `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${now.toLocaleTimeString()}\n│ 📅 ${now.toLocaleDateString()}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${deleted}\n│ └─\n│ 🛡️ Alpha\n╰──`
-            : `${funnyDeleted[0]}\n\n${oldMsg.text || "Media"}`;
-
+          let text = ad.style === "fancy" ? `╭───〔 👁️‍🗨️ ANTIDELETE 〕───⬣\n│\n│ 👤 @${senderNumber}\n│ 📍 ${chatName}\n│ 🕒 ${now.toLocaleTimeString()}\n│ 📅 ${now.toLocaleDateString()}\n│\n│ 🗑️:\n│ ┌─\n│ │ ${deleted}\n│ └─\n│ 🛡️ Alpha\n╰──` : `${funnyDeleted[0]}\n\n${oldMsg.text || "Media"}`;
           const destinations = [];
           if (ad.mode === "chat" || ad.mode === "both") destinations.push(chat);
           if ((ad.mode === "owner" || ad.mode === "both") && ownerJid) destinations.push(ownerJid);
-
           for (const dest of destinations) {
             const opts = {};
             if (isGroup && ad.style === "fancy" && dest === chat) opts.mentions = [sender];
-            if (ad.style === "fancy") {
-              await sock.sendMessage(dest, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } }, ...opts });
-            } else { await sock.sendMessage(dest, { text, ...opts }); }
+            if (ad.style === "fancy") { await sock.sendMessage(dest, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } }, ...opts }); } 
+            else { await sock.sendMessage(dest, { text, ...opts }); }
             if (ad.react && dest === chat) { try { await sock.sendMessage(dest, { react: { text: "👀", key: update.key } }); } catch {} }
           }
         }
-
         if (globalSettings.antiedit && update.update?.message) {
           let newText = "";
           try { const msg = update.update.message; const type = Object.keys(msg)[0]; newText = msg[type]?.text || msg[type]?.caption || ""; } catch {}
-          if (oldMsg.text && newText && oldMsg.text !== newText) {
-            try { await sock.sendMessage(update.key.remoteJid, { text: `✏️ Edited.\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}` }); } catch {}
-          }
+          if (oldMsg.text && newText && oldMsg.text !== newText) { try { await sock.sendMessage(update.key.remoteJid, { text: `✏️ Edited.\n\n📌 Old: ${oldMsg.text}\n🆕 New: ${newText}` }); } catch {} }
         }
       }
     } catch {}
@@ -278,7 +217,6 @@ function attachHandlers(sock, phoneNumber) {
       const { id, participants, action } = update;
       let gs = { welcome: false, welcomeMsg: "🌟 Welcome @user!", goodbye: false, goodbyeMsg: "🚶‍♂️ @user left." };
       try { const all = JSON.parse(fs.readFileSync(path.join(__dirname, "database/groupSettings.json"), "utf8")); gs = all[id] || gs; } catch {}
-
       if (action === "add") {
         for (const user of participants) {
             let isAntibot = false;
@@ -286,38 +224,18 @@ function attachHandlers(sock, phoneNumber) {
             if (isAntibot) {
                 const pInfo = gs.participants?.find(p => p.id === user) || {};
                 const name = pInfo.notify || pInfo.name || "";
-                if (name.toLowerCase().includes('bot') || name.toLowerCase().includes('baileys')) {
-                    await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{});
-                    await sock.sendMessage(id, { text: `🤖 Removed a bot: ${name}` });
-                    continue;
-                }
+                if (name.toLowerCase().includes('bot') || name.toLowerCase().includes('baileys')) { await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{}); await sock.sendMessage(id, { text: `🤖 Removed a bot: ${name}` }); continue; }
             }
-
             let isAntiforeign = false, foreignCode = "";
-            try { 
-                if(fs.existsSync('./database/antiforeign.json')) {
-                    const a = JSON.parse(fs.readFileSync('./database/antiforeign.json'));
-                    isAntiforeign = a.enabled === 1;
-                    foreignCode = a.code || "";
-                }
-            } catch{}
+            try { if(fs.existsSync('./database/antiforeign.json')) { const a = JSON.parse(fs.readFileSync('./database/antiforeign.json')); isAntiforeign = a.enabled === 1; foreignCode = a.code || ""; } } catch{}
             if (isAntiforeign && foreignCode) {
                 const num = user.split('@')[0];
-                if (num.startsWith(foreignCode)) {
-                    await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{});
-                    await sock.sendMessage(id, { text: `🚫 Kicked @${num} (Foreign number: +${foreignCode})`, mentions: [user] });
-                    continue;
-                }
+                if (num.startsWith(foreignCode)) { await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{}); await sock.sendMessage(id, { text: `🚫 Kicked @${num} (Foreign number: +${foreignCode})`, mentions: [user] }); continue; }
             }
         }
       }
-
-      if (action === "add" && gs.welcome) {
-        for (const user of participants) await sock.sendMessage(id, { text: gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
-      }
-      if (action === "remove" && gs.goodbye) {
-        for (const user of participants) await sock.sendMessage(id, { text: gs.goodbyeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] });
-      }
+      if (action === "add" && gs.welcome) { for (const user of participants) await sock.sendMessage(id, { text: gs.welcomeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] }); }
+      if (action === "remove" && gs.goodbye) { for (const user of participants) await sock.sendMessage(id, { text: gs.goodbyeMsg.replace(/@user/g, `@${user.split("@")[0]}`), mentions: [user] }); }
     } catch {}
   });
 
@@ -325,31 +243,28 @@ function attachHandlers(sock, phoneNumber) {
   setTimeout(async () => {
     try {
       const botName = config().settings?.title || "Alpha Bot";
-      const text = `╭───〔 🤖 ${botName} 〕───⬣\n\n✅ Bot Online\n👑 Owner: Alpha\n📞 Contact: wa.me/263786641436\n📂 Repo: https://github.com/Alexio11-09/alpha-xmd\n📢 Channel: https://whatsapp.com/channel/${config().newsletter.id}\n\n🔥 Ready to use.`;
+      const text = `╭───〔 🤖 ${botName} 〕───⬣\n\n✅ Bot Online\n👑 Owner: Alpha\n📞 Contact: wa.me/263786641436\n🔥 Ready to use.`;
       await sock.sendMessage(sock.user.id, { text, contextInfo: { forwardingScore: 999, isForwarded: true, forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name } } });
     } catch {}
   }, 4000);
 
-  // 🎯 FIXED: Save the presence interval so it can be cleared
   sock._presenceInterval = setInterval(() => { 
-    if (sock.user) {
-        if (!global.ghostMode) {
-            sock.sendPresenceUpdate("available").catch(() => {});
-        }
-    }
+    if (sock.user) { if (!global.ghostMode) { sock.sendPresenceUpdate("available").catch(() => {}); } }
   }, 20000);
 }
 
 async function startBot(phoneNumber) {
   if (activeSockets.has(phoneNumber)) return; 
-  const sessionPath = path.join(sessionsDir, phoneNumber);
-  if (!fs.existsSync(path.join(sessionPath, "creds.json"))) return; 
-
-  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber}`));
+  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber} (MongoDB)`));
 
   try {
-    const { state, saveCreds } = await baileys.useMultiFileAuthState(sessionPath);
     const { version } = await baileys.fetchLatestBaileysVersion();
+    const client = new MongoClient(MONGO_URL);
+    await client.connect();
+    const db = client.db("whatsapp_bot");
+    const collection = db.collection("authState");
+
+    const { state, saveCreds } = await useMongoDBAuthState(collection, phoneNumber);
 
     const sock = baileys.default({
       version,
@@ -370,10 +285,7 @@ async function startBot(phoneNumber) {
 
     const originalSendReceipt = sock.sendReceipt.bind(sock);
     sock.sendReceipt = async (jid, participant, ids, type) => {
-        if (global.ghostMode && type === 'delivered') {
-            console.log(`[GHOST] Blocked delivery receipt for ${jid}`);
-            return;
-        }
+        if (global.ghostMode && type === 'delivered') { return; }
         return originalSendReceipt(jid, participant, ids, type);
     };
 
@@ -385,23 +297,15 @@ async function startBot(phoneNumber) {
       if (connection === "open") console.log(chalk.green(`✅ [${phoneNumber}] Bot Connected!`));
 
       if (connection === "close") {
-        // 🎯 CRITICAL MEMORY LEAK FIX: Clear intervals before reconnecting
         if (sock._autobioInterval) clearInterval(sock._autobioInterval);
         if (sock._presenceInterval) clearInterval(sock._presenceInterval);
         if (sock._autobioTimeout) clearTimeout(sock._autobioTimeout);
-
-        try {
-            sock.ev.removeAllListeners();
-            sock.end(undefined);
-        } catch (e) {}
-
+        try { sock.ev.removeAllListeners(); sock.end(undefined); } catch (e) {}
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-
-        if (code === 401) {
-          console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Backing up session.`));
-          try { fs.renameSync(sessionPath, sessionPath + "_backup_" + Date.now()); } catch (e) {}
-        } else {
+        await client.close();
+        
+        if (code !== 401) {
           console.log(chalk.yellow(`🔄 [${phoneNumber}] Reconnecting in 5s...`));
           setTimeout(() => startBot(phoneNumber), 5000);
         }
@@ -418,140 +322,93 @@ global.startBot = startBot;
 
 app.get("/api/stats", (req, res) => {
   const used = process.memoryUsage().heapUsed / 1024 / 1024;
-  res.json({ 
-    connected: activeSockets.size, 
-    status: "online",
-    uptime: process.uptime(),
-    memory: Math.round(used * 100) / 100,
-    sessions: activeSockets.size 
-  });
+  res.json({ connected: activeSockets.size, status: "online", uptime: process.uptime(), memory: Math.round(used * 100) / 100, sessions: activeSockets.size });
 });
 
 app.get("/api/status", (req, res) => res.json({ connected: activeSockets.has(req.query.phoneNumber) }));
 
 app.post("/api/pair", rateLimiter, async (req, res) => {
   const { phoneNumber } = req.body;
-  if (!phoneNumber || !/^\d{10,15}$/.test(phoneNumber)) {
-    return res.status(400).json({ success: false, error: "Invalid number format." });
-  }
-
-  const sessionPath = path.join(sessionsDir, phoneNumber);
+  if (!phoneNumber || !/^\d{10,15}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
   if (activeSockets.has(phoneNumber)) return res.json({ success: true, alreadyPaired: true });
-  if (fs.existsSync(path.join(sessionPath, "creds.json"))) {
-    startBot(phoneNumber);
-    return res.json({ success: true, alreadyPaired: true });
-  }
 
-  fs.mkdirSync(sessionPath, { recursive: true });
-  const { state, saveCreds } = await baileys.useMultiFileAuthState(sessionPath);
-  const { version } = await baileys.fetchLatestBaileysVersion();
+  try {
+    const { version } = await baileys.fetchLatestBaileysVersion();
+    const client = new MongoClient(MONGO_URL);
+    await client.connect();
+    const db = client.db("whatsapp_bot");
+    const collection = db.collection("authState");
+    
+    const { state, saveCreds } = await useMongoDBAuthState(collection, phoneNumber);
 
-  const tempSock = baileys.default({
-    version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"),
-    syncFullHistory: false, 
-  });
+    const tempSock = baileys.default({
+      version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"), syncFullHistory: false
+    });
 
-  tempSock.ev.on("creds.update", saveCreds);
-  let responded = false;
+    tempSock.ev.on("creds.update", saveCreds);
+    let responded = false;
 
-  tempSock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === "connecting" && !responded) {
-      setTimeout(async () => {
-        try {
-          const code = await tempSock.requestPairingCode(phoneNumber);
-          const formatted = code.match(/.{1,4}/g)?.join("-") || code;
-          responded = true;
-          res.json({ success: true, phoneNumber, code: formatted });
-        } catch (err) {
-          if(!responded) { responded = true; res.status(500).json({ success: false, error: err.message }); try { tempSock.end(undefined); } catch (e) {} }
-        }
-      }, 3000);
-    }
-    if (connection === "open") { setTimeout(() => startBot(phoneNumber), 3000); }
-    if (connection === "close") {
-      const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (code === 515) { setTimeout(() => startBot(phoneNumber), 5000); } 
-      else if (!responded) { responded = true; res.status(500).json({ success: false, error: `Closed (${code})` }); try { tempSock.end(undefined); } catch (e) {} }
-    }
-  });
+    tempSock.ev.on("connection.update", async (update) => {
+      const { connection, lastDisconnect } = update;
+      if (connection === "connecting" && !responded) {
+        setTimeout(async () => {
+          try {
+            const code = await tempSock.requestPairingCode(phoneNumber);
+            const formatted = code.match(/.{1,4}/g)?.join("-") || code;
+            responded = true;
+            res.json({ success: true, phoneNumber, code: formatted });
+          } catch (err) {
+            if(!responded) { responded = true; res.status(500).json({ success: false, error: err.message }); try { tempSock.end(undefined); } catch (e) {} }
+          }
+        }, 3000);
+      }
+      if (connection === "open") { await client.close(); setTimeout(() => startBot(phoneNumber), 3000); }
+      if (connection === "close") {
+        const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+        if (code === 515) { await client.close(); setTimeout(() => startBot(phoneNumber), 5000); } 
+        else if (!responded) { responded = true; res.status(500).json({ success: false, error: `Closed (${code})` }); try { tempSock.end(undefined); } catch (e) {} await client.close(); }
+      }
+    });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.post("/api/disconnect", async (req, res) => {
   const { phoneNumber } = req.body;
-  const sessionPath = path.join(sessionsDir, phoneNumber);
   try {
-    if (activeSockets.has(phoneNumber)) {
-      await activeSockets.get(phoneNumber).logout(); 
-      activeSockets.delete(phoneNumber);
-    }
-    if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true });
+    if (activeSockets.has(phoneNumber)) { await activeSockets.get(phoneNumber).logout(); activeSockets.delete(phoneNumber); }
     res.json({ success: true, message: "Bot disconnected." });
-  } catch (err) {
-    try { if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true }); activeSockets.delete(phoneNumber); } catch(e) {}
-    res.json({ success: true, message: "Session deleted." });
-  }
+  } catch (err) { res.json({ success: true, message: "Session deleted." }); }
 });
 
 app.get("/api/settings", (req, res) => {
   const { phoneNumber } = req.query;
   const settingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
-  if (fs.existsSync(settingsPath)) {
-    try { return res.json(JSON.parse(fs.readFileSync(settingsPath, 'utf8'))); } catch(e) {}
-  }
+  if (fs.existsSync(settingsPath)) { try { return res.json(JSON.parse(fs.readFileSync(settingsPath, 'utf8'))); } catch(e) {} }
   res.json({ autoread: false, autotyping: false, antidelete: false, antilink: false, autoreact: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." });
 });
 
 app.post("/api/settings", (req, res) => {
   const { phoneNumber, settings } = req.body;
   const dir = path.join(sessionsDir, phoneNumber);
-
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
   fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(settings, null, 2));
-  console.log(`[WEBSITE SAVED] ${phoneNumber}:`, settings); 
   res.json({ success: true });
 });
 
 (async () => {
   console.log("🚀 Starting Alpha Bot Server...");
   baileys = await import("@whiskeysockets/baileys");
-
   const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
 
   app.listen(PORT, async () => {
     console.log(`🌐 Internal API running on port ${PORT}`);
-
-    try {
-      const ngrok = require("@ngrok/ngrok");
-      await ngrok.forward({ addr: PORT, authtoken: NGROK_AUTHTOKEN, domain: NGROK_DOMAIN });
-      console.log(`✅ PUBLIC API: https://${NGROK_DOMAIN}`);
-    } catch (err) { console.log("⚠️ Ngrok failed:", err.message); }
-
-    setInterval(() => {
-      require('http').get(`http://localhost:${PORT}/api/stats`, () => {}).on('error', () => {});
-    }, 10 * 60 * 1000); 
-
-    console.log("📂 Loading saved bots...");
-    const dirs = fs.readdirSync(sessionsDir);
-    for (const dir of dirs) {
-      if (/^\d{10,15}$/.test(dir)) {
-        await startBot(dir);
-        await new Promise(resolve => setTimeout(resolve, 3000)); 
-      }
-    }
-    console.log("✅ All loaded.");
-
+    try { const ngrok = require("@ngrok/ngrok"); await ngrok.forward({ addr: PORT, authtoken: NGROK_AUTHTOKEN, domain: NGROK_DOMAIN }); } catch (err) {}
+    setInterval(() => { require('http').get(`http://localhost:${PORT}/api/stats`, () => {}).on('error', () => {}); }, 10 * 60 * 1000); 
+    
     setInterval(() => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
-
-      // 🎯 Lowered threshold slightly to prevent the host from hard-killing it
-      if (used > 350) {
-        console.log(`⚠️ Memory limit reached (${Math.round(used)}MB). Restarting bot to prevent crash...`);
-        if (global.gc) global.gc(); // Attempt to clear RAM
-      }
+      if (used > 450) { console.log(`⚠️ Memory limit reached. Restarting to prevent crash...`); process.exit(1); }
     }, 60000); 
-
   });
 })();
