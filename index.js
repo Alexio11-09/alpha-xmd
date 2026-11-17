@@ -38,15 +38,73 @@ if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
 
 const activeSockets = new Map();
 const store = new Map(); 
+const rateLimits = new Map();
 
 global.ghostMode = false;
 global.pollCache = new Map();
 
+// 🧹 1. AUTOMATIC RAM & RATE-LIMIT SWEEP (Every 10 minutes)
 setInterval(() => {
     store.clear();
     global.pollCache.clear();
+
+    const now = Date.now();
+    for (const [ip, timestamps] of rateLimits.entries()) {
+        const valid = timestamps.filter(t => now - t < 3600000);
+        if (valid.length === 0) {
+            rateLimits.delete(ip);
+        } else {
+            rateLimits.set(ip, valid);
+        }
+    }
+
     if (global.gc) global.gc(); 
 }, 10 * 60 * 1000); 
+
+// 🧹 2. AUTOMATIC STALE SIGNAL KEY CLEANUP (Prevents ENOSPC disk/inode crashes)
+function cleanupStaleSignalKeys() {
+    try {
+        if (!fs.existsSync(sessionsDir)) return;
+        const maxAgeMs = 3 * 24 * 60 * 60 * 1000; // Keep keys modified within last 3 days
+        const now = Date.now();
+        let removedCount = 0;
+
+        const sessionFolders = fs.readdirSync(sessionsDir);
+        for (const folder of sessionFolders) {
+            const folderPath = path.join(sessionsDir, folder);
+            if (!fs.statSync(folderPath).isDirectory()) continue;
+
+            const files = fs.readdirSync(folderPath);
+            for (const file of files) {
+                // Never delete core credentials, settings, or app-state sync keys
+                if (file === "creds.json" || file === "settings.json" || file.startsWith("app-state-sync")) {
+                    continue;
+                }
+
+                // Target old ephemeral Signal pre-keys, sender-keys, and stale session files
+                if (file.startsWith("pre-key-") || file.startsWith("sender-key-") || file.startsWith("session-")) {
+                    const filePath = path.join(folderPath, file);
+                    try {
+                        const stats = fs.statSync(filePath);
+                        if (now - stats.mtimeMs > maxAgeMs) {
+                            fs.unlinkSync(filePath);
+                            removedCount++;
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+        if (removedCount > 0) {
+            console.log(chalk.cyan(`🧹 [DISK CLEANUP] Pruned ${removedCount} stale Signal key files.`));
+        }
+    } catch (err) {
+        console.log("⚠️ Cleanup error:", err.message);
+    }
+}
+
+// Run key cleanup on startup and every 6 hours
+cleanupStaleSignalKeys();
+setInterval(cleanupStaleSignalKeys, 6 * 60 * 60 * 1000);
 
 let autoStatusHandler; try { autoStatusHandler = require("./plugins/autostatus"); } catch (e) { autoStatusHandler = { handleStatusUpdate: () => {} }; }
 
@@ -61,15 +119,14 @@ try {
 
 const funnyDeleted = ["🕵️‍♂️ Someone deleted a message, but I saved it! 🛡️", "📝 Deleted message rescued:"];
 
-const rateLimits = new Map();
 function rateLimiter(req, res, next) {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const now = Date.now();
   if (!rateLimits.has(ip)) rateLimits.set(ip, []);
   const requests = rateLimits.get(ip).filter(time => now - time < 3600000);
   if (requests.length >= 5) return res.status(429).json({ success: false, error: "Too many requests." });
-  requests.push(now); rateLimits.set(ip, requests);
-  if (requests.length === 0) rateLimits.delete(ip); 
+  requests.push(now); 
+  rateLimits.set(ip, requests);
   next();
 }
 
@@ -77,9 +134,6 @@ function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
   const channelName = config().newsletter.name;
   const sessionSettingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
-
-  sock.ev.removeAllListeners("creds.update");
-  sock.ev.on("creds.update", async () => {});
 
   const loadGlobalSettings = () => {
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
@@ -133,7 +187,6 @@ function attachHandlers(sock, phoneNumber) {
         }
         if (!mek.message) continue;
         
-        // 🎯 Robust message content extraction for wrapped/ephemeral structures
         const msgContent = mek.message?.ephemeralMessage?.message || mek.message?.deviceSentMessage?.message || mek.message;
         const messageText = msgContent?.conversation || msgContent?.extendedTextMessage?.text || msgContent?.imageMessage?.caption || msgContent?.videoMessage?.caption || "";
         const isCmd = messageText.startsWith(globalSettings.prefix);
@@ -258,7 +311,6 @@ async function startBot(phoneNumber) {
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
     
-    // 🎯 MULTI FILE AUTH STATE
     const sessionDir = path.join(sessionsDir, phoneNumber);
     if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
     const { state, saveCreds } = await baileys.useMultiFileAuthState(sessionDir);
@@ -367,7 +419,6 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
           }, 3000);
         }
 
-        // 🎯 CLOSE tempSock BEFORE launching the real bot socket
         if (connection === "open") {
           console.log(chalk.cyan(`🔗 [${phoneNumber}] Pairing complete, handing off to main socket...`));
           try { tempSock.ev.removeAllListeners(); tempSock.end(undefined); } catch (e) {}
@@ -436,6 +487,15 @@ app.post("/api/settings", (req, res) => {
       console.log(`🔗 Ngrok Tunnel Active: ${listener.url()}`);
     } catch (err) {
       console.log(`❌ NGROK ERROR: ${err.message}`);
+    }
+
+    // 🎯 AUTO-CONNECT ALL SAVED SESSIONS ON SERVER STARTUP
+    const savedSessions = fs.readdirSync(sessionsDir).filter(folder => {
+      return fs.existsSync(path.join(sessionsDir, folder, "creds.json"));
+    });
+    console.log(`📂 Found ${savedSessions.length} saved session(s): ${savedSessions.join(", ") || "None"}`);
+    for (let i = 0; i < savedSessions.length; i++) {
+      setTimeout(() => startBot(savedSessions[i]), i * 1500);
     }
 
     setInterval(() => {
