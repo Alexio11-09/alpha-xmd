@@ -24,18 +24,38 @@ const B = c => ({
   }
 });
 
-// Helper for free public video/audio download APIs
+// Robust multi-API fallback for YouTube Audio/Video
+async function fetchYouTubeDL(url, type = 'mp3') {
+  const endpoints = type === 'mp3' ? [
+    `https://delirius-api-oficial.vercel.app/download/ytmp3?url=${encodeURIComponent(url)}`,
+    `https://api.siputzx.my.id/api/d/ytmp3?url=${encodeURIComponent(url)}`,
+    `https://apis.davidcyriltech.my.id/download?url=${encodeURIComponent(url)}`
+  ] : [
+    `https://delirius-api-oficial.vercel.app/download/ytmp4?url=${encodeURIComponent(url)}`,
+    `https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(url)}`,
+    `https://apis.davidcyriltech.my.id/download?url=${encodeURIComponent(url)}`
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      const { data } = await ax.get(ep, { timeout: 12000 });
+      const link = data?.data?.download?.url || data?.data?.dl || data?.result?.download?.url || data?.result?.dl || data?.result?.audio || data?.result?.video || data?.url;
+      if (link) return link;
+    } catch (e) {}
+  }
+  return null;
+}
+
+// General downloader API for social media (FB, IG, Pin)
 async function fetchDownloadApi(url) {
   try {
-    const { data } = await ax.get(`https://apis.davidcyriltech.my.id/download?url=${encodeURIComponent(url)}`, { timeout: 15000 });
-    if (data && data.status === 200) return data.result;
+    const { data } = await ax.get(`https://delirius-api-oficial.vercel.app/tools/dl?url=${encodeURIComponent(url)}`, { timeout: 12000 });
+    if (data?.status && data?.data) return data.data;
   } catch (e) {}
-  
   try {
-    const { data } = await ax.get(`https://delirius-api-oficial.vercel.app/tools/dl?url=${encodeURIComponent(url)}`, { timeout: 15000 });
-    if (data && data.status) return data.data;
+    const { data } = await ax.get(`https://apis.davidcyriltech.my.id/download?url=${encodeURIComponent(url)}`, { timeout: 12000 });
+    if (data?.status === 200 && data?.result) return data.result;
   } catch (e) {}
-  
   return null;
 }
 
@@ -57,17 +77,7 @@ module.exports = [
       let v = sr.videos[0];
       await s.sendMessage(m.chat, { react: { text: '⬇️', key: m.key } });
 
-      let audioUrl = null;
-      const res = await fetchDownloadApi(v.url);
-      audioUrl = res?.audio || res?.dl || res?.download?.url || res?.low || null;
-
-      if (!audioUrl) {
-        // Fallback public API for audio
-        try {
-          const alt = await ax.get(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(v.url)}`);
-          audioUrl = alt.data?.data?.[0]?.audio || alt.data?.data?.url;
-        } catch (err) {}
-      }
+      let audioUrl = await fetchYouTubeDL(v.url, 'mp3');
 
       if (!audioUrl) {
         await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
@@ -102,9 +112,7 @@ module.exports = [
       }
       await s.sendMessage(m.chat, { react: { text: '⬇️', key: m.key } });
 
-      let videoUrl = null;
-      const res = await fetchDownloadApi(u);
-      videoUrl = res?.video || res?.dl || res?.download?.url || res?.high || null;
+      let videoUrl = await fetchYouTubeDL(u, 'mp4');
 
       if (!videoUrl) {
         await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
