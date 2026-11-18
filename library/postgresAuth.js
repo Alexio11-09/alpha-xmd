@@ -1,67 +1,106 @@
-const { Pool } = require("pg");
-const { initAuthCreds, BufferJSON, proto } = require("@whiskeysockets/baileys");
-
-const RAW_DB_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://neondb_owner:npg_aTFMg7Gewy3f@ep-twilight-pine-bcgiya8u-pooler.c-16.us-east-1.aws.neon.tech/neondb?sslmode=require";
-
-// Ensure lowercase protocol and clean sslmode for pg driver compatibility
-const DB_URL = RAW_DB_URL.replace(/^Postgresql:\/\//i, "postgresql://").replace("&channel_binding=require", "");
+const { Pool } = require('pg');
 
 const pool = new Pool({
-  connectionString: DB_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 15,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000
+  connectionString: process.env.DATABASE_URL || "postgresql://neondb_owner:npg_gY59rQvTzN1B@ep-white-sound-a25t7t1j-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require",
+  ssl: { rejectUnauthorized: false }
 });
 
-let tableReady = false;
-async function ensureTable() {
-  if (tableReady) return;
+// Ensure the sessions table exists with the correct primary key constraint for upserts
+async function initTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_sessions (
-      session_id VARCHAR(64) NOT NULL,
+      session_id VARCHAR(255) NOT NULL,
       key_id VARCHAR(255) NOT NULL,
-      data TEXT NOT NULL,
-      updated_at TIMESTAMP DEFAULT NOW(),
+      value TEXT NOT NULL,
       PRIMARY KEY (session_id, key_id)
     );
   `);
-  tableReady = true;
+
+  // Extra table for session-specific runtime settings (prefixes, toggles, etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_settings (
+      session_id VARCHAR(255) PRIMARY KEY,
+      settings TEXT NOT NULL
+    );
+  `);
 }
 
+initTable().catch((err) => console.log("Database Init Error:", err.message));
+
+// Custom JSON replacer to safely handle Buffers and TypedArrays in Baileys
+const replacer = (key, value) => {
+  if (value && value.type === 'Buffer' && Array.isArray(value.data)) {
+    return Buffer.from(value.data);
+  }
+  return value;
+};
+
+const reviver = (key, value) => {
+  if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
+    return Buffer.from(value.data);
+  }
+  return value;
+};
+
 async function usePostgresAuthState(sessionId) {
-  await ensureTable();
-
-  const writeData = async (keyId, data) => {
-    const serialized = JSON.stringify(data, BufferJSON.replacer);
-    await pool.query(
-      `INSERT INTO whatsapp_sessions (session_id, key_id, data, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (session_id, key_id)
-       DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-      [sessionId, keyId, serialized]
-    );
+  const writeData = async (data, category) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const key of Object.keys(data)) {
+        const value = JSON.stringify(data[key], (k, v) => Buffer.isBuffer(v) ? { type: 'Buffer', data: Array.from(v) } : v);
+        const keyId = `${category}-${key}`;
+        await client.query(
+          `INSERT INTO whatsapp_sessions (session_id, key_id, value) 
+           VALUES ($1, $2, $3) 
+           ON CONFLICT (session_id, key_id) 
+           DO UPDATE SET value = EXCLUDED.value`,
+          [sessionId, keyId, value]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      console.error(`PostgresAuth Write Error [${category}]:`, e.message);
+    } finally {
+      client.release();
+    }
   };
 
-  const readData = async (keyId) => {
-    const res = await pool.query(
-      `SELECT data FROM whatsapp_sessions WHERE session_id = $1 AND key_id = $2`,
-      [sessionId, keyId]
-    );
-    if (!res.rows.length) return null;
-    return JSON.parse(res.rows[0].data, BufferJSON.reviver);
+  const readData = async (category, key) => {
+    try {
+      const keyId = `${category}-${key}`;
+      const res = await pool.query(
+        `SELECT value FROM whatsapp_sessions WHERE session_id = $1 AND key_id = $2`,
+        [sessionId, keyId]
+      );
+      if (res.rows.length === 0) return null;
+      return JSON.parse(res.rows[0].value, reviver);
+    } catch (e) {
+      console.error(`PostgresAuth Read Error [${category}-${key}]:`, e.message);
+      return null;
+    }
   };
 
-  const removeData = async (keyId) => {
-    await pool.query(
-      `DELETE FROM whatsapp_sessions WHERE session_id = $1 AND key_id = $2`,
-      [sessionId, keyId]
-    );
+  const removeData = async (category, key) => {
+    try {
+      const keyId = `${category}-${key}`;
+      await pool.query(
+        `DELETE FROM whatsapp_sessions WHERE session_id = $1 AND key_id = $2`,
+        [sessionId, keyId]
+      );
+    } catch (e) {
+      console.error(`PostgresAuth Remove Error [${category}-${key}]:`, e.message);
+    }
   };
 
-  const creds = (await readData("creds")) || initAuthCreds();
+  // Load initial credentials
+  let creds = await readData('creds', 'creds');
+  if (!creds) {
+    const { initAuthCreds } = require('@whiskeysockets/baileys');
+    creds = initAuthCreds();
+    await writeData({ creds: creds }, 'creds');
+  }
 
   return {
     state: {
@@ -69,80 +108,88 @@ async function usePostgresAuthState(sessionId) {
       keys: {
         get: async (type, ids) => {
           const data = {};
-          await Promise.all(
-            ids.map(async (id) => {
-              let value = await readData(`${type}-${id}`);
-              if (type === "app-state-sync-key" && value) {
-                value = proto.Message.AppStateSyncKeyData.fromObject(value);
-              }
-              data[id] = value;
-            })
-          );
+          for (const id of ids) {
+            let value = await readData(type, id);
+            if (type === 'app-state-sync-key' && value) {
+              value = require('@whiskeysockets/baileys').proto.Message.AppStateSyncKeyData.fromObject(value);
+            }
+            data[id] = value;
+          }
           return data;
         },
         set: async (data) => {
           const tasks = [];
-          for (const category in data) {
-            for (const id in data[category]) {
+          for (const category of Object.keys(data)) {
+            for (const id of Object.keys(data[category])) {
               const value = data[category][id];
-              const key = `${category}-${id}`;
-              tasks.push(value ? writeData(key, value) : removeData(key));
+              if (value) {
+                tasks.push(writeData({ [id]: value }, category));
+              } else {
+                tasks.push(removeData(category, id));
+              }
             }
           }
           await Promise.all(tasks);
         }
       }
     },
-    saveCreds: () => writeData("creds", creds)
+    saveCreds: async () => {
+      await writeData({ creds: creds }, 'creds');
+    }
   };
 }
 
 async function getAllSavedSessions() {
-  await ensureTable();
-  const res = await pool.query(
-    `SELECT DISTINCT session_id FROM whatsapp_sessions WHERE key_id = 'creds'`
-  );
-  return res.rows.map((r) => r.session_id);
+  try {
+    const res = await pool.query(`SELECT DISTINCT session_id FROM whatsapp_sessions`);
+    return res.rows.map(r => r.session_id);
+  } catch (e) {
+    return [];
+  }
 }
 
 async function deleteSession(sessionId) {
-  await ensureTable();
-  await pool.query(`DELETE FROM whatsapp_sessions WHERE session_id = $1`, [sessionId]);
+  try {
+    await pool.query(`DELETE FROM whatsapp_sessions WHERE session_id = $1`, [sessionId]);
+    await pool.query(`DELETE FROM whatsapp_settings WHERE session_id = $1`, [sessionId]);
+  } catch (e) {}
 }
 
 async function getSessionSettings(sessionId) {
-  await ensureTable();
-  const res = await pool.query(
-    `SELECT data FROM whatsapp_sessions WHERE session_id = $1 AND key_id = 'settings'`,
-    [sessionId]
-  );
-  if (!res.rows.length) return null;
   try {
-    return JSON.parse(res.rows[0].data);
-  } catch {
+    const res = await pool.query(`SELECT settings FROM whatsapp_settings WHERE session_id = $1`, [sessionId]);
+    if (res.rows.length === 0) return null;
+    return JSON.parse(res.rows[0].settings);
+  } catch (e) {
     return null;
   }
 }
 
 async function saveSessionSettings(sessionId, settings) {
-  await ensureTable();
-  await pool.query(
-    `INSERT INTO whatsapp_sessions (session_id, key_id, data, updated_at)
-     VALUES ($1, 'settings', $2, NOW())
-     ON CONFLICT (session_id, key_id)
-     DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-    [sessionId, JSON.stringify(settings)]
-  );
+  try {
+    const json = JSON.stringify(settings);
+    await pool.query(
+      `INSERT INTO whatsapp_settings (session_id, settings) VALUES ($1, $2)
+       ON CONFLICT (session_id) DO UPDATE SET settings = EXCLUDED.settings`,
+      [sessionId, json]
+    );
+  } catch (e) {}
 }
 
 async function cleanupOldSignalKeys() {
-  await ensureTable();
-  const res = await pool.query(`
-    DELETE FROM whatsapp_sessions
-    WHERE (key_id LIKE 'pre-key-%' OR key_id LIKE 'sender-key-%' OR key_id LIKE 'session-%')
-      AND updated_at < NOW() - INTERVAL '3 days'
-  `);
-  return res.rowCount || 0;
+  try {
+    // Prunes stale pre-keys older than normal rotation to keep the database lightweight
+    const res = await pool.query(`
+      DELETE FROM whatsapp_sessions 
+      WHERE key_id LIKE 'pre-key-%' 
+      AND session_id IN (
+        SELECT session_id FROM whatsapp_sessions GROUP BY session_id HAVING count(*) > 150
+      )
+    `);
+    return res.rowCount || 0;
+  } catch (e) {
+    return 0;
+  }
 }
 
 module.exports = {
@@ -151,6 +198,5 @@ module.exports = {
   deleteSession,
   getSessionSettings,
   saveSessionSettings,
-  cleanupOldSignalKeys,
-  pool
+  cleanupOldSignalKeys
 };
