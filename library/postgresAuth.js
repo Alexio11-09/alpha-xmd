@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { initAuthCreds, proto } = require('@whiskeysockets/baileys');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -137,11 +138,8 @@ async function saveSessionSettings(sessionId, settings) {
   } catch (e) {}
 }
 
-async function cleanupOldSignalKeys() {
-  // Optional cleanup task
-}
+async function cleanupOldSignalKeys() {}
 
-// Custom JSON replacer/reviver for Baileys buffers
 function replacer(key, value) {
   if (value && value.type === 'Buffer' && Array.isArray(value.data)) {
     return { type: 'Buffer', data: value.data };
