@@ -13,7 +13,7 @@ const {
   getSessionSettings,
   saveSessionSettings,
   cleanupOldSignalKeys
-} = require("./library/postgresAuth"); // 🎯 POSTGRESQL IMPORT
+} = require("./library/postgresAuth"); 
 const config = () => require("./settings/config");
 
 // 🎯 GLOBAL ERROR CATCHERS
@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 
 const activeSockets = new Map();
 const store = new Map(); 
-const settingsCache = new Map(); // 🎯 IN-MEMORY SETTINGS CACHE
+const settingsCache = new Map(); 
 let baileys;
 
 global.ghostMode = false;
@@ -83,19 +83,25 @@ function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
   const channelName = config().newsletter.name;
 
-  // 🎯 LOAD SETTINGS FROM CACHE FIRST, THEN DB
+  // 🎯 LOAD SETTINGS WITH A 3-SECOND TIMEOUT TO PREVENT HANGING
   const loadGlobalSettings = async () => {
     if (settingsCache.has(phoneNumber)) return settingsCache.get(phoneNumber);
     
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
     try {
-      const saved = await getSessionSettings(phoneNumber);
+      const dbFetch = getSessionSettings(phoneNumber);
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("DB Settings Timeout")), 3000));
+      
+      const saved = await Promise.race([dbFetch, timeout]);
+      
       if (saved) {
           const merged = { ...defaults, ...saved };
           settingsCache.set(phoneNumber, merged);
           return merged;
       }
-    } catch {}
+    } catch (err) {
+      console.log(`⚠️ [DB SETTINGS TIMEOUT] Falling back to defaults. Error: ${err.message}`);
+    }
     settingsCache.set(phoneNumber, defaults);
     return defaults;
   };
@@ -136,9 +142,13 @@ function attachHandlers(sock, phoneNumber) {
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       if (!chatUpdate.messages?.length) return;
-      const globalSettings = await loadGlobalSettings(); 
+      
+      console.log(`📩 [DEBUG] Received upsert event! Messages: ${chatUpdate.messages.length}`);
 
-      // 🎯 REVERTED TO STANDARD LOOP (Prevents Signal decryption deadlocks)
+      const globalSettings = await loadGlobalSettings(); 
+      
+      console.log(`⚙️ [DEBUG] Settings loaded successfully.`);
+
       for (const mek of chatUpdate.messages) {
         try {
           const remote = mek.key?.remoteJid;
@@ -148,6 +158,8 @@ function attachHandlers(sock, phoneNumber) {
           }
           if (!mek.message) continue;
           
+          console.log(`📝 [DEBUG] Processing message from: ${remote}`);
+
           const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           const isCmd = messageText.startsWith(globalSettings.prefix);
 
@@ -186,7 +198,12 @@ function attachHandlers(sock, phoneNumber) {
           
           if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
           
+          console.log(`📦 [DEBUG] Passing to messageHandler...`);
+          
           await messageHandler(sock, m);
+          
+          console.log(`✅ [DEBUG] messageHandler finished processing.`);
+
         } catch (err) {
           console.log("⚠️ Single message process error:", err.message);
         }
@@ -281,7 +298,6 @@ async function startBot(phoneNumber) {
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
 
-    // 🎯 POSTGRESQL AUTH STATE
     const { state, saveCreds } = await usePostgresAuthState(phoneNumber);
 
     const sock = baileys.default({
@@ -355,7 +371,6 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
 
-    // 🎯 POSTGRESQL AUTH STATE FOR PAIRING
     const { state, saveCreds } = await usePostgresAuthState(phoneNumber);
 
     const tempSock = baileys.default({
@@ -394,7 +409,7 @@ app.post("/api/disconnect", async (req, res) => {
   try {
     if (activeSockets.has(phoneNumber)) { await activeSockets.get(phoneNumber).logout(); activeSockets.delete(phoneNumber); }
     await deleteSession(phoneNumber);
-    settingsCache.delete(phoneNumber); // 🎯 Clear from cache
+    settingsCache.delete(phoneNumber);
     res.json({ success: true, message: "Bot disconnected." });
   } catch (err) { res.json({ success: true, message: "Session deleted." }); }
 });
@@ -405,7 +420,7 @@ app.get("/api/settings", async (req, res) => {
   
   const saved = await getSessionSettings(phoneNumber);
   if (saved) {
-      settingsCache.set(phoneNumber, saved); // 🎯 Store in cache
+      settingsCache.set(phoneNumber, saved);
       return res.json(saved);
   }
   res.json({ autoread: false, autotyping: false, antidelete: false, antilink: false, autoreact: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." });
@@ -414,7 +429,7 @@ app.get("/api/settings", async (req, res) => {
 app.post("/api/settings", async (req, res) => {
   const { phoneNumber, settings } = req.body;
   await saveSessionSettings(phoneNumber, settings);
-  settingsCache.set(phoneNumber, settings); // 🎯 Save to memory instantly
+  settingsCache.set(phoneNumber, settings);
   res.json({ success: true });
 });
 
@@ -433,7 +448,6 @@ app.post("/api/settings", async (req, res) => {
       console.log("⚠️ Ngrok Error:", err.message);
     }
 
-    // Auto-start all saved PostgreSQL sessions on boot
     try {
       await cleanupOldSignalKeys();
       const sessions = await getAllSavedSessions();
