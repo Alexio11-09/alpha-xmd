@@ -1,6 +1,10 @@
 // © 2026 Alpha - FULL SERIALIZE FIX (PRO 🔥)
 
-const { getContentType } = require("@whiskeysockets/baileys");
+const getContentType = (content) => {
+    if (!content) return undefined;
+    const keys = Object.keys(content);
+    return keys.find(k => (k === 'conversation' || k.endsWith('Message')) && k !== 'senderKeyDistributionMessage');
+};
 
 const smsg = async (sock, m) => {
     if (!m) return m;
@@ -18,6 +22,15 @@ const smsg = async (sock, m) => {
 
         // ✅ MESSAGE TYPE
         if (m.message) {
+            // Unwrap ephemeral or viewOnce messages if present
+            if (m.message.ephemeralMessage) {
+                m.message = m.message.ephemeralMessage.message;
+            } else if (m.message.viewOnceMessage) {
+                m.message = m.message.viewOnceMessage.message;
+            } else if (m.message.viewOnceMessageV2) {
+                m.message = m.message.viewOnceMessageV2.message;
+            }
+
             m.mtype = getContentType(m.message);
             m.msg = m.message[m.mtype];
 
@@ -35,13 +48,13 @@ const smsg = async (sock, m) => {
         if (m.msg?.contextInfo?.quotedMessage) {
             const quoted = m.msg.contextInfo.quotedMessage;
             const type = getContentType(quoted);
-            const quotedSender = m.msg.contextInfo.participant; // 🎯 The person you replied to
+            const quotedSender = m.msg.contextInfo.participant;
 
             m.quoted = {
                 message: quoted,
                 mtype: type,
                 msg: quoted[type],
-                sender: quotedSender, // 🎯 ADDED THIS: Now the bot knows who you replied to!
+                sender: quotedSender,
                 key: {
                     id: m.msg.contextInfo.stanzaId,
                     remoteJid: m.chat,
@@ -61,7 +74,7 @@ const smsg = async (sock, m) => {
                 m.quoted.msg?.fileSha256 ||
                 '';
 
-            // ✅ DOWNLOAD FUNCTION (VERY IMPORTANT)
+            // ✅ DOWNLOAD FUNCTION
             m.quoted.download = async () => {
                 return await sock.downloadMediaMessage({
                     key: m.quoted.key,
