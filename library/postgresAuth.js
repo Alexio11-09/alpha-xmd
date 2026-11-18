@@ -6,7 +6,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Initialize database tables automatically on startup
+// Initialize and ensure correct table schema on startup
 async function initTables() {
   const client = await pool.connect();
   try {
