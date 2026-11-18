@@ -1,11 +1,19 @@
 const { Pool } = require('pg');
 
+// Normalize connection string (ensures lowercase protocol and strips unsupported channel_binding flag for node-postgres)
+const rawUrl = process.env.DATABASE_URL || "";
+const connectionString = rawUrl
+  .replace(/^Postgresql:\/\//i, "postgresql://")
+  .replace(/&channel_binding=require/i, "")
+  .replace(/\?channel_binding=require&/i, "?")
+  .replace(/\?channel_binding=require/i, "");
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://neondb_owner:npg_gY59rQvTzN1B@ep-white-sound-a25t7t1j-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require",
+  connectionString,
   ssl: { rejectUnauthorized: false }
 });
 
-// Ensure the sessions table exists with the correct primary key constraint for upserts
+// Ensure the sessions and settings tables exist with proper primary keys for upserts
 async function initTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_sessions (
@@ -16,7 +24,6 @@ async function initTable() {
     );
   `);
 
-  // Extra table for session-specific runtime settings (prefixes, toggles, etc.)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_settings (
       session_id VARCHAR(255) PRIMARY KEY,
@@ -27,14 +34,7 @@ async function initTable() {
 
 initTable().catch((err) => console.log("Database Init Error:", err.message));
 
-// Custom JSON replacer to safely handle Buffers and TypedArrays in Baileys
-const replacer = (key, value) => {
-  if (value && value.type === 'Buffer' && Array.isArray(value.data)) {
-    return Buffer.from(value.data);
-  }
-  return value;
-};
-
+// Custom JSON reviver to safely restore Buffers and TypedArrays in Baileys
 const reviver = (key, value) => {
   if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
     return Buffer.from(value.data);
@@ -48,7 +48,9 @@ async function usePostgresAuthState(sessionId) {
     try {
       await client.query('BEGIN');
       for (const key of Object.keys(data)) {
-        const value = JSON.stringify(data[key], (k, v) => Buffer.isBuffer(v) ? { type: 'Buffer', data: Array.from(v) } : v);
+        const value = JSON.stringify(data[key], (k, v) =>
+          Buffer.isBuffer(v) ? { type: 'Buffer', data: Array.from(v) } : v
+        );
         const keyId = `${category}-${key}`;
         await client.query(
           `INSERT INTO whatsapp_sessions (session_id, key_id, value) 
@@ -178,7 +180,6 @@ async function saveSessionSettings(sessionId, settings) {
 
 async function cleanupOldSignalKeys() {
   try {
-    // Prunes stale pre-keys older than normal rotation to keep the database lightweight
     const res = await pool.query(`
       DELETE FROM whatsapp_sessions 
       WHERE key_id LIKE 'pre-key-%' 
