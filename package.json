@@ -10,6 +10,8 @@
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@ngrok/ngrok": "^1.4.1",
+    "@pontalabs/ytdl": "^1.0.0",
+    "@raihan07/vidly": "^1.0.0",
     "@whiskeysockets/baileys": "^7.0.0-rc.14",
     "adm-zip": "^0.5.10",
     "axios": "^1.6.8",
