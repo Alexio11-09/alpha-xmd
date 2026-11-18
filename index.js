@@ -356,7 +356,7 @@ function attachHandlers(sock, phoneNumber) {
                 contextInfo: {
                   forwardingScore: 999,
                   isForwarded: true,
-                  forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: config().newsletter.name }
+                  forwardedNewsletterMessageInfo: { newsletterJid: channelJid, newsletterName: channelName }
                 },
                 ...opts
               });
@@ -494,14 +494,14 @@ async function startBot(phoneNumber) {
 
     const sock = baileys.default({
       version,
-      logger: pino({ level: "silent" }),
+      logger: pino({ level: "silent" }, pino.destination({ dest: '/dev/null', sync: true })),
       printQRInTerminal: false,
       auth: state,
       browser: ["Ubuntu", "Chrome", "20.0.04"],
       generateHighQualityLinkPreview: false,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 15000,
+      keepAliveIntervalMs: 25000,
       syncFullHistory: false,
       getMessage: async () => ({ conversation: "" }),
       markOnlineOnConnect: false
@@ -577,7 +577,7 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
 
       const tempSock = baileys.default({
         version,
-        logger: pino({ level: "silent" }),
+        logger: pino({ level: "silent" }, pino.destination({ dest: '/dev/null', sync: true })),
         printQRInTerminal: false,
         auth: state,
         browser: baileys.Browsers.ubuntu("Chrome"),
