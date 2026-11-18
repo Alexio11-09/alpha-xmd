@@ -4,20 +4,32 @@ const {
   fetchLatestBaileysVersion,
   jidNormalizedUser
 } = require('@whiskeysockets/baileys');
-const { usePostgresAuthState, getAllSavedSessions, getSessionSettings } = require('./library/postgresAuth');
+const {
+  usePostgresAuthState,
+  getAllSavedSessions,
+  deleteSession,
+  getSessionSettings,
+  saveSessionSettings,
+  cleanupOldSignalKeys
+} = require('./library/postgresAuth');
 const pino = require('pino');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const ngrok = require('@ngrok/ngrok');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve your pairing website files from 'public' (or root if index.html is there)
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 // Load Plugins
 const plugins = [];
@@ -62,10 +74,9 @@ async function startBot(sessionId, res = null) {
   });
 
   activeSessions.set(sessionId, sock);
-
   sock.ev.on('creds.update', saveCreds);
 
-  // Handle pairing code generation cleanly on the same socket
+  // Pairing code generation on the active socket
   if (res && !sock.authState.creds.registered) {
     setTimeout(async () => {
       try {
@@ -84,6 +95,7 @@ async function startBot(sessionId, res = null) {
     const { connection, lastDisconnect } = update;
     if (connection === 'open') {
       console.log(`✅ [${sessionId}] Bot Connected!`);
+      io.emit('session-connected', { sessionId });
     } else if (connection === 'close') {
       activeSessions.delete(sessionId);
       let reason = lastDisconnect?.error?.output?.statusCode;
@@ -91,6 +103,7 @@ async function startBot(sessionId, res = null) {
         setTimeout(() => startBot(sessionId), 5000);
       } else {
         console.log(`❌ [${sessionId}] Device logged out.`);
+        await deleteSession(sessionId);
       }
     }
   });
@@ -141,6 +154,7 @@ async function startBot(sessionId, res = null) {
 async function initAllSessions() {
   console.log('🔄 Starting Alpha Bot Server (PostgreSQL Mode)...');
   try {
+    await cleanupOldSignalKeys();
     const sessions = await getAllSavedSessions();
     console.log(`📂 Found ${sessions.length} PostgreSQL session(s):`, sessions.join(', '));
     for (const sessionId of sessions) {
@@ -151,9 +165,9 @@ async function initAllSessions() {
   }
 }
 
-// Pairing Endpoint for Web Interface / Vercel
+// Pairing Endpoints (supports both /pair POST and GET query)
 app.post('/pair', async (req, res) => {
-  const { phoneNumber } = req.body;
+  const phoneNumber = req.body.phoneNumber || req.body.number;
   if (!phoneNumber) return res.status(400).json({ error: 'Phone number is required' });
 
   const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
@@ -168,12 +182,59 @@ app.post('/pair', async (req, res) => {
   }
 });
 
+app.get('/pair', async (req, res) => {
+  const phoneNumber = req.query.number || req.query.phoneNumber;
+  if (!phoneNumber) return res.status(400).json({ error: 'Phone number is required' });
+
+  const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+  if (activeSessions.has(cleanNumber)) {
+    return res.json({ status: 'already_running', message: 'Session already active!' });
+  }
+
+  try {
+    await startBot(cleanNumber, res);
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+// Status & Sessions API
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'online',
+    activeSessions: Array.from(activeSessions.keys()),
+    pluginsLoaded: plugins.length
+  });
+});
+
+// Fallback route to serve index.html if present
 app.get('/', (req, res) => {
+  const publicIndex = path.join(__dirname, 'public', 'index.html');
+  const rootIndex = path.join(__dirname, 'index.html');
+  if (fs.existsSync(publicIndex)) return res.sendFile(publicIndex);
+  if (fs.existsSync(rootIndex)) return res.sendFile(rootIndex);
   res.send('Alpha-XMD Bot Server is Running Smoothly!');
 });
 
 const PORT = process.env.PORT || 25440;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`🌐 Internal API running on port ${PORT}`);
+
+  // Start Ngrok tunnel automatically (restoring your static domain if configured)
+  const authtoken = process.env.NGROK_AUTHTOKEN;
+  const domain = process.env.NGROK_DOMAIN || 'itinerary-splashy-flyer.ngrok-free.dev';
+  if (authtoken) {
+    try {
+      const listener = await ngrok.connect({
+        addr: PORT,
+        authtoken,
+        domain
+      });
+      console.log(`🚇 Ngrok Tunnel Active: ${listener.url()}`);
+    } catch (err) {
+      console.log('⚠️ Ngrok Tunnel Warning:', err.message);
+    }
+  }
+
   initAllSessions();
 });
