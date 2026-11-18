@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 
 const activeSockets = new Map();
 const store = new Map(); 
-const settingsCache = new Map(); // 🎯 NEW: In-memory settings cache to stop DB pings
+const settingsCache = new Map(); // 🎯 IN-MEMORY SETTINGS CACHE
 let baileys;
 
 global.ghostMode = false;
@@ -83,7 +83,7 @@ function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
   const channelName = config().newsletter.name;
 
-  // 🎯 FIX: Load from Cache first, only query DB if missing
+  // 🎯 LOAD SETTINGS FROM CACHE FIRST, THEN DB
   const loadGlobalSettings = async () => {
     if (settingsCache.has(phoneNumber)) return settingsCache.get(phoneNumber);
     
@@ -138,15 +138,16 @@ function attachHandlers(sock, phoneNumber) {
       if (!chatUpdate.messages?.length) return;
       const globalSettings = await loadGlobalSettings(); 
 
-      // 🎯 FIX: Use Promise.all to process messages in parallel instead of blocking
-      await Promise.all(chatUpdate.messages.map(async (mek) => {
+      // 🎯 REVERTED TO STANDARD LOOP (Prevents Signal decryption deadlocks)
+      for (const mek of chatUpdate.messages) {
         try {
           const remote = mek.key?.remoteJid;
           if (remote === "status@broadcast") {
             if (autoStatusHandler.handleStatusUpdate) { autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {}); }
-            return; 
+            continue; 
           }
-          if (!mek.message) return;
+          if (!mek.message) continue;
+          
           const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           const isCmd = messageText.startsWith(globalSettings.prefix);
 
@@ -173,16 +174,23 @@ function attachHandlers(sock, phoneNumber) {
                   }
               }
           }
-          if (isCmd) { const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown'; console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`); }
+          
+          if (isCmd) { 
+              const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown'; 
+              console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`); 
+          }
+          
           const m = await smsg(sock, mek);
           m.prefix = globalSettings.prefix;
           m.globalSettings = globalSettings; 
+          
           if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
+          
           await messageHandler(sock, m);
         } catch (err) {
           console.log("⚠️ Single message process error:", err.message);
         }
-      }));
+      }
     } catch (err) { console.log("⚠️ Message handler:", err.message); }
   });
 
