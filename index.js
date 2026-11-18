@@ -42,6 +42,7 @@ app.use((req, res, next) => {
 
 const activeSockets = new Map();
 const store = new Map(); 
+const settingsCache = new Map(); // 🎯 NEW: In-memory settings cache to stop DB pings
 let baileys;
 
 global.ghostMode = false;
@@ -82,13 +83,20 @@ function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
   const channelName = config().newsletter.name;
 
-  // Load settings directly from PostgreSQL instead of local disk
+  // 🎯 FIX: Load from Cache first, only query DB if missing
   const loadGlobalSettings = async () => {
+    if (settingsCache.has(phoneNumber)) return settingsCache.get(phoneNumber);
+    
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
     try {
       const saved = await getSessionSettings(phoneNumber);
-      if (saved) return { ...defaults, ...saved };
+      if (saved) {
+          const merged = { ...defaults, ...saved };
+          settingsCache.set(phoneNumber, merged);
+          return merged;
+      }
     } catch {}
+    settingsCache.set(phoneNumber, defaults);
     return defaults;
   };
 
@@ -130,46 +138,51 @@ function attachHandlers(sock, phoneNumber) {
       if (!chatUpdate.messages?.length) return;
       const globalSettings = await loadGlobalSettings(); 
 
-      for (const mek of chatUpdate.messages) {
-        const remote = mek.key?.remoteJid;
-        if (remote === "status@broadcast") {
-          if (autoStatusHandler.handleStatusUpdate) { autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {}); }
-          continue; 
-        }
-        if (!mek.message) continue;
-        const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
-        const isCmd = messageText.startsWith(globalSettings.prefix);
+      // 🎯 FIX: Use Promise.all to process messages in parallel instead of blocking
+      await Promise.all(chatUpdate.messages.map(async (mek) => {
+        try {
+          const remote = mek.key?.remoteJid;
+          if (remote === "status@broadcast") {
+            if (autoStatusHandler.handleStatusUpdate) { autoStatusHandler.handleStatusUpdate(sock, { messages: [mek] }).catch(() => {}); }
+            return; 
+          }
+          if (!mek.message) return;
+          const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
+          const isCmd = messageText.startsWith(globalSettings.prefix);
 
-        if (remote && remote.endsWith('@newsletter')) {
-            if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) { global.pollCache.set(mek.key.id, mek); }
-            let autoReactChannels = {};
-            try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
-            if (autoReactChannels[remote]) {
-                const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
-                (async () => {
-                    for (let e of emojis) {
-                        try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, e); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: e, senderTimestampMs: Date.now() } }, {}); } } catch (err) { break; }
-                        await new Promise(r => setTimeout(r, 1500));
+          if (remote && remote.endsWith('@newsletter')) {
+              if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) { global.pollCache.set(mek.key.id, mek); }
+              let autoReactChannels = {};
+              try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
+              if (autoReactChannels[remote]) {
+                  const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
+                  (async () => {
+                      for (let e of emojis) {
+                          try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, e); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: e, senderTimestampMs: Date.now() } }, {}); } } catch (err) { break; }
+                          await new Promise(r => setTimeout(r, 1500));
+                      }
+                  })();
+              } else if (isCmd) {
+                  try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, "⚡"); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: "⚡", senderTimestampMs: Date.now() } }, {}); } } catch(e) {}
+              } else {
+                  const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
+                  if (cr.enabled) {
+                    for (const emoji of cr.emojis || []) {
+                      try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, emoji); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {}); } await new Promise(r => setTimeout(r, 1000)); } catch (e) {}
                     }
-                })();
-            } else if (isCmd) {
-                try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, "⚡"); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: "⚡", senderTimestampMs: Date.now() } }, {}); } } catch(e) {}
-            } else {
-                const cr = globalSettings.chreact || { enabled: false, emojis: ["💬"] };
-                if (cr.enabled) {
-                  for (const emoji of cr.emojis || []) {
-                    try { if (sock.newsletterReact) { await sock.newsletterReact(remote, mek.key.id, emoji); } else { await sock.relayMessage(remote, { reactionMessage: { key: { remoteJid: remote, id: mek.key.id, fromMe: false }, text: emoji, senderTimestampMs: Date.now() } }, {}); } await new Promise(r => setTimeout(r, 1000)); } catch (e) {}
                   }
-                }
-            }
+              }
+          }
+          if (isCmd) { const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown'; console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`); }
+          const m = await smsg(sock, mek);
+          m.prefix = globalSettings.prefix;
+          m.globalSettings = globalSettings; 
+          if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
+          await messageHandler(sock, m);
+        } catch (err) {
+          console.log("⚠️ Single message process error:", err.message);
         }
-        if (isCmd) { const senderNumber = mek.key.participant?.split('@')[0] || mek.key.remoteJid?.split('@')[0] || 'unknown'; console.log(`[CMD] ${phoneNumber} | ${senderNumber} | ${messageText.substring(0, 30)}`); }
-        const m = await smsg(sock, mek);
-        m.prefix = globalSettings.prefix;
-        m.globalSettings = globalSettings; 
-        if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
-        await messageHandler(sock, m);
-      }
+      }));
     } catch (err) { console.log("⚠️ Message handler:", err.message); }
   });
 
@@ -259,7 +272,7 @@ async function startBot(phoneNumber) {
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
-    
+
     // 🎯 POSTGRESQL AUTH STATE
     const { state, saveCreds } = await usePostgresAuthState(phoneNumber);
 
@@ -300,7 +313,7 @@ async function startBot(phoneNumber) {
         try { sock.ev.removeAllListeners(); sock.end(undefined); } catch (e) {}
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
         activeSockets.delete(phoneNumber);
-        
+
         if (code !== 401) {
           console.log(chalk.yellow(`🔄 [${phoneNumber}] Reconnecting in 5s...`));
           setTimeout(() => startBot(phoneNumber), 5000);
@@ -333,7 +346,7 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
-    
+
     // 🎯 POSTGRESQL AUTH STATE FOR PAIRING
     const { state, saveCreds } = await usePostgresAuthState(phoneNumber);
 
@@ -373,20 +386,27 @@ app.post("/api/disconnect", async (req, res) => {
   try {
     if (activeSockets.has(phoneNumber)) { await activeSockets.get(phoneNumber).logout(); activeSockets.delete(phoneNumber); }
     await deleteSession(phoneNumber);
+    settingsCache.delete(phoneNumber); // 🎯 Clear from cache
     res.json({ success: true, message: "Bot disconnected." });
   } catch (err) { res.json({ success: true, message: "Session deleted." }); }
 });
 
 app.get("/api/settings", async (req, res) => {
   const { phoneNumber } = req.query;
+  if (settingsCache.has(phoneNumber)) return res.json(settingsCache.get(phoneNumber));
+  
   const saved = await getSessionSettings(phoneNumber);
-  if (saved) return res.json(saved);
+  if (saved) {
+      settingsCache.set(phoneNumber, saved); // 🎯 Store in cache
+      return res.json(saved);
+  }
   res.json({ autoread: false, autotyping: false, antidelete: false, antilink: false, autoreact: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." });
 });
 
 app.post("/api/settings", async (req, res) => {
   const { phoneNumber, settings } = req.body;
   await saveSessionSettings(phoneNumber, settings);
+  settingsCache.set(phoneNumber, settings); // 🎯 Save to memory instantly
   res.json({ success: true });
 });
 
@@ -418,7 +438,7 @@ app.post("/api/settings", async (req, res) => {
     }
 
     setInterval(() => { require('http').get(`http://localhost:${PORT}/api/stats`, () => {}).on('error', () => {}); }, 10 * 60 * 1000); 
-    
+
     setInterval(() => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
