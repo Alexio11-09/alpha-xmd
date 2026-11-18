@@ -6,14 +6,7 @@ const pino = require("pino");
 const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
-const {
-  usePostgresAuthState,
-  getAllSavedSessions,
-  deleteSession,
-  getSessionSettings,
-  saveSessionSettings,
-  cleanupOldSignalKeys
-} = require("./library/postgresAuth"); 
+const { useSQLiteAuthState } = require('@nevi-dev/sqlite-auth'); // 🎯 SQLITE IMPORT
 const config = () => require("./settings/config");
 
 // 🎯 GLOBAL ERROR CATCHERS
@@ -39,6 +32,9 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
+
+const sessionsDir = path.join(__dirname, "sessions");
+if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
 
 const activeSockets = new Map();
 const store = new Map(); 
@@ -83,25 +79,19 @@ function attachHandlers(sock, phoneNumber) {
   const channelJid = `${config().newsletter.id}@newsletter`;
   const channelName = config().newsletter.name;
 
-  // 🎯 LOAD SETTINGS WITH A 3-SECOND TIMEOUT TO PREVENT HANGING
   const loadGlobalSettings = async () => {
     if (settingsCache.has(phoneNumber)) return settingsCache.get(phoneNumber);
     
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
     try {
-      const dbFetch = getSessionSettings(phoneNumber);
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("DB Settings Timeout")), 3000));
-      
-      const saved = await Promise.race([dbFetch, timeout]);
-      
-      if (saved) {
+      const settingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
+      if (fs.existsSync(settingsPath)) {
+          const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
           const merged = { ...defaults, ...saved };
           settingsCache.set(phoneNumber, merged);
           return merged;
       }
-    } catch (err) {
-      console.log(`⚠️ [DB SETTINGS TIMEOUT] Falling back to defaults. Error: ${err.message}`);
-    }
+    } catch (err) {}
     settingsCache.set(phoneNumber, defaults);
     return defaults;
   };
@@ -142,12 +132,7 @@ function attachHandlers(sock, phoneNumber) {
   sock.ev.on("messages.upsert", async (chatUpdate) => {
     try {
       if (!chatUpdate.messages?.length) return;
-      
-      console.log(`📩 [DEBUG] Received upsert event! Messages: ${chatUpdate.messages.length}`);
-
       const globalSettings = await loadGlobalSettings(); 
-      
-      console.log(`⚙️ [DEBUG] Settings loaded successfully.`);
 
       for (const mek of chatUpdate.messages) {
         try {
@@ -158,8 +143,6 @@ function attachHandlers(sock, phoneNumber) {
           }
           if (!mek.message) continue;
           
-          console.log(`📝 [DEBUG] Processing message from: ${remote}`);
-
           const messageText = mek.message?.conversation || mek.message?.extendedTextMessage?.text || "";
           const isCmd = messageText.startsWith(globalSettings.prefix);
 
@@ -198,11 +181,7 @@ function attachHandlers(sock, phoneNumber) {
           
           if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
           
-          console.log(`📦 [DEBUG] Passing to messageHandler...`);
-          
           await messageHandler(sock, m);
-          
-          console.log(`✅ [DEBUG] messageHandler finished processing.`);
 
         } catch (err) {
           console.log("⚠️ Single message process error:", err.message);
@@ -293,12 +272,16 @@ function attachHandlers(sock, phoneNumber) {
 
 async function startBot(phoneNumber) {
   if (activeSockets.has(phoneNumber)) return; 
-  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber} (PostgreSQL)`));
+  console.log(chalk.blue(`🤖 Starting bot for ${phoneNumber} (SQLite)`));
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
-
-    const { state, saveCreds } = await usePostgresAuthState(phoneNumber);
+    
+    // 🎯 SQLITE AUTH STATE
+    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+        dbName: 'auth.db', 
+        cleanOldFiles: true 
+    });
 
     const sock = baileys.default({
       version,
@@ -342,8 +325,7 @@ async function startBot(phoneNumber) {
           console.log(chalk.yellow(`🔄 [${phoneNumber}] Reconnecting in 5s...`));
           setTimeout(() => startBot(phoneNumber), 5000);
         } else {
-          console.log(chalk.red(`❌ [${phoneNumber}] Logged out. Deleting session from DB.`));
-          await deleteSession(phoneNumber);
+          console.log(chalk.red(`❌ [${phoneNumber}] Logged out.`));
         }
       }
     });
@@ -371,7 +353,11 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
 
-    const { state, saveCreds } = await usePostgresAuthState(phoneNumber);
+    // 🎯 SQLITE AUTH STATE FOR PAIRING
+    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+        dbName: 'auth.db',
+        cleanOldFiles: true
+    });
 
     const tempSock = baileys.default({
       version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"), syncFullHistory: false
@@ -408,9 +394,10 @@ app.post("/api/disconnect", async (req, res) => {
   const { phoneNumber } = req.body;
   try {
     if (activeSockets.has(phoneNumber)) { await activeSockets.get(phoneNumber).logout(); activeSockets.delete(phoneNumber); }
-    await deleteSession(phoneNumber);
+    const sessionPath = path.join(sessionsDir, phoneNumber);
+    if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true });
     settingsCache.delete(phoneNumber);
-    res.json({ success: true, message: "Bot disconnected." });
+    res.json({ success: true, message: "Bot disconnected and session deleted." });
   } catch (err) { res.json({ success: true, message: "Session deleted." }); }
 });
 
@@ -418,23 +405,28 @@ app.get("/api/settings", async (req, res) => {
   const { phoneNumber } = req.query;
   if (settingsCache.has(phoneNumber)) return res.json(settingsCache.get(phoneNumber));
   
-  const saved = await getSessionSettings(phoneNumber);
-  if (saved) {
-      settingsCache.set(phoneNumber, saved);
-      return res.json(saved);
+  const settingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
+  if (fs.existsSync(settingsPath)) {
+      try {
+          const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+          settingsCache.set(phoneNumber, saved);
+          return res.json(saved);
+      } catch(e) {}
   }
   res.json({ autoread: false, autotyping: false, antidelete: false, antilink: false, autoreact: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." });
 });
 
 app.post("/api/settings", async (req, res) => {
   const { phoneNumber, settings } = req.body;
-  await saveSessionSettings(phoneNumber, settings);
+  const dir = path.join(sessionsDir, phoneNumber);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(settings, null, 2));
   settingsCache.set(phoneNumber, settings);
   res.json({ success: true });
 });
 
 (async () => {
-  console.log("🚀 Starting Alpha Bot Server (PostgreSQL Mode)...");
+  console.log("🚀 Starting Alpha Bot Server (SQLite Mode)...");
   baileys = await import("@whiskeysockets/baileys");
   const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
 
@@ -448,15 +440,17 @@ app.post("/api/settings", async (req, res) => {
       console.log("⚠️ Ngrok Error:", err.message);
     }
 
+    // Auto-start saved SQLite sessions on boot
     try {
-      await cleanupOldSignalKeys();
-      const sessions = await getAllSavedSessions();
-      console.log(`📂 Found ${sessions.length} PostgreSQL session(s):`, sessions.join(', '));
+      const dirs = fs.readdirSync(sessionsDir);
+      const sessions = dirs.filter(d => /^\d{10,15}$/.test(d));
+      console.log(`📂 Found ${sessions.length} SQLite session(s):`, sessions.join(', '));
       for (const phone of sessions) {
         await startBot(phone);
+        await new Promise(res => setTimeout(res, 3000)); // Stagger to prevent crash
       }
     } catch (err) {
-      console.log("❌ Error loading PostgreSQL sessions:", err.message);
+      console.log("❌ Error loading SQLite sessions:", err.message);
     }
 
     setInterval(() => { require('http').get(`http://localhost:${PORT}/api/stats`, () => {}).on('error', () => {}); }, 10 * 60 * 1000); 
