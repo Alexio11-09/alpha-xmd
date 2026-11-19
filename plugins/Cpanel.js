@@ -3,41 +3,21 @@ const fs = require('fs');
 const path = require('path');
 
 // ---------- DATABASES ----------
-const serverPath = './database/cpanel_servers.json';
-const premiumPath = './database/cpanel_premium.json';
-
+const tenant = require('../library/tenant');
+const premiumPath = path.join(process.cwd(), 'database', 'cpanel_premium.json');
 if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true });
-if (!fs.existsSync(serverPath)) fs.writeFileSync(serverPath, '[]');
 if (!fs.existsSync(premiumPath)) fs.writeFileSync(premiumPath, '[]');
-
-// ---------- HELPERS ----------
-const loadServers = () => { try { return JSON.parse(fs.readFileSync(serverPath)); } catch { return []; } };
-const saveServers = (data) => fs.writeFileSync(serverPath, JSON.stringify(data, null, 2));
-const nextServerId = () => {
-    const servers = loadServers();
-    const ids = servers.map(s => s.id);
-    return ids.length > 0 ? Math.max(...ids) + 1 : 1;
-};
-
-const loadPremium = () => { try { return JSON.parse(fs.readFileSync(premiumPath)); } catch { return []; } };
+const serverPathFor = (sock) => tenant.fileOf(sock, 'cpanel_servers.json');
+const loadServers = (sock) => { try { return JSON.parse(fs.readFileSync(serverPathFor(sock), 'utf8')); } catch { return []; } };
+const saveServers = (sock, data) => fs.writeFileSync(serverPathFor(sock), JSON.stringify(data, null, 2));
+const nextServerId = (sock) => { const servers = loadServers(sock); const ids = servers.map(s => Number(s.id) || 0); return ids.length ? Math.max(...ids) + 1 : 1; };
+const loadPremium = () => { try { return JSON.parse(fs.readFileSync(premiumPath, 'utf8')); } catch { return []; } };
 const savePremium = (data) => fs.writeFileSync(premiumPath, JSON.stringify(data, null, 2));
-const cleanNumber = (num) => num.replace(/[^0-9]/g, '');
-
-// ---------- PERMISSION HELPERS (using same logic as message.js) ----------
-const isMainOwner = (sender, sock, config) => {
-    const botNumber = cleanNumber(sock.user?.id || '');
-    const senderNum = cleanNumber(sender);
-    return (config.owner || []).includes(senderNum) || senderNum === botNumber;
-};
-
-const isPremium = (sender) => {
-    const premium = loadPremium();
-    return premium.includes(cleanNumber(sender));
-};
-
-const canManagePanels = (sender, sock, config) => {
-    return isMainOwner(sender, sock, config) || isPremium(sender);
-};
+const cleanNumber = (num) => String(num || '').replace(/[^0-9]/g, '');
+const isMainOwner = (sender) => cleanNumber(sender) === tenant.MAIN_OWNER;
+const isAccountOwner = (sender, sock) => tenant.isAccountOwner(sender, sock);
+const isPremium = (sender) => loadPremium().includes(cleanNumber(sender));
+const canManagePanels = (sender, sock) => isMainOwner(sender) || isAccountOwner(sender, sock) || isPremium(sender);
 
 // ---------- SEND SERVER DETAILS TO A USER ----------
 const sendServerToUser = async (sock, server, targetName, targetNumber) => {
@@ -53,7 +33,7 @@ module.exports = [
         aliases: ["newserver", "addpanel"],
         category: "cpanel",
         execute: async (sock, m, { args, reply, config }) => {
-            if (!canManagePanels(m.sender, sock, config)) return reply("❌ Only the main owner or premium users can manage servers.");
+            if (!canManagePanels(m.sender, sock)) return reply("❌ Only the main owner or premium users can manage servers.");
 
             if (args.length < 4) return reply("❌ Usage: .addserver <type> <link> <username> <password>\n\n📌 Example: .addserver 3gb 1.prexzyvilla.site Axiom 12345");
 
@@ -66,18 +46,18 @@ module.exports = [
                 return reply("❌ Invalid type. Allowed: 1gb, 2gb, 3gb, 4gb, 5gb, 6gb, 7gb, 8gb, 9gb, unli, admin");
             }
 
-            const servers = loadServers();
+            const servers = loadServers(sock);
             const server = {
-                id: nextServerId(),
+                id: nextServerId(sock),
                 type,
                 link,
                 username,
                 password
             };
             servers.push(server);
-            saveServers(servers);
+            saveServers(sock, servers);
 
-            reply(`✅ Server added!\n\n🆔 ID: ${server.id}\n📦 Type: ${type.toUpperCase()}\n🌐 Link: ${link}\n👤 Login: ${username}\n🔑 Pass: ${password}`);
+            reply(`✅ Server added to this account’s private stock!\n🆔 ID: ${server.id}\n📦 Type: ${type.toUpperCase()}\n🔐 Credentials are stored for this bot account.`);
         }
     },
 
@@ -87,19 +67,19 @@ module.exports = [
         aliases: ["delpanel", "removeserver"],
         category: "cpanel",
         execute: async (sock, m, { args, reply, config }) => {
-            if (!canManagePanels(m.sender, sock, config)) return reply("❌ Only the main owner or premium users can manage servers.");
+            if (!canManagePanels(m.sender, sock)) return reply("❌ Only the main owner or premium users can manage servers.");
 
             if (!args[0]) return reply("❌ Usage: .delserver <id>\n\n📌 Example: .delserver 3");
 
             const id = parseInt(args[0]);
             if (isNaN(id)) return reply("❌ Invalid ID.");
 
-            const servers = loadServers();
+            const servers = loadServers(sock);
             const index = servers.findIndex(s => s.id === id);
             if (index === -1) return reply(`❌ No server with ID ${id}.`);
 
             const removed = servers.splice(index, 1)[0];
-            saveServers(servers);
+            saveServers(sock, servers);
             reply(`🗑️ Server #${id} (${removed.type.toUpperCase()}) deleted.`);
         }
     },
@@ -110,9 +90,9 @@ module.exports = [
         aliases: ["servers", "cpanels", "panelist"],
         category: "cpanel",
         execute: async (sock, m, { reply, config }) => {
-            if (!canManagePanels(m.sender, sock, config)) return reply("❌ Only the main owner or premium users can view servers.");
+            if (!canManagePanels(m.sender, sock)) return reply("❌ Only the main owner or premium users can view servers.");
 
-            const servers = loadServers();
+            const servers = loadServers(sock);
             if (servers.length === 0) return reply("📋 No servers stored.");
 
             let text = `📋 *STORED SERVERS (${servers.length})*\n\n`;
@@ -130,21 +110,21 @@ module.exports = [
             command: type,
             category: "cpanel",
             execute: async (sock, m, { args, reply, config }) => {
-                if (!canManagePanels(m.sender, sock, config)) return reply("❌ Only the main owner or premium users can send panels.");
+                if (!canManagePanels(m.sender, sock)) return reply("❌ Only the main owner or premium users can send panels.");
 
                 if (args.length < 2) return reply(`❌ Usage: .${type} <name> <number>\n\n📌 Example: .${type} Alpha 263786641436`);
 
                 const receiverName = args[0];
                 const targetNumber = args[1];
 
-                const servers = loadServers();
+                const servers = loadServers(sock);
                 const server = servers.find(s => s.type === type);
                 if (!server) return reply(`❌ No ${type.toUpperCase()} panel available. Add one with .addserver ${type} ...`);
 
                 await sendServerToUser(sock, server, receiverName, targetNumber);
 
                 const updated = servers.filter(s => s.id !== server.id);
-                saveServers(updated);
+                saveServers(sock, updated);
 
                 reply(`✅ ${type.toUpperCase()} panel sent to ${targetNumber} for ${receiverName}. Server #${server.id} removed from stock.`);
             }
@@ -157,7 +137,7 @@ module.exports = [
         aliases: ["addpremium", "setprem"],
         category: "cpanel",
         execute: async (sock, m, { args, reply, config }) => {
-            if (!isMainOwner(m.sender, sock, config)) return reply("❌ Only the main bot owner can manage premium users.");
+            if (!isMainOwner(m.sender)) return reply("❌ Only the main bot owner can manage premium users.");
 
             if (!args[0]) return reply("❌ Usage: .addprem <phone_number>");
 
@@ -177,7 +157,7 @@ module.exports = [
         aliases: ["delpremium", "unprem"],
         category: "cpanel",
         execute: async (sock, m, { args, reply, config }) => {
-            if (!isMainOwner(m.sender, sock, config)) return reply("❌ Only the main bot owner can manage premium users.");
+            if (!isMainOwner(m.sender)) return reply("❌ Only the main bot owner can manage premium users.");
 
             if (!args[0]) return reply("❌ Usage: .delprem <phone_number>");
 
@@ -196,7 +176,7 @@ module.exports = [
         aliases: ["premlist", "listprem"],
         category: "cpanel",
         execute: async (sock, m, { reply, config }) => {
-            if (!isMainOwner(m.sender, sock, config) && !isPremium(m.sender)) return reply("❌ Only owner or premium can view the list.");
+            if (!isMainOwner(m.sender) && !isPremium(m.sender)) return reply("❌ Only owner or premium can view the list.");
 
             const premium = loadPremium();
             if (premium.length === 0) return reply("📋 No premium users.");
