@@ -719,82 +719,8 @@ ${config.settings.footer}
         command: "pair",
         aliases: ["pairing", "session"],
         category: "general",
-        execute: async (sock, m, { args, reply }) => {
-            if (!args[0]) return reply("❌ Provide a phone number!\n\n📌 Example: .pair 263786641436");
-            const rawNumber = args[0].replace(/[^0-9]/g, "");
-            if (rawNumber.length < 10) return reply("❌ Invalid phone number.");
-
-            reply(`🔐 Requesting pairing code for +${rawNumber}... Please wait.`);
-
-            try {
-                const baileys = await import('@whiskeysockets/baileys');
-                const sessionPath = path.join(process.cwd(), 'sessions', rawNumber);
-                
-                if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true });
-                fs.mkdirSync(sessionPath, { recursive: true });
-
-                const { state, saveCreds } = await baileys.useMultiFileAuthState(sessionPath);
-                const { version } = await baileys.fetchLatestBaileysVersion();
-
-                const tempSock = baileys.default({
-                    version, 
-                    logger: pino({ level: "silent" }), 
-                    printQRInTerminal: false, 
-                    auth: state, 
-                    browser: baileys.Browsers.ubuntu("Chrome"),
-                });
-
-                tempSock.ev.on("creds.update", saveCreds);
-                let responded = false;
-
-                tempSock.ev.on("connection.update", async (update) => {
-                    const { connection, lastDisconnect } = update;
-                    
-                    if (connection === "connecting" && !responded) {
-                        setTimeout(async () => {
-                            try {
-                                const code = await tempSock.requestPairingCode(rawNumber);
-                                const formatted = code.match(/.{1,4}/g)?.join("-") || code;
-                                if (!responded) {
-                                    responded = true;
-                                    reply(`✅ *Pairing Code Ready*\n\n📞 *Number:* +${rawNumber}\n🔢 *Code:* *${formatted}*\n\n⏱️ Expires in 60 seconds.\n📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`);
-                                }
-                            } catch (err) {
-                                if(!responded) { 
-                                    responded = true; 
-                                    reply(`❌ Pairing failed: ${err.message}`); 
-                                    try { tempSock.end(undefined); } catch (e) {} 
-                                }
-                            }
-                        }, 3000);
-                    }
-                    
-                    if (connection === "open") { 
-                        reply(`🎉 Successfully connected +${rawNumber}!\n\nYour bot is now starting... You will receive a startup message shortly.`);
-                        setTimeout(() => {
-                            if (global.startBot) global.startBot(rawNumber);
-                        }, 3000); 
-                    }
-                    
-                    if (connection === "close") {
-                        const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-                        if (code === 515) { 
-                            setTimeout(() => {
-                                if (global.startBot) global.startBot(rawNumber);
-                            }, 5000); 
-                        } 
-                        else if (!responded) { 
-                            responded = true; 
-                            reply(`❌ Pairing closed (${code}). Please try again.`); 
-                            try { tempSock.end(undefined); } catch (e) {} 
-                        }
-                    }
-                });
-
-            } catch (err) {
-                console.error('Pair error:', err);
-                reply(`❌ Error: ${err.message || String(err)}`);
-            }
+        execute: async (sock, m, { reply }) => {
+            return reply("🔐 Pairing is managed by the Alpha XMD pairing website now.\n\nPlease use the website to connect another number. This keeps every account on the same SQLite authentication system and prevents existing sessions from being overwritten.");
         }
     }
 ];
