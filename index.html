@@ -1,1393 +1,284 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Alpha-XMD | WhatsApp Bot Dashboard</title>
-<meta name="description" content="Connect and manage your WhatsApp device with Alpha-XMD. Generate pairing codes and monitor live bot statistics.">
-<meta name="theme-color" content="#ff477e">
-<meta property="og:title" content="Alpha-XMD Dashboard">
-<meta property="og:description" content="Connect your WhatsApp device and explore Alpha-XMD tools.">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg">
-<meta name="twitter:card" content="summary_large_image">
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alpha-XMD | Control Center</title>
+<meta name="description" content="Alpha-XMD WhatsApp bot control center.">
+<meta name="theme-color" content="#10111a">
 <link rel="icon" href="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/css/intlTelInput.css">
-
 <style>
-:root {
-    --bg:#f8f9fa;
-    --txt:#111827;
-    --mut:#6b7280;
-    --card:#fff;
-    --brd:#e5e7eb;
-    --pri:#ff477e;
-    --pri-glow:rgba(255,71,126,.2);
-    --grad:linear-gradient(135deg,#ff477e 0%,#9d4edd 100%);
-    --shadow:0 10px 30px rgba(0,0,0,.05);
-}
-
-[data-theme="dark"] {
-    --bg:#0f1016;
-    --txt:#fff;
-    --mut:#9ca3af;
-    --card:#1c1d24;
-    --brd:#2d2e38;
-    --pri:#00ff88;
-    --pri-glow:rgba(0,255,136,.15);
-    --grad:linear-gradient(135deg,#00ff88 0%,#00b35f 100%);
-    --shadow:0 10px 30px rgba(0,0,0,.3);
-}
-
-* {
-    box-sizing:border-box;
-    margin:0;
-    padding:0;
-}
-
-html {
-    scroll-behavior:smooth;
-}
-
-body {
-    background:var(--bg);
-    color:var(--txt);
-    font-family:'Inter',sans-serif;
-    min-height:100vh;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    overflow-x:hidden;
-    transition:background .3s,color .3s;
-}
-
-h1,h2,h3,h4,.brand {
-    font-family:'Space Grotesk',sans-serif;
-}
-
-button,a {
-    -webkit-tap-highlight-color:transparent;
-}
-
-button:focus-visible,a:focus-visible,input:focus-visible {
-    outline:2px solid var(--pri);
-    outline-offset:3px;
-}
-
-/* NAVIGATION */
-nav {
-    width:100%;
-    max-width:1000px;
-    padding:24px 20px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-}
-
-.brand-area {
-    display:flex;
-    align-items:center;
-    gap:12px;
-    font-weight:700;
-    font-size:20px;
-    letter-spacing:-.5px;
-}
-
-.brand-area img {
-    width:36px;
-    height:36px;
-    border-radius:10px;
-    border:1px solid var(--brd);
-    object-fit:cover;
-}
-
-.nav-actions {
-    display:flex;
-    align-items:center;
-    gap:16px;
-}
-
-.theme-toggle {
-    background:var(--card);
-    border:1px solid var(--brd);
-    color:var(--txt);
-    width:40px;
-    height:40px;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    cursor:pointer;
-    box-shadow:var(--shadow);
-    transition:transform .2s;
-}
-
-.theme-toggle:hover {
-    transform:scale(1.05);
-}
-
-.status-badge {
-    display:flex;
-    align-items:center;
-    gap:8px;
-    font-size:13px;
-    color:var(--pri);
-    background:var(--pri-glow);
-    padding:8px 16px;
-    border-radius:20px;
-    border:1px solid var(--pri);
-    font-weight:600;
-}
-
-.dot {
-    width:8px;
-    height:8px;
-    background:var(--pri);
-    border-radius:50%;
-    box-shadow:0 0 10px var(--pri);
-    animation:pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%,100% {opacity:1}
-    50% {opacity:.4}
-}
-
-/* MAIN */
-.container {
-    width:100%;
-    max-width:800px;
-    padding:20px;
-    display:flex;
-    flex-direction:column;
-    gap:40px;
-}
-
-/* PAIRING CARD */
-.pair-card {
-    background:var(--card);
-    border:1px solid var(--brd);
-    border-radius:24px;
-    padding:40px;
-    box-shadow:var(--shadow);
-    text-align:center;
-    position:relative;
-    overflow:hidden;
-    animation:fadeUp .6s ease both;
-}
-
-.pair-card::before {
-    content:'';
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:4px;
-    background:var(--grad);
-}
-
-.pair-card h2 {
-    font-size:24px;
-    margin-bottom:10px;
-}
-
-.pair-card p {
-    color:var(--mut);
-    font-size:14px;
-    margin-bottom:24px;
-}
-
-/* FORMS */
-.in-group {
-    margin-bottom:24px;
-    text-align:left;
-}
-
-.in-group label {
-    display:block;
-    font-size:13px;
-    color:var(--mut);
-    margin-bottom:8px;
-    font-weight:600;
-    text-transform:uppercase;
-    letter-spacing:.5px;
-}
-
-.btn {
-    padding:16px 24px;
-    background:var(--grad);
-    color:#fff;
-    border:none;
-    border-radius:12px;
-    font-size:16px;
-    font-weight:700;
-    font-family:'Space Grotesk',sans-serif;
-    cursor:pointer;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    gap:10px;
-    width:100%;
-    box-shadow:0 4px 15px var(--pri-glow);
-    transition:transform .2s,box-shadow .2s,opacity .2s;
-}
-
-.btn:hover {
-    transform:translateY(-2px);
-    box-shadow:0 10px 30px var(--pri-glow);
-}
-
-.btn:disabled {
-    background:#52525b;
-    color:#a1a1aa;
-    cursor:not-allowed;
-    transform:none;
-    box-shadow:none;
-}
-
-.btn svg {
-    width:20px;
-    height:20px;
-}
-
-/* FEEDBACK MESSAGE */
-.feedback {
-    display:none;
-    padding:13px 15px;
-    margin-top:18px;
-    border-radius:12px;
-    font-size:13px;
-    line-height:1.5;
-    text-align:left;
-    border:1px solid var(--brd);
-    background:var(--bg);
-}
-
-.feedback.error {
-    display:block;
-    color:#ef4444;
-    border-color:rgba(239,68,68,.35);
-    background:rgba(239,68,68,.07);
-}
-
-.feedback.success {
-    display:block;
-    color:#10b981;
-    border-color:rgba(16,185,129,.35);
-    background:rgba(16,185,129,.07);
-}
-
-.feedback.info {
-    display:block;
-    color:var(--pri);
-    border-color:var(--pri-glow);
-}
-
-/* CODE BOX */
-.res-box {
-    display:none;
-    margin-top:24px;
-    padding:20px;
-    background:rgba(128,128,128,.05);
-    border-radius:16px;
-    border:1px dashed var(--brd);
-    animation:fadeUp .3s ease;
-}
-
-.code-container {
-    display:flex;
-    align-items:center;
-    gap:12px;
-    margin-top:12px;
-}
-
-.code-box {
-    flex:1;
-    min-width:0;
-    background:var(--bg);
-    border:1px solid var(--brd);
-    border-radius:12px;
-    padding:16px;
-    text-align:center;
-    font-size:28px;
-    font-weight:700;
-    font-family:'Space Grotesk',sans-serif;
-    letter-spacing:4px;
-    color:var(--txt);
-    overflow-wrap:anywhere;
-}
-
-.copy-btn {
-    background:var(--bg);
-    border:1px solid var(--brd);
-    color:var(--txt);
-    padding:16px;
-    border-radius:12px;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    flex-shrink:0;
-}
-
-.copy-btn:hover {
-    background:var(--pri-glow);
-    color:var(--pri);
-    border-color:var(--pri);
-}
-
-/* SESSION MANAGEMENT */
-.mg {
-    margin-top:20px;
-}
-
-.mg h3 {
-    font-size:16px;
-    color:var(--pri);
-    margin-bottom:10px;
-}
-
-/* LIVE STATS */
-.section-title {
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-end;
-    margin-bottom:16px;
-    padding:0 10px;
-}
-
-.section-title h3 {
-    font-size:24px;
-}
-
-.updates-badge {
-    display:flex;
-    align-items:center;
-    gap:6px;
-    font-size:13px;
-    color:var(--mut);
-}
-
-.updates-dot {
-    width:6px;
-    height:6px;
-    background:#10b981;
-    border-radius:50%;
-}
-
-.stats-grid {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:20px;
-}
-
-.stat-main {
-    grid-column:span 2;
-    background:var(--grad);
-    color:#fff;
-    border-radius:24px;
-    padding:32px;
-    position:relative;
-    overflow:hidden;
-    box-shadow:var(--shadow);
-}
-
-.stat-main::after {
-    content:'📈';
-    position:absolute;
-    right:-10px;
-    bottom:-20px;
-    font-size:120px;
-    opacity:.1;
-    transform:rotate(-15deg);
-}
-
-.stat-main h4 {
-    font-size:14px;
-    font-weight:500;
-    opacity:.9;
-    margin-bottom:12px;
-    display:flex;
-    align-items:center;
-    gap:8px;
-}
-
-.stat-main h4 svg {
-    width:20px;
-    height:20px;
-}
-
-.stat-main .value {
-    font-size:48px;
-    font-weight:700;
-    font-family:'Space Grotesk',sans-serif;
-}
-
-.stat-card {
-    background:var(--card);
-    border:1px solid var(--brd);
-    border-radius:20px;
-    padding:24px;
-    box-shadow:var(--shadow);
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-}
-
-.stat-card h4 {
-    font-size:13px;
-    color:var(--mut);
-    font-weight:600;
-    display:flex;
-    align-items:center;
-    gap:8px;
-}
-
-.stat-card h4 svg {
-    width:16px;
-    height:16px;
-    color:var(--pri);
-}
-
-.stat-card .value {
-    font-size:28px;
-    font-weight:700;
-    font-family:'Space Grotesk',sans-serif;
-}
-
-/* ABOUT */
-.about-section {
-    text-align:center;
-    padding:20px;
-}
-
-.about-section p.credits {
-    font-size:12px;
-    font-weight:700;
-    letter-spacing:2px;
-    color:var(--pri);
-    text-transform:uppercase;
-    margin-bottom:10px;
-}
-
-.about-section h2 {
-    font-size:28px;
-    margin-bottom:16px;
-}
-
-.about-section p.desc {
-    color:var(--mut);
-    font-size:15px;
-    line-height:1.6;
-    max-width:600px;
-    margin:0 auto;
-}
-
-/* FEATURES */
-.features-grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:16px;
-}
-
-.feature-card {
-    background:var(--card);
-    border:1px solid var(--brd);
-    border-radius:16px;
-    padding:24px;
-    box-shadow:var(--shadow);
-    transition:transform .25s,box-shadow .25s;
-}
-
-.feature-card:hover {
-    transform:translateY(-5px);
-    box-shadow:var(--shadow);
-}
-
-.feature-card h4 {
-    font-size:11px;
-    font-weight:700;
-    color:var(--pri);
-    letter-spacing:1px;
-    text-transform:uppercase;
-    margin-bottom:12px;
-}
-
-.feature-card h3 {
-    font-size:18px;
-    margin-bottom:8px;
-}
-
-.feature-card p {
-    font-size:13px;
-    color:var(--mut);
-    line-height:1.5;
-}
-
-/* SOCIAL LINKS */
-.social-section {
-    text-align:center;
-}
-
-.social-heading {
-    margin-bottom:22px;
-}
-
-.social-heading h2 {
-    font-size:26px;
-    margin-bottom:8px;
-}
-
-.social-heading p {
-    color:var(--mut);
-    font-size:14px;
-}
-
-.social-grid {
-    display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:14px;
-}
-
-.social-btn {
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:12px;
-    min-height:64px;
-    padding:16px;
-    border-radius:16px;
-    border:1px solid var(--brd);
-    background:var(--card);
-    color:var(--txt);
-    text-decoration:none;
-    font-family:'Space Grotesk',sans-serif;
-    font-size:15px;
-    font-weight:700;
-    box-shadow:var(--shadow);
-    transition:transform .2s,box-shadow .2s,border-color .2s;
-}
-
-.social-btn:hover {
-    transform:translateY(-4px);
-    box-shadow:0 12px 25px rgba(0,0,0,.12);
-}
-
-.social-btn svg {
-    width:25px;
-    height:25px;
-    flex-shrink:0;
-}
-
-.social-btn.whatsapp:hover {border-color:#25D366;color:#25D366}
-.social-btn.github:hover {border-color:#8b5cf6;color:#8b5cf6}
-.social-btn.youtube:hover {border-color:#f00;color:#f00}
-.social-btn.instagram:hover {border-color:#E1306C;color:#E1306C}
-.social-btn.facebook:hover {border-color:#1877F2;color:#1877F2}
-.social-btn.telegram:hover {border-color:#229ED9;color:#229ED9}
-
-/* PHONE INPUT */
-.iti {
-    width:100%;
-    display:block;
-}
-
-.iti__flag-container {
-    background:rgba(128,128,128,.05)!important;
-    border-radius:12px 0 0 12px!important;
-}
-
-.iti__selected-flag {
-    background:transparent!important;
-    padding:0 16px!important;
-}
-
-.iti__selected-dial-code {
-    color:var(--txt)!important;
-    font-family:'Space Grotesk',sans-serif!important;
-    font-size:15px!important;
-    margin-left:8px!important;
-    font-weight:600;
-}
-
-.iti__arrow {
-    border-top-color:var(--txt)!important;
-}
-
-.iti__country-list {
-    background:var(--card)!important;
-    border:1px solid var(--brd)!important;
-    border-radius:8px!important;
-    color:var(--txt)!important;
-    box-shadow:0 10px 30px rgba(0,0,0,.2)!important;
-    width:300px!important;
-    max-width:calc(100vw - 30px)!important;
-    z-index:9999!important;
-}
-
-.iti__country.iti__highlight {
-    background:rgba(128,128,128,.1)!important;
-}
-
-.iti__dial-code {
-    color:var(--mut)!important;
-}
-
-#phone {
-    width:100%;
-    padding:16px 16px 16px 90px!important;
-    background:rgba(128,128,128,.05)!important;
-    border:1px solid var(--brd)!important;
-    border-radius:12px!important;
-    color:var(--txt)!important;
-    font-size:16px!important;
-    outline:none!important;
-    font-family:'Space Grotesk',sans-serif!important;
-    letter-spacing:1px;
-    font-weight:600;
-}
-
-#phone:focus {
-    border-color:var(--pri)!important;
-    box-shadow:0 0 0 3px var(--pri-glow)!important;
-}
-
-/* FOOTER */
-footer {
-    width:100%;
-    text-align:center;
-    padding:25px 15px;
-    color:var(--mut);
-    font-size:12px;
-    border-top:1px solid var(--brd);
-    margin-top:20px;
-}
-
-/* ANIMATIONS */
-@keyframes fadeUp {
-    from {opacity:0;transform:translateY(12px)}
-    to {opacity:1;transform:translateY(0)}
-}
-
-/* RESPONSIVE */
-@media(max-width:600px) {
-    nav {
-        padding:18px 14px;
-    }
-
-    .brand-area {
-        font-size:17px;
-        gap:8px;
-    }
-
-    .brand-area img {
-        width:32px;
-        height:32px;
-    }
-
-    .nav-actions {
-        gap:8px;
-    }
-
-    .status-badge {
-        padding:7px 10px;
-        font-size:11px;
-    }
-
-    .container {
-        padding:14px;
-        gap:30px;
-    }
-
-    .pair-card {
-        padding:24px 18px;
-        border-radius:18px;
-    }
-
-    .stats-grid {
-        grid-template-columns:1fr;
-        gap:14px;
-    }
-
-    .stat-main {
-        grid-column:span 1;
-        padding:26px;
-    }
-
-    .stat-main .value {
-        font-size:40px;
-    }
-
-    .stat-card {
-        padding:20px;
-    }
-
-    .social-grid {
-        grid-template-columns:1fr;
-    }
-
-    .section-title {
-        padding:0 4px;
-        align-items:center;
-    }
-
-    .section-title h3 {
-        font-size:21px;
-    }
-
-    .updates-badge {
-        font-size:11px;
-    }
-
-    .code-box {
-        font-size:23px;
-        letter-spacing:3px;
-        padding:14px 8px;
-    }
-
-    .about-section {
-        padding:10px;
-    }
-
-    .about-section h2 {
-        font-size:25px;
-    }
-}
-
-@media(prefers-reduced-motion:reduce) {
-    *,*::before,*::after {
-        animation-duration:.01ms!important;
-        animation-iteration-count:1!important;
-        scroll-behavior:auto!important;
-        transition-duration:.01ms!important;
-    }
-}
+:root{--bg:#0b0c12;--panel:#12141e;--panel2:#181b27;--line:#272b3a;--text:#f4f5fb;--muted:#9298aa;--accent:#ff477e;--accent2:#9b5cff;--good:#20d996;--bad:#ff647c;--shadow:0 18px 55px #0005}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 70% -15%,#49204455,transparent 38%),var(--bg);color:var(--text);font:14px 'DM Sans',sans-serif;min-height:100vh}
+button,input{font:inherit}
+button,a{-webkit-tap-highlight-color:transparent}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+.sidebar{border-right:1px solid var(--line);background:#0e1018ef;padding:24px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;z-index:5}
+.brand{display:flex;align-items:center;gap:11px;padding:0 10px 28px;font:700 19px 'Space Grotesk'}
+.brand img{width:38px;height:38px;border-radius:12px;object-fit:cover}
+.brand em{font-style:normal;color:var(--accent)}
+.nav-label{color:#656b7d;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:12px 12px 8px}
+.nav{display:grid;gap:5px}
+.nav button{border:0;background:transparent;color:var(--muted);padding:12px;border-radius:11px;text-align:left;display:flex;gap:12px;align-items:center;cursor:pointer;font-weight:600}
+.nav button:hover,.nav button.active{background:#ff477e18;color:#ff7199}
+.nav .ico{width:20px;text-align:center;font-size:16px}
+.side-bottom{margin-top:auto;border-top:1px solid var(--line);padding:18px 10px 0;color:var(--muted);font-size:12px;line-height:1.7}
+.main{min-width:0;padding:28px clamp(16px,4vw,48px) 50px;max-width:1500px;width:100%;margin:auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:30px}
+.eyebrow{color:var(--accent);font-size:11px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase}
+.topbar h1{font:700 clamp(25px,3vw,34px) 'Space Grotesk';margin:5px 0}
+.sub{color:var(--muted);margin:0}
+.top-actions{display:flex;align-items:center;gap:10px}
+.pill{display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--line);border-radius:30px;background:var(--panel);color:var(--muted);font-size:12px}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 12px var(--good)}
+.icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);width:39px;height:39px;border-radius:11px;cursor:pointer}
+.page{display:none;animation:up .25s ease}
+.page.active{display:block}
+@keyframes up{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.grid{display:grid;gap:16px}
+.stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:20px}
+.card{background:linear-gradient(145deg,#171a26,#11131c);border:1px solid var(--line);border-radius:17px;padding:20px;box-shadow:var(--shadow);min-width:0}
+.stat-head{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;font-weight:600}
+.stat-icon{font-size:18px}
+.stat-value{font:700 29px 'Space Grotesk';margin:14px 0 4px}
+.stat-foot{font-size:11px;color:var(--muted)}
+.two{grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr)}
+.card-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:17px}
+.card-title h2,.section-head h2{font:600 18px 'Space Grotesk';margin:0}
+.card-title span{color:var(--muted);font-size:11px}
+.btn{border:0;border-radius:10px;padding:12px 16px;background:linear-gradient(110deg,var(--accent),var(--accent2));color:white;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.secondary{background:#242838;border:1px solid var(--line);color:var(--text)}
+.btn.danger{background:#ff647c18;border:1px solid #ff647c66;color:#ff8295}
+.field{margin:13px 0}
+.field label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:8px}
+.field input,.field select{width:100%;padding:13px;background:#0d0f17;border:1px solid var(--line);border-radius:10px;color:var(--text)}
+.iti{width:100%}
+.iti__country-list{background:#171a26;color:white;border-color:var(--line);max-width:calc(100vw - 30px)}
+.iti__selected-dial-code{color:var(--text)}
+.feedback{display:none;padding:12px;border-radius:10px;margin-top:13px;background:#252938;color:var(--muted);line-height:1.5}
+.feedback.show{display:block}
+.feedback.error{background:#ff647c16;color:#ff91a1}
+.feedback.success{background:#20d99616;color:#56e9b5}
+.pair-code{display:none;margin-top:15px;padding:15px;border:1px dashed #56516a;border-radius:12px;text-align:center}
+.pair-code strong{display:block;font:700 26px 'Space Grotesk';letter-spacing:4px;margin:9px}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.row .btn{flex:1}
+.mini{font-size:11px;color:var(--muted);line-height:1.6}
+.status-line{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);gap:10px}
+.status-line:last-child{border:0}
+.status-line span:first-child{color:var(--muted)}
+.tag{font-size:11px;padding:5px 9px;border-radius:20px;background:#20d99618;color:var(--good)}
+.tag.off{background:#ff647c18;color:#ff8497}
+.bar{height:7px;border-radius:20px;background:#282c3b;overflow:hidden;margin:12px 0}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:20px}
+.setting{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;border-bottom:1px solid var(--line)}
+.setting:last-child{border:0}
+.setting b{display:block;font-size:13px}
+.setting small{display:block;color:var(--muted);margin-top:4px;font-size:11px}
+.switch{position:relative;width:43px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#3a3e4e;border-radius:30px;cursor:pointer;transition:.2s}
+.slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--accent)}
+.switch input:checked+.slider:before{transform:translateX(19px)}
+.section-head{display:flex;justify-content:space-between;align-items:end;margin:5px 0 18px}
+.section-head p{color:var(--muted);margin:6px 0 0}
+.activity{display:grid;gap:10px}
+.activity-item{display:flex;gap:12px;padding:13px;background:#0e1018;border:1px solid var(--line);border-radius:11px}
+.activity-item .bullet{color:var(--accent)}
+.activity-item small{display:block;color:var(--muted);margin-top:4px}
+.feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.feature h3{font:600 15px 'Space Grotesk';margin:9px 0}
+.feature p{color:var(--muted);font-size:12px;line-height:1.6;margin:0}
+.codeblock{background:#090b11;border:1px solid var(--line);padding:14px;border-radius:10px;color:#b9c0d5;overflow:auto;font:12px monospace}
+.toast{position:fixed;right:20px;bottom:20px;background:#202433;border:1px solid var(--line);border-radius:12px;padding:13px 16px;box-shadow:var(--shadow);z-index:20;display:none}
+.toast.show{display:block}
+.mobile-menu{display:none}
+footer{border-top:1px solid var(--line);padding-top:20px;margin-top:35px;color:#656b7d;font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media(max-width:1050px){.stats{grid-template-columns:repeat(2,1fr)}.feature-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.app{display:block}.sidebar{position:fixed;left:-270px;width:250px;transition:left .25s;box-shadow:var(--shadow)}.sidebar.open{left:0}.mobile-menu{display:inline-block}.main{padding:20px 14px 35px}.topbar{align-items:flex-start}.topbar h1{font-size:25px}.top-actions{gap:6px}.pill{padding:8px;font-size:10px}.two{grid-template-columns:1fr}.feature-grid{grid-template-columns:1fr}.stats{gap:10px}.card{padding:16px}.stat-value{font-size:25px}}
+@media(max-width:390px){.stats{grid-template-columns:1fr 1fr}.stat-value{font-size:22px}}
 </style>
 </head>
-
 <body>
-
-<nav>
-    <div class="brand-area">
-        <img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg" alt="Alpha-XMD Logo">
-        <span>Alpha-XMD</span>
-    </div>
-
-    <div class="nav-actions">
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme" aria-label="Toggle theme">
-            <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
-        </button>
-
-        <div class="status-badge" role="status" aria-live="polite">
-            <div class="dot" id="s-dot"></div>
-            <span id="s-txt">Checking API...</span>
-        </div>
-    </div>
-</nav>
-
-<div class="container">
-
-    <!-- PAIRING -->
-    <div class="pair-card">
-        <h2>Link Your Device</h2>
-        <p>Enter your WhatsApp number to generate a secure pairing code.</p>
-
-        <div class="in-group" id="in-a">
-            <label for="phone">Phone Number</label>
-            <input type="tel" id="phone" autocomplete="tel">
-        </div>
-
-        <button class="btn" id="gen-b" onclick="rc()">
-            <span id="b-txt">Generate Pairing Code</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
-        </button>
-
-        <div id="feedback" class="feedback" role="alert" aria-live="polite"></div>
-
-        <div class="res-box" id="res-b">
-            <p style="font-size:13px;color:var(--mut);margin-bottom:8px;">
-                Enter this code in WhatsApp &gt; Linked Devices
-            </p>
-
-            <div class="code-container">
-                <div class="code-box" id="cd">----</div>
-
-                <button class="copy-btn" onclick="copyCode()" title="Copy Code" aria-label="Copy pairing code">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <div class="mg" id="mg-b" style="display:none;">
-            <h3>Already Connected</h3>
-            <button class="btn" style="background:transparent;border:1px solid #ef4444;color:#ef4444;box-shadow:none;" onclick="db()">
-                Disconnect Session
-            </button>
-        </div>
-
-        <p style="margin-top:20px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            </svg>
-            Your number is never shown publicly.
-        </p>
-    </div>
-
-    <!-- LIVE STATS -->
-    <div>
-        <div class="section-title">
-            <h3>Live Stats</h3>
-            <div class="updates-badge">
-                <div class="updates-dot"></div>
-                Updates every 10s
-            </div>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-main">
-                <h4>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    Active Sessions
-                </h4>
-                <div class="value" id="stat-sessions">0</div>
-            </div>
-
-            <div class="stat-card">
-                <h4>◷ Uptime</h4>
-                <div class="value" id="stat-uptime">N/A</div>
-            </div>
-
-            <div class="stat-card">
-                <h4>▣ RAM Usage</h4>
-                <div class="value" id="stat-ram">N/A</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ABOUT -->
-    <div class="about-section">
-        <p class="credits">Built &amp; Powered by Alpha Tech</p>
-        <h2>What is Alpha-XMD?</h2>
-        <p class="desc">
-            Alpha-XMD is a free, feature-rich WhatsApp bot developed and powered by Alpha.
-            It connects to your WhatsApp account through the Linked Devices pairing process,
-            bringing useful AI, media, group, and channel tools directly into your chats.
-        </p>
-    </div>
-
-    <!-- FEATURES -->
-    <div class="features-grid">
-        <div class="feature-card">
-            <h4>01 • AI and Creation</h4>
-            <h3>AI chat and creative tools</h3>
-            <p>Ask AI assistants questions, generate images, and use creative tools right in your chats.</p>
-        </div>
-
-        <div class="feature-card">
-            <h4>02 • Media and Utilities</h4>
-            <h3>Downloads and everyday media tools</h3>
-            <p>Search and download from YouTube, Instagram, Facebook, and Pinterest. Create stickers instantly.</p>
-        </div>
-
-        <div class="feature-card">
-            <h4>03 • Groups and Channels</h4>
-            <h3>WhatsApp group and channel tools</h3>
-            <p>Moderate group links, manage members, auto-react to channel posts, and secure your community.</p>
-        </div>
-    </div>
-
-    <!-- SOCIAL LINKS -->
-    <section class="social-section">
-        <div class="social-heading">
-            <h2>Connect With Alpha</h2>
-            <p>Follow our pages and stay connected with Alpha-XMD.</p>
-        </div>
-
-        <div class="social-grid">
-
-            <a class="social-btn whatsapp" href="https://whatsapp.com/channel/0029Vb7nHdBFnSzBDbvL6y1X" target="_blank" rel="noopener noreferrer" aria-label="Join Alpha on WhatsApp">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12.04 2a9.91 9.91 0 0 0-8.47 15.06L2.5 22l5.09-1.33A9.95 9.95 0 1 0 12.04 2zm0 18.18a8.18 8.18 0 0 1-4.17-1.14l-.3-.18-3.02.79.81-2.94-.2-.31a8.17 8.17 0 1 1 6.88 3.78zm4.49-6.12c-.25-.12-1.48-.73-1.71-.81-.23-.08-.4-.12-.57.12-.17.25-.65.81-.8.98-.15.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.48-1.39-1.73-.15-.25-.02-.38.11-.5.11-.11.25-.29.37-.44.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.57-1.37-.78-1.88-.2-.49-.41-.42-.57-.43h-.49c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1s.9 2.44 1.02 2.61c.12.17 1.77 2.7 4.29 3.78.6.26 1.07.41 1.43.52.6.19 1.15.16 1.58.1.48-.07 1.48-.61 1.69-1.2.21-.59.21-1.1.15-1.2-.06-.11-.23-.17-.48-.29z"/>
-                </svg>
-                WhatsApp
-            </a>
-
-            <a class="social-btn github" href="https://github.com/Alexio11-09/alpha-xmd" target="_blank" rel="noopener noreferrer" aria-label="View Alpha-XMD on GitHub">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 .9a11.1 11.1 0 0 0-3.51 21.63c.55.1.76-.24.76-.54v-2.1c-3.1.68-3.75-1.32-3.75-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.01-.69.08-.68.08-.68 1.12.08 1.71 1.15 1.71 1.15 1 .1.77 2.27 3.4 1.61.1-.72.39-1.22.7-1.5-2.47-.28-5.06-1.24-5.06-5.5 0-1.22.44-2.22 1.15-3-.12-.28-.5-1.42.11-2.96 0 0 .94-.3 3.05 1.14a10.6 10.6 0 0 1 5.55 0c2.11-1.44 3.05-1.14 3.05-1.14.61 1.54.23 2.68.11 2.96.72.78 1.15 1.78 1.15 3 0 4.27-2.6 5.21-5.08 5.49.4.35.75 1.02.75 2.06v3.02c0 .3.2.65.77.54A11.1 11.1 0 0 0 12 .9z"/>
-                </svg>
-                GitHub
-            </a>
-
-            <a class="social-btn youtube" href="https://youtube.com/@alexiomhungu?si=A1P4tX8uTL-i9nPt" target="_blank" rel="noopener noreferrer" aria-label="Subscribe on YouTube">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/>
-                </svg>
-                YouTube
-            </a>
-
-            <a class="social-btn instagram" href="https://www.instagram.com/voidgallery_09?bqrl=OGh4eG51bWNqcHdz" target="_blank" rel="noopener noreferrer" aria-label="Follow on Instagram">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="5"/>
-                    <circle cx="12" cy="12" r="4"/>
-                    <circle cx="18" cy="6" r="1" fill="currentColor" stroke="none"/>
-                </svg>
-                Instagram
-            </a>
-
-            <a class="social-btn facebook" href="https://www.facebook.com/profile.php?id=61595727230598&mibextid=ZbWKwL" target="_blank" rel="noopener noreferrer" aria-label="Follow on Facebook">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M24 12a12 12 0 1 0-13.88 11.85v-8.39H7.08V12h3.04V9.36c0-3 1.79-4.66 4.52-4.66 1.31 0 2.68.24 2.68.24v2.95h-1.51c-1.49 0-1.95.92-1.95 1.87V12h3.32l-.53 3.46h-2.79v8.39A12 12 0 0 0 24 12z"/>
-                </svg>
-                Facebook
-            </a>
-
-            <a class="social-btn telegram" href="https://t.me/AlphaXmd" target="_blank" rel="noopener noreferrer" aria-label="Join Alpha-XMD on Telegram">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21.9 4.2 18.6 20c-.25 1.12-.9 1.4-1.82.87l-5.03-3.71-2.43 2.34c-.27.27-.5.5-1.03.5l.36-5.12 9.32-8.42c.41-.36-.09-.56-.64-.2L5.8 13.55.83 12c-1.08-.34-1.1-1.08.22-1.6L20.5 2.84c.9-.33 1.68.22 1.4 1.36z"/>
-                </svg>
-                Telegram
-            </a>
-
-        </div>
-    </section>
-
+<div class="app">
+<aside class="sidebar" id="sidebar">
+<div class="brand"><img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg" alt=""><span>ALPHA<em>-XMD</em></span></div>
+<div class="nav-label">WORKSPACE</div>
+<div class="nav">
+<button class="active" data-page="overview"><span class="ico">▦</span>Overview</button>
+<button data-page="pairing"><span class="ico">⌁</span>Device pairing</button>
+<button data-page="settings"><span class="ico">⚙</span>Bot settings</button>
+<button data-page="monitor"><span class="ico">◉</span>Server monitor</button>
+<button data-page="activity"><span class="ico">≡</span>Activity log</button>
 </div>
-
-<footer>
-    © <span id="year"></span> Alpha-XMD. All rights reserved.
-</footer>
-
+<div class="nav-label">RESOURCES</div>
+<div class="nav">
+<button data-page="features"><span class="ico">✦</span>Features</button>
+<button data-page="docs"><span class="ico">▤</span>Documentation</button>
+<button data-page="support"><span class="ico">♡</span>Support</button>
+</div>
+<div class="side-bottom">Alpha-XMD Control Center<br><span id="sideApi">Connecting to API…</span><br>© <span id="year"></span> Alpha Tech</div>
+</aside>
+<main class="main">
+<header class="topbar">
+<div><div class="eyebrow">ALPHA TECH / CONTROL PANEL</div><h1 id="pageTitle">Overview</h1><p class="sub" id="pageSub">Your bot operations at a glance.</p></div>
+<div class="top-actions"><button class="icon-btn mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">☰</button><div class="pill"><i class="pulse" id="apiDot"></i><span id="apiLabel">Checking API</span></div></div>
+</header>
+<section class="page active" id="page-overview">
+<div class="grid stats">
+<div class="card"><div class="stat-head">Active sessions <span class="stat-icon">⌁</span></div><div class="stat-value" id="statSessions">—</div><div class="stat-foot">Connected WhatsApp accounts</div></div>
+<div class="card"><div class="stat-head">Server uptime <span class="stat-icon">◷</span></div><div class="stat-value" id="statUptime">—</div><div class="stat-foot">Time since last restart</div></div>
+<div class="card"><div class="stat-head">Heap memory <span class="stat-icon">▥</span></div><div class="stat-value" id="statMemory">—</div><div class="stat-foot">Node.js heap usage</div></div>
+<div class="card"><div class="stat-head">Pending pairings <span class="stat-icon">⌗</span></div><div class="stat-value" id="statPairing">—</div><div class="stat-foot">Pairing requests in progress</div></div>
+</div>
+<div class="grid two">
+<div class="card">
+<div class="card-title"><h2>Quick device pairing</h2><span>WhatsApp multi-device</span></div>
+<p class="mini">Enter your WhatsApp number with the correct country code to generate a pairing code.</p>
+<div class="field"><label>PHONE NUMBER</label><input id="phoneQuick" type="tel" placeholder="Enter phone number"></div>
+<button class="btn" id="pairQuick" onclick="pairDevice('quick')">Generate pairing code →</button>
+<div class="feedback" id="pairFeedback"></div>
+<div class="pair-code" id="pairCode"><span class="mini">YOUR WHATSAPP PAIRING CODE</span><strong id="codeValue">----</strong><button class="btn secondary" onclick="copyCode('quick')">Copy code</button></div>
+</div>
+<div class="card">
+<div class="card-title"><h2>System status</h2><span>Live overview</span></div>
+<div class="status-line"><span>API connection</span><b class="tag off" id="apiState">Checking</b></div>
+<div class="status-line"><span>Bot process</span><b class="tag off" id="botState">Checking</b></div>
+<div class="status-line"><span>Runtime</span><b id="nodeVersion">—</b></div>
+<div class="status-line"><span>Last checked</span><b id="lastChecked">—</b></div>
+<button class="btn secondary" style="width:100%;margin-top:15px" onclick="refreshAll()">Refresh status</button>
+</div>
+</div>
+</section>
+<section class="page" id="page-pairing">
+<div class="section-head"><div><h2>Device pairing</h2><p>Connect a WhatsApp account to Alpha-XMD.</p></div></div>
+<div class="grid two">
+<div class="card">
+<div class="card-title"><h2>Link a new device</h2></div>
+<div class="field"><label>WHATSAPP NUMBER</label><input id="phoneFull" type="tel" placeholder="Enter phone number"></div>
+<button class="btn" id="pairFull" onclick="pairDevice('full')">Generate pairing code →</button>
+<div class="feedback" id="pairFeedbackFull"></div>
+<div class="pair-code" id="pairCodeFull"><span class="mini">YOUR PAIRING CODE</span><strong id="codeValueFull">----</strong><button class="btn secondary" onclick="copyCode('full')">Copy code</button></div>
+<p class="mini">On WhatsApp, open Linked devices → Link a device → Link with phone number instead. Enter the code shown here.</p>
+</div>
+<div class="card">
+<div class="card-title"><h2>Saved device</h2><span>Current browser</span></div>
+<div class="status-line"><span>Phone number</span><b id="savedPhone">Not linked</b></div>
+<div class="status-line"><span>Connection</span><b class="tag off" id="savedStatus">Unknown</b></div>
+<button class="btn danger" style="width:100%;margin-top:15px" onclick="disconnectDevice()">Disconnect saved device</button>
+<p class="mini">Disconnecting removes the saved session from the bot. Only use this when you intend to unlink the device.</p>
+</div>
+</div>
+</section>
+<section class="page" id="page-settings">
+<div class="section-head"><div><h2>Bot settings</h2><p>Manage settings for the linked account.</p></div><span class="mini" id="settingsFor">No linked account</span></div>
+<div class="card">
+<div class="card-title"><h2>Automation & protection</h2><span>Account settings</span></div>
+<div id="settingsList"><p class="mini">Pair your device in this browser first.</p></div>
+<div class="field"><label>COMMAND PREFIX</label><input id="prefix" maxlength="5" value="." placeholder="."></div>
+<button class="btn" onclick="saveSettings()">Save settings</button>
+</div>
+</section>
+<section class="page" id="page-monitor">
+<div class="section-head"><div><h2>Server monitor</h2><p>Runtime information reported by the bot server.</p></div><button class="btn secondary" onclick="fetchHealth()">Refresh</button></div>
+<div class="grid stats">
+<div class="card"><div class="stat-head">Health status</div><div class="stat-value"><span class="tag off" id="healthTag">Checking</span></div><div class="stat-foot">API health endpoint</div></div>
+<div class="card"><div class="stat-head">Active sessions</div><div class="stat-value" id="healthSessions">—</div><div class="stat-foot">Connected accounts</div></div>
+<div class="card"><div class="stat-head">Pending pairings</div><div class="stat-value" id="healthPairings">—</div><div class="stat-foot">Current pairing requests</div></div>
+<div class="card"><div class="stat-head">Uptime</div><div class="stat-value" id="healthUptime">—</div><div class="stat-foot">Process uptime</div></div>
+</div>
+<div class="card">
+<div class="card-title"><h2>Memory usage</h2><span>Node.js process</span></div>
+<div class="status-line"><span>Heap used</span><b id="heapText">—</b></div>
+<div class="bar"><i id="heapBar"></i></div>
+<div class="status-line"><span>Heap total</span><b id="heapTotal">—</b></div>
+<div class="status-line"><span>Resident memory (RSS)</span><b id="rssText">—</b></div>
+<div class="status-line"><span>Node version</span><b id="nodeText">—</b></div>
+</div>
+</section>
+<section class="page" id="page-activity">
+<div class="section-head"><div><h2>Activity log</h2><p>Actions recorded in this browser only.</p></div><button class="btn secondary" onclick="clearActivity()">Clear log</button></div>
+<div class="card"><div class="activity" id="activityList"><p class="mini">No activity recorded yet.</p></div></div>
+</section>
+<section class="page" id="page-features">
+<div class="section-head"><div><h2>Features</h2><p>Tools available in the Alpha-XMD project.</p></div></div>
+<div class="grid feature-grid">
+<div class="card feature"><div>⌁</div><h3>Multi-device pairing</h3><p>Connect a WhatsApp account using a phone-number pairing code.</p></div>
+<div class="card feature"><div>⚙</div><h3>Bot automation</h3><p>Configure supported automation options from the dashboard.</p></div>
+<div class="card feature"><div>◉</div><h3>Server monitoring</h3><p>View uptime, memory usage, sessions and runtime status.</p></div>
+<div class="card feature"><div>✦</div><h3>Group tools</h3><p>Use supported group management and moderation commands.</p></div>
+<div class="card feature"><div>▤</div><h3>Media tools</h3><p>Use the bot's available media and download commands.</p></div>
+<div class="card feature"><div>♡</div><h3>Personal settings</h3><p>Manage the available settings for your linked account.</p></div>
+</div>
+</section>
+<section class="page" id="page-docs">
+<div class="section-head"><div><h2>Documentation</h2><p>Quick instructions for connecting your WhatsApp.</p></div></div>
+<div class="card">
+<h3>How to pair your device</h3>
+<p class="mini">1. Enter your phone number using the country selector.<br>2. Generate a pairing code.<br>3. Open WhatsApp on your phone.<br>4. Go to Linked devices → Link a device → Link with phone number instead.<br>5. Enter the code shown on this dashboard.</p>
+<h3>Dashboard access</h3>
+<p class="mini">The browser stores a private control token when a new pairing is created. Keep your browser data safe. If you clear it, you may lose access to account settings and disconnect controls.</p>
+<h3>API status</h3>
+<pre class="codeblock">GET /api/stats
+GET /api/health
+GET /api/status?phoneNumber=YOUR_NUMBER</pre>
+</div>
+</section>
+<section class="page" id="page-support">
+<div class="section-head"><div><h2>Support</h2><p>Official Alpha-XMD project links.</p></div></div>
+<div class="card">
+<h3>Alpha-XMD</h3>
+<p class="mini">For project updates and support, use the official project resources.</p>
+<div class="row">
+<a class="btn" href="https://github.com/Alexio11-09/alpha-xmd" target="_blank" rel="noopener">GitHub repository</a>
+<a class="btn secondary" href="https://whatsapp.com/channel/0029VbCHc4kB4hdVt7JDX10a" target="_blank" rel="noopener">WhatsApp channel</a>
+</div>
+</div>
+</section>
+<footer><span>Alpha-XMD Control Center</span><span>© <span id="yearFooter"></span> Alpha Tech</span></footer>
+</main>
+</div>
+<div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/intlTelInput.min.js"></script>
-
 <script>
-/*
- * API CONFIGURATION
- *
- * Keep the current API URL as the fallback.
- * A permanent backend URL can be configured here later.
- */
-const AU = (
-    window.ALPHA_XMD_API_URL ||
-    "https://itinerary-splashy-flyer.ngrok-free.dev"
-).replace(/\/+$/, "");
-
-let cp = "";
-let iti;
-let statsTimer = null;
-let statsRequestRunning = false;
-
-const tokenKey = phone => `alpha-xmd-control-${phone}`;
-const getControlToken = phone => localStorage.getItem(tokenKey(phone)) || "";
-
-const $ = id => document.getElementById(id);
-
-/* THEME */
-function updateThemeIcon(theme) {
-    const icon = $("theme-icon");
-    if (!icon) return;
-
-    if (theme === "dark") {
-        icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
-    } else {
-        icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
-    }
-}
-
-function toggleTheme() {
-    const current = document.documentElement.getAttribute("data-theme");
-    const next = current === "dark" ? "light" : "dark";
-
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
-    updateThemeIcon(next);
-}
-
-function loadTheme() {
-    let savedTheme = "light";
-
-    try {
-        savedTheme = localStorage.getItem("theme") || "light";
-    } catch (e) {}
-
-    document.documentElement.setAttribute("data-theme", savedTheme);
-    updateThemeIcon(savedTheme);
-}
-
-/* FEEDBACK */
-function showFeedback(message, type = "info") {
-    const box = $("feedback");
-    box.textContent = message;
-    box.className = "feedback " + type;
-}
-
-function clearFeedback() {
-    const box = $("feedback");
-    box.textContent = "";
-    box.className = "feedback";
-}
-
-/* API STATUS */
-function setApiStatus(online, label) {
-    const text = $("s-txt");
-    const dot = $("s-dot");
-
-    text.textContent = label;
-
-    if (online) {
-        text.style.color = "var(--pri)";
-        dot.style.background = "var(--pri)";
-        dot.style.boxShadow = "0 0 10px var(--pri)";
-    } else {
-        text.style.color = "#ef4444";
-        dot.style.background = "#ef4444";
-        dot.style.boxShadow = "0 0 10px #ef4444";
-    }
-}
-
-/* COUNTRY DETECTION */
-async function detectUserCountry() {
-    try {
-        const res = await fetch("https://ipwho.is/", {
-            signal: AbortSignal.timeout(7000)
-        });
-
-        const data = await res.json();
-
-        if (data.success && data.country_code && iti) {
-            iti.setCountry(data.country_code.toLowerCase());
-        }
-    } catch (e) {
-        // Zimbabwe remains the default country.
-    }
-}
-
-/* LIVE STATS */
-async function fetchStats() {
-    if (statsRequestRunning) return;
-
-    statsRequestRunning = true;
-
-    try {
-        const response = await fetch(AU + "/api/stats", {
-            headers: {
-                "ngrok-skip-browser-warning": "true"
-            },
-            signal: AbortSignal.timeout(10000)
-        });
-
-        if (!response.ok) {
-            throw new Error("API returned HTTP " + response.status);
-        }
-
-        const data = await response.json();
-
-        if (data.status !== "online") {
-            throw new Error("API is not reporting online status");
-        }
-
-        setApiStatus(true, "API Online");
-
-        $("stat-sessions").textContent =
-            data.sessions ?? "0";
-
-        $("stat-ram").textContent =
-            data.memory != null ? data.memory + " MB" : "N/A";
-
-        const seconds = Math.max(0, Math.floor(Number(data.uptime) || 0));
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-
-        $("stat-uptime").textContent = `${hours}h ${minutes}m`;
-
-    } catch (error) {
-        setApiStatus(false, "API Offline");
-
-        $("stat-sessions").textContent = "N/A";
-        $("stat-ram").textContent = "N/A";
-        $("stat-uptime").textContent = "N/A";
-
-        console.warn("Alpha-XMD stats error:", error.message);
-
-    } finally {
-        statsRequestRunning = false;
-    }
-}
-
-/* INITIALIZATION */
-document.addEventListener("DOMContentLoaded", () => {
-    loadTheme();
-
-    $("year").textContent = new Date().getFullYear();
-
-    const input = $("phone");
-
-    if (window.intlTelInput) {
-        iti = window.intlTelInput(input, {
-            utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/utils.js",
-            initialCountry: "zw",
-            separateDialCode: true,
-            dropdownContainer: document.body
-        });
-
-        detectUserCountry();
-    }
-
-    fetchStats();
-
-    if (statsTimer) clearInterval(statsTimer);
-    statsTimer = setInterval(fetchStats, 10000);
-});
-
-/* RESPONSE HANDLING */
-async function readApiResponse(response) {
-    const text = await response.text();
-
-    let data = {};
-
-    try {
-        data = text ? JSON.parse(text) : {};
-    } catch (e) {
-        throw new Error(
-            "The server returned an invalid response. Please try again later."
-        );
-    }
-
-    if (!response.ok) {
-        throw new Error(
-            data.error ||
-            data.message ||
-            `Server error (${response.status}). Please try again.`
-        );
-    }
-
-    return data;
-}
-
-/* PAIRING */
-async function rc() {
-    const button = $("gen-b");
-    const buttonText = $("b-txt");
-    const resultBox = $("res-b");
-    const manageBox = $("mg-b");
-    const inputArea = $("in-a");
-
-    clearFeedback();
-
-    if (!iti) {
-        showFeedback("Phone number input is still loading. Refresh the page and try again.", "error");
-        return;
-    }
-
-    if (!iti.getNumber() || !iti.isValidNumber()) {
-        showFeedback("Please enter a valid WhatsApp phone number, including the correct country code.", "error");
-        return;
-    }
-
-    const phone = iti.getNumber().replace("+", "").replace(/\D/g, "");
-
-    if (!phone) {
-        showFeedback("Please enter a valid phone number.", "error");
-        return;
-    }
-
-    cp = phone;
-
-    button.disabled = true;
-    buttonText.textContent = "Connecting...";
-    resultBox.style.display = "none";
-    manageBox.style.display = "none";
-
-    showFeedback("Contacting Alpha-XMD server. Please wait...", "info");
-
-    try {
-        const response = await fetch(AU + "/api/pair", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "ngrok-skip-browser-warning": "true"
-            },
-            body: JSON.stringify({
-                phoneNumber: phone
-            }),
-            signal: AbortSignal.timeout(30000)
-        });
-
-        const data = await readApiResponse(response);
-
-        if (!data.success) {
-            throw new Error(
-                data.error ||
-                data.message ||
-                "The server could not generate a pairing code."
-            );
-        }
-
-        if (data.alreadyPaired) {
-            button.style.display = "none";
-            inputArea.style.display = "none";
-
-            showFeedback(
-                "This number is already connected. Use the disconnect option if you want to unlink this session.",
-                "success"
-            );
-
-            manageBox.style.display = "block";
-            return;
-        }
-
-        if (!data.code) {
-            throw new Error("The server did not return a pairing code. Please try again.");
-        }
-
-        if (data.controlToken) {
-            localStorage.setItem(tokenKey(phone), data.controlToken);
-        }
-
-        localStorage.setItem("alpha-xmd-last-phone", phone);
-
-        $("cd").textContent = data.code;
-        resultBox.style.display = "block";
-
-        button.style.display = "none";
-        inputArea.style.display = "none";
-
-        showFeedback(
-            "Pairing code generated successfully. Open WhatsApp > Linked Devices and enter the code.",
-            "success"
-        );
-
-    } catch (error) {
-        console.error("Pairing error:", error);
-
-        let message = error.message || "Something went wrong.";
-
-        if (error.name === "AbortError" || error.name === "TimeoutError") {
-            message = "The request timed out. Check your internet connection and try again.";
-        } else if (error instanceof TypeError) {
-            message = "Could not reach the Alpha-XMD server. The API may be offline or the connection may be blocked.";
-        }
-
-        showFeedback(message, "error");
-
-        button.disabled = false;
-        buttonText.textContent = "Generate Pairing Code";
-        button.style.display = "flex";
-    }
-}
-
-/* COPY CODE */
-async function copyCode() {
-    const code = $("cd").textContent;
-
-    if (!code || code === "----") return;
-
-    try {
-        await navigator.clipboard.writeText(code);
-
-        const button = document.querySelector(".copy-btn");
-        const originalHTML = button.innerHTML;
-
-        button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-
-        button.style.color = "var(--pri)";
-        button.style.borderColor = "var(--pri)";
-
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.style.color = "var(--txt)";
-            button.style.borderColor = "var(--brd)";
-        }, 2000);
-
-    } catch (error) {
-        showFeedback("Could not copy automatically. Please select and copy the code manually.", "error");
-    }
-}
-
-/* DISCONNECT */
-async function db() {
-    if (!confirm("Are you sure you want to unlink this WhatsApp device?")) {
-        return;
-    }
-
-    const lastPhone = localStorage.getItem("alpha-xmd-last-phone") || "";
-    cp = cp || lastPhone;
-
-    if (!cp || !getControlToken(cp)) {
-        showFeedback(
-            "No dashboard access token was found in this browser. Use the browser that originally paired this number.",
-            "error"
-        );
-        return;
-    }
-
-    const button = document.querySelector("#mg-b .btn");
-    const originalText = button.textContent;
-
-    button.disabled = true;
-    button.textContent = "Disconnecting...";
-
-    try {
-        const response = await fetch(AU + "/api/disconnect", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "ngrok-skip-browser-warning": "true",
-                "Authorization": "Bearer " + getControlToken(cp)
-            },
-            body: JSON.stringify({
-                phoneNumber: cp
-            }),
-            signal: AbortSignal.timeout(20000)
-        });
-
-        const data = await readApiResponse(response);
-
-        if (data.success === false) {
-            throw new Error(data.error || data.message || "The server could not disconnect this session.");
-        }
-
-        localStorage.removeItem(tokenKey(cp));
-        localStorage.removeItem("alpha-xmd-last-phone");
-
-        showFeedback("Disconnect request completed. Reloading dashboard...", "success");
-
-        setTimeout(() => window.location.reload(), 1000);
-
-    } catch (error) {
-        console.error("Disconnect error:", error);
-
-        let message = error.message || "Failed to disconnect.";
-
-        if (error.name === "AbortError" || error.name === "TimeoutError") {
-            message = "The disconnect request timed out. Please check the connection and try again.";
-        } else if (error instanceof TypeError) {
-            message = "Could not contact the server. Please try again when the API is online.";
-        }
-
-        showFeedback(message, "error");
-
-        button.disabled = false;
-        button.textContent = originalText;
-    }
-}
+const $=id=>document.getElementById(id);
+const DEFAULT_API='https://itinerary-splashy-flyer.ngrok-free.dev';
+const AU=(window.ALPHA_XMD_API_URL||localStorage.getItem('alpha-xmd-api')||DEFAULT_API).replace(/\/+$/,'');
+const phoneInputs={};let currentPhone='',currentCode='';
+const tokenKey=p=>'alpha-xmd-token-'+p;
+const tokenFor=p=>localStorage.getItem(tokenKey(p));
+const titles={overview:['Overview','Your bot operations at a glance.'],pairing:['Device pairing','Connect and manage your WhatsApp device.'],settings:['Bot settings','Configure supported bot settings.'],monitor:['Server monitor','Live server health and runtime information.'],activity:['Activity log','Recent actions recorded in this browser.'],features:['Features','Explore Alpha-XMD capabilities.'],docs:['Documentation','Pairing instructions and API reference.'],support:['Support','Official Alpha-XMD project links.']};
+function nav(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$('pageTitle').textContent=titles[page][0];$('pageSub').textContent=titles[page][1];$('sidebar').classList.remove('open');if(page==='settings')loadSettings();if(page==='pairing')checkSavedSession();if(page==='monitor')fetchHealth()}
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.page)));
+function toggleSidebar(){$('sidebar').classList.toggle('open')}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
+function activity(msg){let a=[];try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}a.unshift({msg,time:new Date().toLocaleString()});localStorage.setItem('alpha-xmd-activity',JSON.stringify(a.slice(0,30)));renderActivity()}
+function renderActivity(){let a=[];try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}$('activityList').innerHTML=a.length?a.map(x=>`<div class="activity-item"><span class="bullet">●</span><div>${escapeHtml(x.msg)}<small>${escapeHtml(x.time)}</small></div></div>`).join(''):'<p class="mini">No activity recorded yet.</p>'}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function clearActivity(){localStorage.removeItem('alpha-xmd-activity');renderActivity()}
+function feedback(id,msg,type='info'){const e=$(id);e.textContent=msg;e.className='feedback show '+type}
+async function api(path,opts={}){const r=await fetch(AU+path,{...opts,headers:{'ngrok-skip-browser-warning':'true',...(opts.headers||{})},signal:opts.signal||AbortSignal.timeout(15000)});let d;try{d=await r.json()}catch{throw Error('Server returned an unreadable response.')}if(!r.ok)throw Error(d.error||d.message||`Request failed (${r.status})`);return d}
+function fmtUptime(n){n=Math.max(0,Math.floor(Number(n)||0));let d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d}d ${h}h`:`${h}h ${m}m`}
+async function refreshAll(){try{const d=await api('/api/stats');$('apiLabel').textContent='API Online';$('apiState').textContent='Online';$('apiState').className='tag';$('botState').textContent='Running';$('botState').className='tag';$('apiDot').style.background='var(--good)';$('sideApi').textContent='API connected';$('statSessions').textContent=d.sessions??d.connected??0;$('statUptime').textContent=fmtUptime(d.uptime);$('statMemory').textContent=d.memory!=null?d.memory+' MB':'—';$('statPairing').textContent=d.pairing??'—';$('nodeVersion').textContent=d.node||'Node.js';$('lastChecked').textContent=new Date().toLocaleTimeString();if(d.rss!=null)$('rssText').textContent=d.rss+' MB';if(d.memory!=null)$('heapText').textContent=d.memory+' MB';if(d.node)$('nodeText').textContent=d.node;await fetchHealth(false)}catch(e){$('apiLabel').textContent='API Offline';$('apiState').textContent='Offline';$('apiState').className='tag off';$('botState').textContent='Unavailable';$('botState').className='tag off';$('apiDot').style.background='var(--bad)';$('sideApi').textContent='API unavailable';$('lastChecked').textContent=new Date().toLocaleTimeString();console.warn(e)}}
+async function fetchHealth(show=true){try{const d=await api('/api/health');$('healthTag').textContent=d.status||'Healthy';$('healthTag').className='tag';$('healthSessions').textContent=d.activeSessions??'—';$('healthPairings').textContent=d.pendingPairings??'—';$('healthUptime').textContent=fmtUptime(d.uptime);if(d.memory){$('heapText').textContent=d.memory.heapUsed+' MB';$('heapTotal').textContent=d.memory.heapTotal+' MB';$('rssText').textContent=d.memory.rss+' MB';$('nodeText').textContent=d.node||'—';let pct=d.memory.heapTotal?Math.min(100,d.memory.heapUsed/d.memory.heapTotal*100):0;$('heapBar').style.width=pct+'%'}if(show)toast('Health check completed')}catch(e){$('healthTag').textContent='Unavailable';$('healthTag').className='tag off';if(show)toast(e.message)}}
+function initPhone(id){const el=$(id);if(!el||!window.intlTelInput)return;phoneInputs[id]=window.intlTelInput(el,{initialCountry:'zw',separateDialCode:true,utilsScript:'https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/utils.js',dropdownContainer:document.body})}
+function validPhone(id){const iti=phoneInputs[id];if(!iti||!iti.isValidNumber())throw Error('Enter a valid phone number with the correct country code.');return iti.getNumber().replace('+','').replace(/\D/g,'')}
+async function pairDevice(which='quick'){const id=which==='full'?'phoneFull':'phoneQuick',btn=$(which==='full'?'pairFull':'pairQuick'),fb=which==='full'?'pairFeedbackFull':'pairFeedback',box=which==='full'?'pairCodeFull':'pairCode',code=which==='full'?'codeValueFull':'codeValue';try{const phone=validPhone(id);currentPhone=phone;btn.disabled=true;btn.textContent='Connecting…';feedback(fb,'Contacting Alpha-XMD server…');$(box).style.display='none';const d=await api('/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phoneNumber:phone})});if(d.alreadyPaired){localStorage.setItem('alpha-xmd-last-phone',phone);feedback(fb,'This number is already connected. Check the session panel.','success');activity('Checked an already-connected device');await checkSavedSession();return}if(!d.code)throw Error('The server did not return a pairing code.');if(d.controlToken)localStorage.setItem(tokenKey(phone),d.controlToken);localStorage.setItem('alpha-xmd-last-phone',phone);currentCode=d.code;$(code).textContent=d.code;$(box).style.display='block';feedback(fb,'Pairing code generated. Open WhatsApp → Linked devices and enter the code.','success');activity('Generated a WhatsApp pairing code')}catch(e){feedback(fb,e.message,'error')}finally{btn.disabled=false;btn.textContent='Generate pairing code →'}}
+async function copyCode(which='quick'){const id=which==='full'?'codeValueFull':'codeValue';const v=$(id).textContent;if(!v||v==='----')return;try{await navigator.clipboard.writeText(v);toast('Pairing code copied')}catch{toast('Select and copy the code manually')}}
+async function checkSavedSession(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';$('savedPhone').textContent=p?`+${p}`:'Not linked';if(!p){$('savedStatus').textContent='Unknown';$('savedStatus').className='tag off';return}try{const d=await api('/api/status?phoneNumber='+encodeURIComponent(p));$('savedStatus').textContent=d.connected?'Connected':'Disconnected';$('savedStatus').className='tag'+(d.connected?'':' off')}catch(e){$('savedStatus').textContent='Unavailable';$('savedStatus').className='tag off'}}
+async function disconnectDevice(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';if(!p||!tokenFor(p)){toast('No saved dashboard access token in this browser');return}if(!confirm('Disconnect this WhatsApp device? This removes its saved session.'))return;try{await api('/api/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},body:JSON.stringify({phoneNumber:p})});localStorage.removeItem(tokenKey(p));localStorage.removeItem('alpha-xmd-last-phone');currentPhone='';activity('Disconnected the saved WhatsApp device');toast('Device disconnected');checkSavedSession()}catch(e){toast(e.message)}}
+const settingDefs=[['autoread','Auto read','Automatically mark incoming messages as read.'],['autotyping','Auto typing','Show typing status while preparing a response.'],['autorecording','Auto recording','Show recording status where supported.'],['autoreact','Auto react','Enable automatic message reactions.'],['antidelete','Anti-delete','Keep supported deleted-message notifications.'],['antiedit','Anti-edit','Track supported edited-message changes.'],['antilink','Anti-link','Enable configured group link protection.']];
+let loadedSettings={};
+async function loadSettings(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';const host=$('settingsList');if(!p||!tokenFor(p)){host.innerHTML='<p class="mini">Pair your device in this browser first. The private access token is required to load settings.</p>';$('settingsFor').textContent='No linked account';return}try{const d=await api('/api/settings?phoneNumber='+encodeURIComponent(p),{headers:{'Authorization':'Bearer '+tokenFor(p)}});loadedSettings=d||{};$('settingsFor').textContent='Account +'+p;host.innerHTML=settingDefs.map(([k,n,desc])=>`<div class="setting"><div><b>${n}</b><small>${desc}</small></div><label class="switch"><input type="checkbox" data-setting="${k}" ${loadedSettings[k]===true?'checked':''}><span class="slider"></span></label></div>`).join('');$('prefix').value=loadedSettings.prefix||'.'}catch(e){host.innerHTML='<p class="mini">'+escapeHtml(e.message)+'</p>';$('settingsFor').textContent='Could not load'}}
+async function saveSettings(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';if(!p||!tokenFor(p)){toast('Pair a device in this browser first');return}const settings={};document.querySelectorAll('[data-setting]').forEach(x=>settings[x.dataset.setting]=x.checked);settings.prefix=$('prefix').value.trim()||'.';try{await api('/api/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},body:JSON.stringify({phoneNumber:p,settings})});activity('Saved bot settings');toast('Bot settings saved')}catch(e){toast(e.message)}}
+document.addEventListener('DOMContentLoaded',()=>{const y=new Date().getFullYear();$('year').textContent=y;$('yearFooter').textContent=y;initPhone('phoneQuick');initPhone('phoneFull');renderActivity();refreshAll();setInterval(refreshAll,10000)});
 </script>
-
 </body>
 </html>
