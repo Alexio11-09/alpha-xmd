@@ -62,6 +62,7 @@ console.error = (...a) => {
 // ======================================================
 
 const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || "3L4Ccoik7R16ilMsfKycK2OZkmC_7qvF29reP3BEE19h42nyk";
+
 const NGROK_DOMAIN =
   process.env.NGROK_DOMAIN ||
   "itinerary-splashy-flyer.ngrok-free.dev";
@@ -194,6 +195,22 @@ function scheduleReconnect(phoneNumber, delay = 5000) {
   }, delay);
 
   reconnectTimers.set(phoneNumber, timer);
+}
+
+function formatUptime(seconds) {
+  const total = Math.floor(Number(seconds) || 0);
+
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  return [
+    days ? `${days}d` : null,
+    hours ? `${hours}h` : null,
+    minutes ? `${minutes}m` : null,
+    `${secs}s`
+  ].filter(Boolean).join(" ");
 }
 
 // ======================================================
@@ -1539,16 +1556,86 @@ function authorized(req, phone) {
 // ======================================================
 
 app.get("/api/stats", (req, res) => {
-  const used =
-    process.memoryUsage().heapUsed /
-    1024 / 1024;
+  const mem = process.memoryUsage();
+
+  const heap = mem.heapUsed / 1024 / 1024;
+  const rss = mem.rss / 1024 / 1024;
+  const external = mem.external / 1024 / 1024;
 
   res.json({
+    success: true,
+
     connected: activeSockets.size,
+    sessions: activeSockets.size,
+
+    pairing: pairingSockets.size,
+    starting: startingSockets.size,
+
     status: "online",
+
     uptime: process.uptime(),
-    memory: Math.round(used * 100) / 100,
-    sessions: activeSockets.size
+    uptimeFormatted: formatUptime(process.uptime()),
+
+    memory: Math.round(heap * 100) / 100,
+    rss: Math.round(rss * 100) / 100,
+    external: Math.round(external * 100) / 100,
+
+    nodeVersion: process.version,
+    platform: process.platform,
+    architecture: process.arch,
+
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ======================================================
+// DASHBOARD HEALTH
+// ======================================================
+
+app.get("/api/health", (req, res) => {
+  const mem = process.memoryUsage();
+
+  res.json({
+    success: true,
+    healthy: true,
+
+    service: "Alpha XMD API",
+
+    uptime: process.uptime(),
+    uptimeFormatted: formatUptime(process.uptime()),
+
+    memory: {
+      heapUsed: Math.round(
+        mem.heapUsed / 1024 / 1024 * 100
+      ) / 100,
+
+      heapTotal: Math.round(
+        mem.heapTotal / 1024 / 1024 * 100
+      ) / 100,
+
+      rss: Math.round(
+        mem.rss / 1024 / 1024 * 100
+      ) / 100,
+
+      external: Math.round(
+        mem.external / 1024 / 1024 * 100
+      ) / 100
+    },
+
+    connections: {
+      active: activeSockets.size,
+      pairing: pairingSockets.size,
+      starting: startingSockets.size,
+      reconnecting: reconnectTimers.size
+    },
+
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      architecture: process.arch
+    },
+
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -2124,7 +2211,7 @@ app.post(
       setInterval(() => {
         require("http")
           .get(
-            `http://localhost:${PORT}/api/stats`,
+            `http://localhost:${PORT}/api/health`,
             () => {}
           )
           .on("error", () => {});
