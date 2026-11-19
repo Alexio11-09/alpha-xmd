@@ -281,6 +281,8 @@ nav {
 <script>
 const AU = "https://itinerary-splashy-flyer.ngrok-free.dev";
 let cp = "";
+const tokenKey = (phone) => `alpha-xmd-control-${phone}`;
+const getControlToken = (phone) => localStorage.getItem(tokenKey(phone)) || "";
 let iti;
 
 // 🎯 THEME LOGIC
@@ -385,8 +387,10 @@ async function rc() {
         if(d.success){
             b.style.display = 'none'; 
             ia.style.display = 'none';
-            if(d.alreadyPaired) mb.style.display = 'block';
+            if(d.alreadyPaired) { mb.style.display = 'block'; alert('This number is already connected. Manage it from the browser that originally paired it.'); }
             else { 
+                if (d.controlToken) localStorage.setItem(tokenKey(p), d.controlToken);
+                localStorage.setItem('alpha-xmd-last-phone', p);
                 rb.style.display = 'block'; 
                 document.getElementById('cd').innerText = d.code; 
             }
@@ -422,11 +426,15 @@ function copyCode() {
 async function db() {
     if(!confirm("Unlink device?"))return;
     try {
-        await fetch(AU+"/api/disconnect", {
+        cp = cp || localStorage.getItem('alpha-xmd-last-phone') || '';
+    if (!cp || !getControlToken(cp)) return alert('No dashboard access token found for this browser.');
+    await fetch(AU+"/api/disconnect", {
             method:'POST', 
-            headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'}, 
+            headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true','Authorization':'Bearer '+getControlToken(cp)}, 
             body:JSON.stringify({phoneNumber:cp})
         });
+        localStorage.removeItem(tokenKey(cp));
+        localStorage.removeItem('alpha-xmd-last-phone');
         window.location.reload();
     } catch(e) {
         alert("Failed to disconnect.");
