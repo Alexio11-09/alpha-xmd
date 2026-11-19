@@ -719,8 +719,28 @@ ${config.settings.footer}
         command: "pair",
         aliases: ["pairing", "session"],
         category: "general",
-        execute: async (sock, m, { reply }) => {
-            return reply("🔐 Pairing is managed by the Alpha XMD pairing website now.\n\nPlease use the website to connect another number. This keeps every account on the same SQLite authentication system and prevents existing sessions from being overwritten.");
+        execute: async (sock, m, { args, reply }) => {
+            if (!args[0]) return reply("❌ Provide a phone number with country code!\n\n📌 Example: .pair 263784969735");
+            const rawNumber = args[0].replace(/[^0-9]/g, "");
+            if (!/^\d{10,15}$/.test(rawNumber)) return reply("❌ Invalid phone number. Use 10–15 digits with country code.");
+            if (typeof global.pairAccount !== "function") {
+                return reply("❌ Pairing service is not ready. Please try again shortly.");
+            }
+
+            await reply(`🔐 Requesting a WhatsApp pairing code for +${rawNumber}... Please wait.`);
+            try {
+                await global.pairAccount(rawNumber, {
+                    onCode: async formatted => reply(
+                        `✅ *Pairing Code Ready*\n\n📞 *Number:* +${rawNumber}\n🔢 *Code:* *${formatted}*\n\n⏱️ The code expires shortly.\n📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
+                    ),
+                    onConnected: async () => reply(
+                        `🎉 *Successfully connected +${rawNumber}!*\n\nYour Alpha XMD account is starting now.`
+                    ),
+                    onError: async err => reply(`❌ Pairing failed: ${err.message || String(err)}`)
+                });
+            } catch (err) {
+                return reply(`❌ ${err.message || String(err)}`);
+            }
         }
     }
 ];
