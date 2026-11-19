@@ -1,12 +1,14 @@
 // © 2026 Alpha. All Rights Reserved.
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const pino = require("pino");
 const chalk = require("chalk");
 const { Boom } = require("@hapi/boom");
 const { smsg } = require("./library/serialize");
 const { useSQLiteAuthState } = require('@nevi-dev/sqlite-auth'); // 🎯 SQLITE IMPORT
+const tenant = require("./library/tenant");
 const config = () => require("./settings/config");
 
 // 🎯 GLOBAL ERROR CATCHERS
@@ -20,7 +22,7 @@ console.error = (...a) => {
   _origErr(...a);
 };
 
-const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || "3L4Ccoik7R16ilMsfKycK2OZkmC_7qvF29reP3BEE19h42nyk"; 
+const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || ""; 
 const NGROK_DOMAIN = process.env.NGROK_DOMAIN || "itinerary-splashy-flyer.ngrok-free.dev"; 
 
 const app = express();
@@ -37,11 +39,12 @@ const sessionsDir = path.join(__dirname, "sessions");
 if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
 
 const activeSockets = new Map();
+const pairingSockets = new Map();
 const store = new Map(); 
 const settingsCache = new Map(); 
 let baileys;
 
-global.ghostMode = false;
+global.ghostMode = false; // Legacy fallback; account-specific state is stored on each socket.
 global.pollCache = new Map();
 
 setInterval(() => {
@@ -80,8 +83,6 @@ function attachHandlers(sock, phoneNumber) {
   const channelName = config().newsletter.name;
 
   const loadGlobalSettings = async () => {
-    if (settingsCache.has(phoneNumber)) return settingsCache.get(phoneNumber);
-    
     let defaults = { autoread: false, autotyping: false, autorecording: false, autoreact: false, antidelete: false, antiedit: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
     try {
       const settingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
@@ -98,9 +99,8 @@ function attachHandlers(sock, phoneNumber) {
 
   const updateAutobio = async () => {
     try {
-        const p = path.join(process.cwd(), 'database', 'autobio.json');
-        if (fs.existsSync(p)) {
-            const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
+        const cfg = tenant.read(sock, 'autobio.json', { enabled: 0 });
+        if (cfg) {
             if (cfg.enabled === 1) {
                 const bios = ["⚡ Built different.", "🥶 I don't do small talk.", "🛑 Zero tolerance.", "💼 Efficiency is my only language.", "🤖 I run on code.", "🧊 Cold hearted.", "📵 Call me? I'll block you.", "👑 The system doesn't sleep.", "⚙️ Programmed for perfection.", "🔇 Actions over words."];
                 await sock.updateProfileStatus(bios[Math.floor(Math.random() * bios.length)]);
@@ -114,9 +114,7 @@ function attachHandlers(sock, phoneNumber) {
 
   sock.ev.on("call", async (calls) => {
     try {
-        const anticallPath = path.join(process.cwd(), 'database', 'anticall.json');
-        let config = { enabled: 0, block: 0 };
-        if (fs.existsSync(anticallPath)) { try { config = JSON.parse(fs.readFileSync(anticallPath, 'utf8')); } catch(e) {} }
+        const config = tenant.read(sock, 'anticall.json', { enabled: 0, block: 0 });
         if (config.enabled === 1) {
             for (const call of calls) {
                 if (call.status === "offer") {
@@ -147,9 +145,9 @@ function attachHandlers(sock, phoneNumber) {
           const isCmd = messageText.startsWith(globalSettings.prefix);
 
           if (remote && remote.endsWith('@newsletter')) {
-              if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) { global.pollCache.set(mek.key.id, mek); }
+              if (mek.message.pollCreationMessage || mek.message.pollCreationMessageV3) { global.pollCache.set(`${phoneNumber}:${mek.key.id}`, mek); }
               let autoReactChannels = {};
-              try { if(fs.existsSync('./database/channel_automation.json')) autoReactChannels = JSON.parse(fs.readFileSync('./database/channel_automation.json')); } catch(e) {}
+              try { const tenantChannelFile = path.join(sessionsDir, phoneNumber, 'channel_automation.json'); if(fs.existsSync(tenantChannelFile)) autoReactChannels = JSON.parse(fs.readFileSync(tenantChannelFile)); } catch(e) {}
               if (autoReactChannels[remote]) {
                   const emojis = ["🔥","💯","🚀","❤️","😂","⚡","🎉","👑","💎","🤯"];
                   (async () => {
@@ -179,7 +177,7 @@ function attachHandlers(sock, phoneNumber) {
           m.prefix = globalSettings.prefix;
           m.globalSettings = globalSettings; 
           
-          if (m.text) { store.set(mek.key.id, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
+          if (m.text) { store.set(`${phoneNumber}:${mek.key.id}`, { text: m.text || "", message: mek.message, sender: m.sender, pushName: m.pushName || null }); }
           
           await messageHandler(sock, m);
 
@@ -197,7 +195,7 @@ function attachHandlers(sock, phoneNumber) {
       const ownerNumber = (config().owner?.[0] || "").replace(/[^0-9]/g, "");
       const ownerJid = ownerNumber ? `${ownerNumber}@s.whatsapp.net` : null;
       for (const update of updates) {
-        const oldMsg = store.get(update.key.id);
+        const oldMsg = store.get(`${phoneNumber}:${update.key.id}`);
         if (!oldMsg) continue;
         if (update.update?.message === null && ad.enabled) {
           const chat = update.key.remoteJid; if (!chat) continue;
@@ -233,18 +231,18 @@ function attachHandlers(sock, phoneNumber) {
     try {
       const { id, participants, action } = update;
       let gs = { welcome: false, welcomeMsg: "🌟 Welcome @user!", goodbye: false, goodbyeMsg: "🚶‍♂️ @user left." };
-      try { const all = JSON.parse(fs.readFileSync(path.join(__dirname, "database/groupSettings.json"), "utf8")); gs = all[id] || gs; } catch {}
+      try { const all = tenant.read(sock, 'groupSettings.json', {}); gs = all[id] || gs; } catch {}
       if (action === "add") {
         for (const user of participants) {
             let isAntibot = false;
-            try { if(fs.existsSync('./database/antibot.json')) isAntibot = JSON.parse(fs.readFileSync('./database/antibot.json')).enabled === 1; } catch{}
+            try { const a = tenant.read(sock, 'antibot.json', { enabled: 0 }); isAntibot = a.enabled === 1; } catch{}
             if (isAntibot) {
                 const pInfo = gs.participants?.find(p => p.id === user) || {};
                 const name = pInfo.notify || pInfo.name || "";
                 if (name.toLowerCase().includes('bot') || name.toLowerCase().includes('baileys')) { await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{}); await sock.sendMessage(id, { text: `🤖 Removed a bot: ${name}` }); continue; }
             }
             let isAntiforeign = false, foreignCode = "";
-            try { if(fs.existsSync('./database/antiforeign.json')) { const a = JSON.parse(fs.readFileSync('./database/antiforeign.json')); isAntiforeign = a.enabled === 1; foreignCode = a.code || ""; } } catch{}
+            try { const a = tenant.read(sock, 'antiforeign.json', { enabled: 0, code: '' }); isAntiforeign = a.enabled === 1; foreignCode = a.code || ""; } catch{}
             if (isAntiforeign && foreignCode) {
                 const num = user.split('@')[0];
                 if (num.startsWith(foreignCode)) { await sock.groupParticipantsUpdate(id, [user], 'remove').catch(()=>{}); await sock.sendMessage(id, { text: `🚫 Kicked @${num} (Foreign number: +${foreignCode})`, mentions: [user] }); continue; }
@@ -266,7 +264,7 @@ function attachHandlers(sock, phoneNumber) {
   }, 4000);
 
   sock._presenceInterval = setInterval(() => { 
-    if (sock.user) { if (!global.ghostMode) { sock.sendPresenceUpdate("available").catch(() => {}); } }
+    if (sock.user) { if (!sock._ghostMode) { sock.sendPresenceUpdate("available").catch(() => {}); } }
   }, 20000);
 }
 
@@ -278,7 +276,7 @@ async function startBot(phoneNumber) {
     const { version } = await baileys.fetchLatestBaileysVersion();
     
     // 🎯 SQLITE AUTH STATE
-    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+    const { state, saveCreds } = await useSQLiteAuthState(`./sessions/${phoneNumber}`, {
         dbName: 'auth.db', 
         cleanOldFiles: true 
     });
@@ -298,11 +296,13 @@ async function startBot(phoneNumber) {
       markOnlineOnConnect: false, 
     });
 
-    global.currentSock = sock;
+    sock._phoneNumber = phoneNumber;
+    sock._ghostMode = false;
+    global.currentSock = sock; // Backward compatibility for older plugins only.
 
     const originalSendReceipt = sock.sendReceipt.bind(sock);
     sock.sendReceipt = async (jid, participant, ids, type) => {
-        if (global.ghostMode && type === 'delivered') { return; }
+        if (sock._ghostMode && type === 'delivered') { return; }
         return originalSendReceipt(jid, participant, ids, type);
     };
 
@@ -315,13 +315,14 @@ async function startBot(phoneNumber) {
 
       if (connection === "close") {
         if (sock._autobioInterval) clearInterval(sock._autobioInterval);
+        if (sock._pairCleanup) clearTimeout(sock._pairCleanup);
         if (sock._presenceInterval) clearInterval(sock._presenceInterval);
         if (sock._autobioTimeout) clearTimeout(sock._autobioTimeout);
         try { sock.ev.removeAllListeners(); sock.end(undefined); } catch (e) {}
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-        activeSockets.delete(phoneNumber);
+        if (activeSockets.get(phoneNumber) === sock) activeSockets.delete(phoneNumber);
 
-        if (code !== 401) {
+        if (code !== 401 && !sock._manualDisconnect && !activeSockets.has(phoneNumber)) {
           console.log(chalk.yellow(`🔄 [${phoneNumber}] Reconnecting in 5s...`));
           setTimeout(() => startBot(phoneNumber), 5000);
         } else {
@@ -338,23 +339,48 @@ async function startBot(phoneNumber) {
 
 global.startBot = startBot;
 
+// Dashboard control tokens: only the browser that completes pairing receives the token.
+function validPhone(value) { return typeof value === "string" && /^\d{10,15}$/.test(value); }
+function controlFile(phone) { return path.join(sessionsDir, phone, "control.json"); }
+function hashToken(token) { return crypto.createHash("sha256").update(String(token)).digest("hex"); }
+function issueControlToken(phone) {
+  const token = crypto.randomBytes(32).toString("hex");
+  fs.mkdirSync(path.join(sessionsDir, phone), { recursive: true });
+  fs.writeFileSync(controlFile(phone), JSON.stringify({ tokenHash: hashToken(token), createdAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+  return token;
+}
+function authorized(req, phone) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token || !validPhone(phone)) return false;
+  try {
+    const saved = JSON.parse(fs.readFileSync(controlFile(phone), "utf8"));
+    const a = Buffer.from(saved.tokenHash || "", "hex"), b = Buffer.from(hashToken(token), "hex");
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch { return false; }
+}
+
 app.get("/api/stats", (req, res) => {
   const used = process.memoryUsage().heapUsed / 1024 / 1024;
   res.json({ connected: activeSockets.size, status: "online", uptime: process.uptime(), memory: Math.round(used * 100) / 100, sessions: activeSockets.size });
 });
 
-app.get("/api/status", (req, res) => res.json({ connected: activeSockets.has(req.query.phoneNumber) }));
+app.get("/api/status", (req, res) => { const phone = req.query.phoneNumber; if (!validPhone(phone)) return res.status(400).json({ connected: false }); return res.json({ connected: activeSockets.has(phone) }); });
 
 app.post("/api/pair", rateLimiter, async (req, res) => {
   const { phoneNumber } = req.body;
-  if (!phoneNumber || !/^\d{10,15}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
-  if (activeSockets.has(phoneNumber)) return res.json({ success: true, alreadyPaired: true });
+  if (!validPhone(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
+  if (activeSockets.has(phoneNumber)) return res.json({ success: true, alreadyPaired: true, needsControlToken: true });
+  if (pairingSockets.has(phoneNumber)) return res.status(409).json({ success: false, error: "A pairing request for this number is already running." });
+  const existingControl = fs.existsSync(controlFile(phoneNumber));
+  if (existingControl && !authorized(req, phoneNumber)) return res.status(403).json({ success: false, error: "This account is already registered. Use its saved dashboard access token." });
+  let controlToken = null;
 
   try {
     const { version } = await baileys.fetchLatestBaileysVersion();
 
     // 🎯 SQLITE AUTH STATE FOR PAIRING
-    const { state, saveCreds } = useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+    const { state, saveCreds } = await useSQLiteAuthState(`./sessions/${phoneNumber}`, {
         dbName: 'auth.db',
         cleanOldFiles: true
     });
@@ -363,6 +389,7 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
       version, logger: pino({ level: "silent" }), printQRInTerminal: false, auth: state, browser: baileys.Browsers.ubuntu("Chrome"), syncFullHistory: false
     });
 
+    pairingSockets.set(phoneNumber, tempSock);
     tempSock.ev.on("creds.update", saveCreds);
     let responded = false;
 
@@ -373,16 +400,18 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
           try {
             const code = await tempSock.requestPairingCode(phoneNumber);
             const formatted = code.match(/.{1,4}/g)?.join("-") || code;
+            if (!existingControl) controlToken = issueControlToken(phoneNumber);
             responded = true;
-            res.json({ success: true, phoneNumber, code: formatted });
+            res.json({ success: true, phoneNumber, code: formatted, controlToken });
           } catch (err) {
-            if(!responded) { responded = true; res.status(500).json({ success: false, error: err.message }); try { tempSock.end(undefined); } catch (e) {} }
+            if(!responded) { responded = true; pairingSockets.delete(phoneNumber); res.status(500).json({ success: false, error: err.message }); try { tempSock.end(undefined); } catch (e) {} }
           }
         }, 3000);
       }
-      if (connection === "open") { setTimeout(() => startBot(phoneNumber), 3000); }
+      if (connection === "open") { pairingSockets.delete(phoneNumber); setTimeout(() => { try { tempSock.end(undefined); } catch {} startBot(phoneNumber); }, 2500); }
       if (connection === "close") {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+        pairingSockets.delete(phoneNumber);
         if (code === 515) { setTimeout(() => startBot(phoneNumber), 5000); } 
         else if (!responded) { responded = true; res.status(500).json({ success: false, error: `Closed (${code})` }); try { tempSock.end(undefined); } catch (e) {} }
       }
@@ -391,38 +420,51 @@ app.post("/api/pair", rateLimiter, async (req, res) => {
 });
 
 app.post("/api/disconnect", async (req, res) => {
-  const { phoneNumber } = req.body;
+  const { phoneNumber } = req.body || {};
+  if (!validPhone(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
+  if (!authorized(req, phoneNumber)) return res.status(403).json({ success: false, error: "Unauthorized. Pair this account from this browser first." });
   try {
-    if (activeSockets.has(phoneNumber)) { await activeSockets.get(phoneNumber).logout(); activeSockets.delete(phoneNumber); }
+    const sock = activeSockets.get(phoneNumber);
+    if (sock) {
+      activeSockets.delete(phoneNumber);
+      sock._manualDisconnect = true;
+      try { await sock.logout(); } catch {}
+      try { sock.end(undefined); } catch {}
+    }
     const sessionPath = path.join(sessionsDir, phoneNumber);
     if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true });
     settingsCache.delete(phoneNumber);
     res.json({ success: true, message: "Bot disconnected and session deleted." });
-  } catch (err) { res.json({ success: true, message: "Session deleted." }); }
+  } catch (err) { res.status(500).json({ success: false, error: "Could not disconnect this account." }); }
 });
 
 app.get("/api/settings", async (req, res) => {
-  const { phoneNumber } = req.query;
+  const phoneNumber = req.query.phoneNumber;
+  if (!validPhone(phoneNumber)) return res.status(400).json({ success: false, error: "Invalid number format." });
+  if (!authorized(req, phoneNumber)) return res.status(403).json({ success: false, error: "Unauthorized." });
   if (settingsCache.has(phoneNumber)) return res.json(settingsCache.get(phoneNumber));
-  
   const settingsPath = path.join(sessionsDir, phoneNumber, "settings.json");
-  if (fs.existsSync(settingsPath)) {
-      try {
-          const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-          settingsCache.set(phoneNumber, saved);
-          return res.json(saved);
-      } catch(e) {}
-  }
-  res.json({ autoread: false, autotyping: false, antidelete: false, antilink: false, autoreact: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." });
+  try {
+    const saved = fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, "utf8")) : { autoread: false, autotyping: false, autorecording: false, antidelete: false, antiedit: false, antilink: false, autoreact: false, chreact: { enabled: false, emojis: ["💬"] }, prefix: "." };
+    settingsCache.set(phoneNumber, saved);
+    return res.json(saved);
+  } catch { return res.status(500).json({ success: false, error: "Could not read settings." }); }
 });
 
 app.post("/api/settings", async (req, res) => {
-  const { phoneNumber, settings } = req.body;
+  const { phoneNumber, settings } = req.body || {};
+  if (!validPhone(phoneNumber) || !settings || typeof settings !== "object" || Array.isArray(settings)) return res.status(400).json({ success: false, error: "Invalid settings request." });
+  if (!authorized(req, phoneNumber)) return res.status(403).json({ success: false, error: "Unauthorized." });
+  const allowed = ["autoread", "autotyping", "autorecording", "autoreact", "antidelete", "antiedit", "antilink", "chreact", "prefix"];
+  const cleanSettings = {};
+  for (const key of allowed) if (Object.prototype.hasOwnProperty.call(settings, key)) cleanSettings[key] = settings[key];
   const dir = path.join(sessionsDir, phoneNumber);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(settings, null, 2));
-  settingsCache.set(phoneNumber, settings);
-  res.json({ success: true });
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(cleanSettings, null, 2), { mode: 0o600 });
+    settingsCache.set(phoneNumber, cleanSettings);
+    res.json({ success: true });
+  } catch { res.status(500).json({ success: false, error: "Could not save settings." }); }
 });
 
 (async () => {
@@ -434,7 +476,8 @@ app.post("/api/settings", async (req, res) => {
     console.log(`🌐 Internal API running on port ${PORT}`);
     try { 
       const ngrok = require("@ngrok/ngrok"); 
-      const listener = await ngrok.forward({ addr: PORT, authtoken: NGROK_AUTHTOKEN, domain: NGROK_DOMAIN }); 
+      if (!NGROK_AUTHTOKEN) throw new Error("Set NGROK_AUTHTOKEN in hosting environment variables.");
+      const listener = await ngrok.forward({ addr: PORT, authtoken: NGROK_AUTHTOKEN, domain: NGROK_DOMAIN });
       console.log(`🚇 Ngrok Tunnel Active: ${listener.url()}`);
     } catch (err) {
       console.log("⚠️ Ngrok Error:", err.message);
@@ -458,7 +501,7 @@ app.post("/api/settings", async (req, res) => {
     setInterval(() => {
       const used = process.memoryUsage().heapUsed / 1024 / 1024;
       console.log(`📊 Memory Usage: ${Math.round(used * 100) / 100} MB`);
-      if (used > 450) { console.log(`⚠️ Memory limit reached. Restarting to prevent crash...`); process.exit(1); }
+      if (used > 220) { console.log(`⚠️ Heap usage is high. Reduce concurrent sessions or restart manually if needed.`); }
     }, 60000); 
   });
 })();
