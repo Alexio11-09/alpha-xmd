@@ -339,6 +339,89 @@ async function startBot(phoneNumber) {
 
 global.startBot = startBot;
 
+// Chat-based .pair command: uses the SAME SQLite auth system as the dashboard.
+// It never deletes an existing session and prevents duplicate pairing attempts.
+global.pairAccount = async function pairAccount(phoneNumber, callbacks = {}) {
+  const validPhone = value => typeof value === "string" && /^\d{10,15}$/.test(value);
+  const onCode = typeof callbacks.onCode === "function" ? callbacks.onCode : () => {};
+  const onConnected = typeof callbacks.onConnected === "function" ? callbacks.onConnected : () => {};
+  const onError = typeof callbacks.onError === "function" ? callbacks.onError : () => {};
+
+  if (!validPhone(phoneNumber)) throw new Error("Invalid phone number. Use 10–15 digits with country code.");
+  if (activeSockets.has(phoneNumber)) throw new Error("That number is already connected.");
+  if (pairingSockets.has(phoneNumber)) throw new Error("A pairing request for that number is already running.");
+
+  const { version } = await baileys.fetchLatestBaileysVersion();
+  const { state, saveCreds } = await useSQLiteAuthState(`./sessions/${phoneNumber}`, {
+    dbName: "auth.db",
+    cleanOldFiles: true
+  });
+
+  const tempSock = baileys.default({
+    version,
+    logger: pino({ level: "silent" }),
+    printQRInTerminal: false,
+    auth: state,
+    browser: baileys.Browsers.ubuntu("Chrome"),
+    syncFullHistory: false
+  });
+
+  pairingSockets.set(phoneNumber, tempSock);
+  tempSock.ev.on("creds.update", saveCreds);
+  let codeSent = false;
+  let finished = false;
+  let requestTimer;
+
+  const cleanup = () => {
+    if (requestTimer) clearTimeout(requestTimer);
+    if (pairingSockets.get(phoneNumber) === tempSock) pairingSockets.delete(phoneNumber);
+  };
+
+  tempSock.ev.on("connection.update", async update => {
+    const { connection, lastDisconnect } = update;
+    if (connection === "connecting" && !codeSent && !requestTimer) {
+      requestTimer = setTimeout(async () => {
+        try {
+          const code = await tempSock.requestPairingCode(phoneNumber);
+          codeSent = true;
+          const formatted = code.match(/.{1,4}/g)?.join("-") || code;
+          await onCode(formatted);
+        } catch (err) {
+          if (!finished) {
+            finished = true;
+            cleanup();
+            try { tempSock.end(undefined); } catch {}
+            await onError(err);
+          }
+        }
+      }, 3000);
+    }
+
+    if (connection === "open") {
+      finished = true;
+      cleanup();
+      try { tempSock.end(undefined); } catch {}
+      await onConnected();
+      setTimeout(() => startBot(phoneNumber), 2500);
+    }
+
+    if (connection === "close") {
+      const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      cleanup();
+      if (code === 515) {
+        finished = true;
+        setTimeout(() => startBot(phoneNumber), 5000);
+      } else if (!finished) {
+        finished = true;
+        try { tempSock.end(undefined); } catch {}
+        await onError(new Error(`Pairing connection closed (${code || "unknown"}). Please try again.`));
+      }
+    }
+  });
+
+  return { started: true };
+};
+
 // Dashboard control tokens: only the browser that completes pairing receives the token.
 function validPhone(value) { return typeof value === "string" && /^\d{10,15}$/.test(value); }
 function controlFile(phone) { return path.join(sessionsDir, phone, "control.json"); }
