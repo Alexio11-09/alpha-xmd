@@ -11,49 +11,92 @@ const { useSQLiteAuthState } = require("@nevi-dev/sqlite-auth");
 const tenant = require("./library/tenant");
 const config = () => require("./settings/config");
 
-// GLOBAL ERROR HANDLERS
-process.on("uncaughtException", err => {
-  console.log("🔥 [UNCAUGHT EXCEPTION]:", err.message);
+// ======================================================
+// PROCESS DIAGNOSTICS
+// ======================================================
+
+process.on("uncaughtException", (err) => {
+  console.error("🔥 [UNCAUGHT EXCEPTION]", err?.stack || err);
+  process.exitCode = 1;
 });
 
-process.on("unhandledRejection", reason => {
-  console.log("🔥 [UNHANDLED REJECTION]:", reason);
+process.on("unhandledRejection", (reason) => {
+  console.error("🔥 [UNHANDLED REJECTION]", reason?.stack || reason);
+});
+
+process.on("exit", code => {
+  console.log(`🛑 Node process exiting. Exit code: ${code}`);
+});
+
+process.on("beforeExit", code => {
+  console.log(`⚠️ Node event loop is empty. Exit code: ${code}`);
+});
+
+process.on("SIGTERM", () => {
+  console.log("⚠️ Received SIGTERM from hosting panel.");
+});
+
+process.on("SIGINT", () => {
+  console.log("⚠️ Received SIGINT.");
 });
 
 const _origErr = console.error;
-console.error = (...args) => {
-  const message = args.join(" ");
+
+console.error = (...a) => {
+  const m = a.join(" ");
+
   if (
-    message.includes("Bad MAC") ||
-    message.includes("Session error") ||
-    message.includes("verifyMAC") ||
-    message.includes("Failed to decrypt") ||
-    message.includes("decryptWithSessions") ||
-    message.includes("closed session")
+    m.includes("Bad MAC") ||
+    m.includes("Session error") ||
+    m.includes("verifyMAC") ||
+    m.includes("Failed to decrypt") ||
+    m.includes("decryptWithSessions") ||
+    m.includes("closed session")
   ) return;
 
-  _origErr(...args);
+  _origErr(...a);
 };
 
-// NGROK: configure these in hosting environment variables.
+// ======================================================
+// NGROK CONFIGURATION
+// ======================================================
+
 const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || "3L4Ccoik7R16ilMsfKycK2OZkmC_7qvF29reP3BEE19h42nyk";
 const NGROK_DOMAIN =
-  process.env.NGROK_DOMAIN || "itinerary-splashy-flyer.ngrok-free.dev";
+  process.env.NGROK_DOMAIN ||
+  "itinerary-splashy-flyer.ngrok-free.dev";
+
+// ======================================================
+// EXPRESS SERVER
+// ======================================================
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+
+app.use(express.json({ limit: "100kb" }));
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
+
   res.header(
     "Access-Control-Allow-Headers",
     "Content-Type, ngrok-skip-browser-warning, Authorization"
   );
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
-  if (req.method === "OPTIONS") return res.sendStatus(200);
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS"
+  );
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
   next();
 });
+
+// ======================================================
+// SESSION MANAGEMENT
+// ======================================================
 
 const sessionsDir = path.join(__dirname, "sessions");
 
@@ -62,9 +105,9 @@ if (!fs.existsSync(sessionsDir)) {
 }
 
 const activeSockets = new Map();
-const pairingSockets = new Map();
 const startingSockets = new Set();
 const reconnectTimers = new Map();
+const pairingSockets = new Map();
 
 const store = new Map();
 const settingsCache = new Map();
@@ -74,24 +117,31 @@ let baileys;
 global.ghostMode = false;
 global.pollCache = new Map();
 
+// ======================================================
+// MEMORY CLEANUP
+// ======================================================
+
 setInterval(() => {
   store.clear();
   global.pollCache.clear();
 
   if (global.gc) {
-    try {
-      global.gc();
-    } catch {}
+    global.gc();
   }
 }, 10 * 60 * 1000);
+
+// ======================================================
+// HANDLER IMPORTS
+// ======================================================
 
 let autoStatusHandler;
 
 try {
   autoStatusHandler = require("./plugins/autostatus");
-} catch (error) {
-  console.log("⚠️ AutoStatus plugin unavailable:", error.message);
-  autoStatusHandler = { handleStatusUpdate: () => Promise.resolve() };
+} catch (e) {
+  autoStatusHandler = {
+    handleStatusUpdate: () => {}
+  };
 }
 
 let messageHandler;
@@ -99,8 +149,8 @@ let messageHandler;
 try {
   messageHandler = require("./message");
   console.log("✅ Message Handler loaded successfully!");
-} catch (error) {
-  console.log("❌ FAILED TO LOAD message.js:", error.message);
+} catch (e) {
+  console.log("❌ FAILED TO LOAD message.js:", e.message);
   messageHandler = async () => {};
 }
 
@@ -109,75 +159,18 @@ const funnyDeleted = [
   "📝 Deleted message rescued:"
 ];
 
-// RATE LIMITER
-const rateLimits = new Map();
+// ======================================================
+// COMMON HELPERS
+// ======================================================
 
-function rateLimiter(req, res, next) {
-  const ip =
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.socket.remoteAddress ||
-    "unknown";
-
-  const now = Date.now();
-
-  const requests = (rateLimits.get(ip) || []).filter(
-    time => now - time < 60 * 60 * 1000
+function validPhone(value) {
+  return (
+    typeof value === "string" &&
+    /^\d{10,15}$/.test(value)
   );
-
-  if (requests.length >= 5) {
-    rateLimits.set(ip, requests);
-    return res.status(429).json({
-      success: false,
-      error: "Too many requests. Try again later."
-    });
-  }
-
-  requests.push(now);
-  rateLimits.set(ip, requests);
-  next();
 }
 
-// Periodically remove expired rate-limit records.
-setInterval(() => {
-  const now = Date.now();
-
-  for (const [ip, timestamps] of rateLimits.entries()) {
-    const recent = timestamps.filter(
-      time => now - time < 60 * 60 * 1000
-    );
-
-    if (recent.length) rateLimits.set(ip, recent);
-    else rateLimits.delete(ip);
-  }
-}, 10 * 60 * 1000);
-
-// SOCKET CLEANUP
-function clearSocketTimers(sock) {
-  if (!sock) return;
-
-  if (sock._autobioInterval) clearInterval(sock._autobioInterval);
-  if (sock._autobioTimeout) clearTimeout(sock._autobioTimeout);
-  if (sock._presenceInterval) clearInterval(sock._presenceInterval);
-  if (sock._pairCleanup) clearTimeout(sock._pairCleanup);
-}
-
-function scheduleReconnect(phoneNumber, delay = 5000) {
-  if (reconnectTimers.has(phoneNumber)) return;
-
-  const timer = setTimeout(() => {
-    reconnectTimers.delete(phoneNumber);
-    startBot(phoneNumber).catch(error => {
-      console.log(
-        `❌ Reconnect failed for ${phoneNumber}:`,
-        error.message
-      );
-    });
-  }, delay);
-
-  reconnectTimers.set(phoneNumber, timer);
-}
-
-function cancelReconnect(phoneNumber) {
+function clearReconnectTimer(phoneNumber) {
   const timer = reconnectTimers.get(phoneNumber);
 
   if (timer) {
@@ -186,10 +179,84 @@ function cancelReconnect(phoneNumber) {
   }
 }
 
-// MESSAGE HANDLERS
+function scheduleReconnect(phoneNumber, delay = 5000) {
+  if (reconnectTimers.has(phoneNumber)) return;
+
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(phoneNumber);
+
+    startBot(phoneNumber).catch(err => {
+      console.error(
+        `[${phoneNumber}] Reconnect error:`,
+        err?.stack || err
+      );
+    });
+  }, delay);
+
+  reconnectTimers.set(phoneNumber, timer);
+}
+
+// ======================================================
+// RATE LIMITER
+// ======================================================
+
+const rateLimits = new Map();
+
+function rateLimiter(req, res, next) {
+  const forwarded = String(
+    req.headers["x-forwarded-for"] || ""
+  ).split(",")[0].trim();
+
+  const ip =
+    forwarded ||
+    req.socket.remoteAddress ||
+    "unknown";
+
+  const now = Date.now();
+
+  const requests = (
+    rateLimits.get(ip) || []
+  ).filter(time => now - time < 60 * 60 * 1000);
+
+  if (requests.length >= 5) {
+    rateLimits.set(ip, requests);
+
+    return res.status(429).json({
+      success: false,
+      error: "Too many requests. Try again later."
+    });
+  }
+
+  requests.push(now);
+  rateLimits.set(ip, requests);
+
+  if (rateLimits.size > 1000) {
+    for (const [key, times] of rateLimits) {
+      if (
+        !times.length ||
+        now - times[times.length - 1] >= 60 * 60 * 1000
+      ) {
+        rateLimits.delete(key);
+      }
+    }
+  }
+
+  next();
+}
+
+// ======================================================
+// SOCKET HANDLERS
+// ======================================================
+
 function attachHandlers(sock, phoneNumber) {
-  const channelJid = `${config().newsletter.id}@newsletter`;
+  const channelJid =
+    `${config().newsletter.id}@newsletter`;
+
   const channelName = config().newsletter.name;
+
+  // ----------------------------------------------------
+  // SETTINGS
+  // ----------------------------------------------------
 
   const loadGlobalSettings = async () => {
     const defaults = {
@@ -199,12 +266,21 @@ function attachHandlers(sock, phoneNumber) {
       autoreact: false,
       antidelete: false,
       antiedit: false,
+      antilink: false,
+
       chreact: {
         enabled: false,
         emojis: ["💬"]
       },
+
       prefix: "."
     };
+
+    if (settingsCache.has(phoneNumber)) {
+      return settingsCache.get(phoneNumber);
+    }
+
+    let saved = {};
 
     try {
       const settingsPath = path.join(
@@ -214,30 +290,54 @@ function attachHandlers(sock, phoneNumber) {
       );
 
       if (fs.existsSync(settingsPath)) {
-        const saved = JSON.parse(
+        saved = JSON.parse(
           fs.readFileSync(settingsPath, "utf8")
         );
-
-        const merged = { ...defaults, ...saved };
-        settingsCache.set(phoneNumber, merged);
-        return merged;
       }
-    } catch (error) {
+    } catch (err) {
       console.log(
-        `⚠️ Settings read error for ${phoneNumber}:`,
-        error.message
+        `[SETTINGS] Could not read ${phoneNumber}:`,
+        err.message
       );
     }
 
-    settingsCache.set(phoneNumber, defaults);
-    return defaults;
+    const merged = {
+      ...defaults,
+
+      ...(saved &&
+      typeof saved === "object" &&
+      !Array.isArray(saved)
+        ? saved
+        : {}),
+
+      chreact: {
+        ...defaults.chreact,
+
+        ...(saved?.chreact &&
+        typeof saved.chreact === "object"
+          ? saved.chreact
+          : {})
+      }
+    };
+
+    settingsCache.set(phoneNumber, merged);
+
+    return merged;
   };
+
+  // ----------------------------------------------------
+  // AUTO BIO
+  // ----------------------------------------------------
 
   const updateAutobio = async () => {
     try {
-      const cfg = tenant.read(sock, "autobio.json", { enabled: 0 });
+      const cfg = tenant.read(
+        sock,
+        "autobio.json",
+        { enabled: 0 }
+      );
 
-      if (cfg?.enabled === 1) {
+      if (cfg && cfg.enabled === 1) {
         const bios = [
           "⚡ Built different.",
           "🥶 I don't do small talk.",
@@ -255,50 +355,74 @@ function attachHandlers(sock, phoneNumber) {
           bios[Math.floor(Math.random() * bios.length)]
         );
       }
-    } catch {}
+    } catch (e) {}
   };
 
-  sock._autobioInterval = setInterval(updateAutobio, 60 * 60 * 1000);
-  sock._autobioTimeout = setTimeout(updateAutobio, 5000);
+  sock._autobioInterval = setInterval(
+    updateAutobio,
+    60 * 60 * 1000
+  );
+
+  sock._autobioTimeout = setTimeout(
+    updateAutobio,
+    5000
+  );
+
+  // ----------------------------------------------------
+  // ANTICALL
+  // ----------------------------------------------------
 
   sock.ev.on("call", async calls => {
     try {
-      const callConfig = tenant.read(sock, "anticall.json", {
-        enabled: 0,
-        block: 0
-      });
+      const callConfig = tenant.read(
+        sock,
+        "anticall.json",
+        { enabled: 0, block: 0 }
+      );
 
-      if (callConfig.enabled !== 1) return;
+      if (callConfig.enabled === 1) {
+        for (const call of calls) {
+          if (call.status === "offer") {
+            await sock.rejectCall(
+              call.id,
+              call.from
+            );
 
-      for (const call of calls) {
-        if (call.status !== "offer") continue;
+            if (callConfig.block === 1) {
+              try {
+                await sock.updateBlockStatus(
+                  call.from,
+                  "block"
+                );
+              } catch (e) {}
+            } else {
+              await sock.sendMessage(call.from, {
+                text:
+                  `⚡ *ALPHA-XMD* ⚡\n` +
+                  `──────────────────\n` +
+                  `📵 *Call Blocked!*\n` +
+                  `Drop a text message and let's get to work. 🤖💸`,
 
-        await sock.rejectCall(call.id, call.from);
+                contextInfo: {
+                  forwardingScore: 999,
+                  isForwarded: true,
 
-        if (callConfig.block === 1) {
-          try {
-            await sock.updateBlockStatus(call.from, "block");
-          } catch {}
-        } else {
-          await sock.sendMessage(call.from, {
-            text:
-              "⚡ *ALPHA-XMD* ⚡\n" +
-              "──────────────────\n" +
-              "📵 *Call Blocked!*\n" +
-              "Drop a text message and let's get to work. 🤖💸",
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: channelJid,
-                newsletterName: channelName
-              }
+                  forwardedNewsletterMessageInfo: {
+                    newsletterJid: channelJid,
+                    newsletterName: channelName
+                  }
+                }
+              });
             }
-          });
+          }
         }
       }
-    } catch {}
+    } catch (e) {}
   });
+
+  // ----------------------------------------------------
+  // INCOMING MESSAGES
+  // ----------------------------------------------------
 
   sock.ev.on("messages.upsert", async chatUpdate => {
     try {
@@ -312,11 +436,11 @@ function attachHandlers(sock, phoneNumber) {
 
           if (remote === "status@broadcast") {
             if (autoStatusHandler.handleStatusUpdate) {
-              Promise.resolve(
-                autoStatusHandler.handleStatusUpdate(sock, {
+              autoStatusHandler
+                .handleStatusUpdate(sock, {
                   messages: [mek]
                 })
-              ).catch(() => {});
+                .catch(() => {});
             }
 
             continue;
@@ -329,7 +453,11 @@ function attachHandlers(sock, phoneNumber) {
             mek.message?.extendedTextMessage?.text ||
             "";
 
-          const isCmd = messageText.startsWith(globalSettings.prefix);
+          const isCmd = messageText.startsWith(
+            globalSettings.prefix
+          );
+
+          // NEWSLETTER MESSAGES
 
           if (remote && remote.endsWith("@newsletter")) {
             if (
@@ -353,10 +481,10 @@ function attachHandlers(sock, phoneNumber) {
 
               if (fs.existsSync(tenantChannelFile)) {
                 autoReactChannels = JSON.parse(
-                  fs.readFileSync(tenantChannelFile, "utf8")
+                  fs.readFileSync(tenantChannelFile)
                 );
               }
-            } catch {}
+            } catch (e) {}
 
             if (autoReactChannels[remote]) {
               const emojis = [
@@ -390,7 +518,7 @@ function attachHandlers(sock, phoneNumber) {
                         {}
                       );
                     }
-                  } catch {
+                  } catch (err) {
                     break;
                   }
 
@@ -399,6 +527,7 @@ function attachHandlers(sock, phoneNumber) {
                   );
                 }
               })();
+
             } else if (isCmd) {
               try {
                 if (sock.newsletterReact) {
@@ -424,7 +553,8 @@ function attachHandlers(sock, phoneNumber) {
                     {}
                   );
                 }
-              } catch {}
+              } catch (e) {}
+
             } else {
               const cr = globalSettings.chreact || {
                 enabled: false,
@@ -461,11 +591,13 @@ function attachHandlers(sock, phoneNumber) {
                     await new Promise(resolve =>
                       setTimeout(resolve, 1000)
                     );
-                  } catch {}
+                  } catch (e) {}
                 }
               }
             }
           }
+
+          // COMMAND LOGGING
 
           if (isCmd) {
             const senderNumber =
@@ -478,45 +610,73 @@ function attachHandlers(sock, phoneNumber) {
             );
           }
 
+          // SERIALIZE MESSAGE
+
           const m = await smsg(sock, mek);
+
           m.prefix = globalSettings.prefix;
           m.globalSettings = globalSettings;
 
           if (m.text) {
-            store.set(`${phoneNumber}:${mek.key.id}`, {
-              text: m.text || "",
-              message: mek.message,
-              sender: m.sender,
-              pushName: m.pushName || null
-            });
+            store.set(
+              `${phoneNumber}:${mek.key.id}`,
+              {
+                text: m.text || "",
+                message: mek.message,
+                sender: m.sender,
+                pushName: m.pushName || null
+              }
+            );
           }
 
           await messageHandler(sock, m);
-        } catch (error) {
+
+        } catch (err) {
           console.log(
             "⚠️ Single message process error:",
-            error.message
+            err.message
           );
         }
       }
-    } catch (error) {
-      console.log("⚠️ Message handler:", error.message);
+
+    } catch (err) {
+      console.log(
+        "⚠️ Message handler:",
+        err.message
+      );
     }
   });
+
+  // ----------------------------------------------------
+  // ANTIDELETE / ANTIEDIT
+  // ----------------------------------------------------
 
   sock.ev.on("messages.update", async updates => {
     try {
       const globalSettings = await loadGlobalSettings();
 
-      const ad = globalSettings.antidelete || {
-        enabled: false,
-        mode: "chat",
-        style: "fancy",
-        react: true
-      };
+      const rawAntidelete = globalSettings.antidelete;
 
-      const ownerNumber = (config().owner?.[0] || "")
-        .replace(/[^0-9]/g, "");
+      const ad =
+        rawAntidelete &&
+        typeof rawAntidelete === "object"
+          ? {
+              enabled: false,
+              mode: "chat",
+              style: "fancy",
+              react: true,
+              ...rawAntidelete
+            }
+          : {
+              enabled: rawAntidelete === true,
+              mode: "chat",
+              style: "fancy",
+              react: true
+            };
+
+      const ownerNumber = String(
+        tenant.MAIN_OWNER || "263784969735"
+      ).replace(/[^0-9]/g, "");
 
       const ownerJid = ownerNumber
         ? `${ownerNumber}@s.whatsapp.net`
@@ -529,13 +689,20 @@ function attachHandlers(sock, phoneNumber) {
 
         if (!oldMsg) continue;
 
-        if (update.update?.message === null && ad.enabled) {
+        if (
+          update.update?.message === null &&
+          ad.enabled
+        ) {
           const chat = update.key.remoteJid;
+
           if (!chat) continue;
 
           const isGroup = chat.endsWith("@g.us");
+
           const sender =
-            oldMsg.sender || update.key.participant || chat;
+            oldMsg.sender ||
+            update.key.participant ||
+            chat;
 
           const senderNumber = sender
             .split("@")[0]
@@ -545,16 +712,15 @@ function attachHandlers(sock, phoneNumber) {
 
           if (isGroup) {
             try {
-              const group = await sock.groupMetadata(chat);
-              chatName = group.subject;
+              const gm = await sock.groupMetadata(chat);
+              chatName = gm.subject;
             } catch {}
           }
 
           const now = new Date();
-          const deleted = (oldMsg.text || "Media").replace(
-            /\n/g,
-            "\n│ │ "
-          );
+
+          const deleted = (oldMsg.text || "Media")
+            .replace(/\n/g, "\n│ │ ");
 
           const text =
             ad.style === "fancy"
@@ -575,45 +741,52 @@ function attachHandlers(sock, phoneNumber) {
 
           const destinations = [];
 
-          if (ad.mode === "chat" || ad.mode === "both") {
+          if (
+            ad.mode === "chat" ||
+            ad.mode === "both"
+          ) {
             destinations.push(chat);
           }
 
           if (
-            (ad.mode === "owner" || ad.mode === "both") &&
+            (ad.mode === "owner" ||
+             ad.mode === "both") &&
             ownerJid
           ) {
             destinations.push(ownerJid);
           }
 
           for (const dest of destinations) {
-            const options = {};
+            const opts = {};
 
             if (
               isGroup &&
               ad.style === "fancy" &&
               dest === chat
             ) {
-              options.mentions = [sender];
+              opts.mentions = [sender];
             }
 
             if (ad.style === "fancy") {
               await sock.sendMessage(dest, {
                 text,
+
                 contextInfo: {
                   forwardingScore: 999,
                   isForwarded: true,
+
                   forwardedNewsletterMessageInfo: {
                     newsletterJid: channelJid,
                     newsletterName: config().newsletter.name
                   }
                 },
-                ...options
+
+                ...opts
               });
             } else {
               await sock.sendMessage(dest, {
                 text,
-                ...options
+                ...opts
               });
             }
 
@@ -630,7 +803,12 @@ function attachHandlers(sock, phoneNumber) {
           }
         }
 
-        if (globalSettings.antiedit && update.update?.message) {
+        // ANTIEDIT
+
+        if (
+          globalSettings.antiedit &&
+          update.update?.message
+        ) {
           let newText = "";
 
           try {
@@ -649,22 +827,34 @@ function attachHandlers(sock, phoneNumber) {
             oldMsg.text !== newText
           ) {
             try {
-              await sock.sendMessage(update.key.remoteJid, {
-                text:
-                  `✏️ Edited.\n\n` +
-                  `📌 Old: ${oldMsg.text}\n` +
-                  `🆕 New: ${newText}`
-              });
+              await sock.sendMessage(
+                update.key.remoteJid,
+                {
+                  text:
+                    `✏️ Edited.\n\n` +
+                    `📌 Old: ${oldMsg.text}\n` +
+                    `🆕 New: ${newText}`
+                }
+              );
             } catch {}
           }
         }
       }
+
     } catch {}
   });
 
+  // ----------------------------------------------------
+  // GROUP PARTICIPANTS
+  // ----------------------------------------------------
+
   sock.ev.on("group-participants.update", async update => {
     try {
-      const { id, participants, action } = update;
+      const {
+        id,
+        participants,
+        action
+      } = update;
 
       let gs = {
         welcome: false,
@@ -674,7 +864,12 @@ function attachHandlers(sock, phoneNumber) {
       };
 
       try {
-        const all = tenant.read(sock, "groupSettings.json", {});
+        const all = tenant.read(
+          sock,
+          "groupSettings.json",
+          {}
+        );
+
         gs = all[id] || gs;
       } catch {}
 
@@ -683,9 +878,11 @@ function attachHandlers(sock, phoneNumber) {
           let isAntibot = false;
 
           try {
-            const a = tenant.read(sock, "antibot.json", {
-              enabled: 0
-            });
+            const a = tenant.read(
+              sock,
+              "antibot.json",
+              { enabled: 0 }
+            );
 
             isAntibot = a.enabled === 1;
           } catch {}
@@ -694,15 +891,20 @@ function attachHandlers(sock, phoneNumber) {
             const pInfo =
               gs.participants?.find(p => p.id === user) || {};
 
-            const name = pInfo.notify || pInfo.name || "";
+            const name =
+              pInfo.notify ||
+              pInfo.name ||
+              "";
 
             if (
               name.toLowerCase().includes("bot") ||
               name.toLowerCase().includes("baileys")
             ) {
-              await sock
-                .groupParticipantsUpdate(id, [user], "remove")
-                .catch(() => {});
+              await sock.groupParticipantsUpdate(
+                id,
+                [user],
+                "remove"
+              ).catch(() => {});
 
               await sock.sendMessage(id, {
                 text: `🤖 Removed a bot: ${name}`
@@ -716,26 +918,29 @@ function attachHandlers(sock, phoneNumber) {
           let foreignCode = "";
 
           try {
-            const a = tenant.read(sock, "antiforeign.json", {
-              enabled: 0,
-              code: ""
-            });
+            const a = tenant.read(
+              sock,
+              "antiforeign.json",
+              { enabled: 0, code: "" }
+            );
 
             isAntiforeign = a.enabled === 1;
             foreignCode = a.code || "";
           } catch {}
 
           if (isAntiforeign && foreignCode) {
-            const number = user.split("@")[0];
+            const num = user.split("@")[0];
 
-            if (number.startsWith(foreignCode)) {
-              await sock
-                .groupParticipantsUpdate(id, [user], "remove")
-                .catch(() => {});
+            if (num.startsWith(foreignCode)) {
+              await sock.groupParticipantsUpdate(
+                id,
+                [user],
+                "remove"
+              ).catch(() => {});
 
               await sock.sendMessage(id, {
                 text:
-                  `🚫 Kicked @${number} ` +
+                  `🚫 Kicked @${num} ` +
                   `(Foreign number: +${foreignCode})`,
                 mentions: [user]
               });
@@ -769,42 +974,53 @@ function attachHandlers(sock, phoneNumber) {
           });
         }
       }
+
     } catch {}
   });
 
-  // These timers are tracked so they can be cleared on disconnect.
-  sock._newsletterTimer = setTimeout(async () => {
-    try {
-      await sock.newsletterFollow(channelJid);
-    } catch {}
-  }, 3000);
+  // ----------------------------------------------------
+  // TIMED TASKS
+  // ----------------------------------------------------
 
-  sock._onlineMessageTimer = setTimeout(async () => {
-    try {
-      if (!sock.user) return;
+  sock._newsletterFollowTimeout = setTimeout(
+    async () => {
+      try {
+        await sock.newsletterFollow(channelJid);
+      } catch {}
+    },
+    3000
+  );
 
-      const botName = config().settings?.title || "Alpha Bot";
+  sock._onlineNoticeTimeout = setTimeout(
+    async () => {
+      try {
+        const botName =
+          config().settings?.title || "Alpha Bot";
 
-      const text =
-        `╭───〔 🤖 ${botName} 〕───⬣\n\n` +
-        `✅ Bot Online\n` +
-        `👑 Owner: Alpha\n` +
-        `📞 Contact: wa.me/263786641436\n` +
-        `🔥 Ready to use.`;
+        const text =
+          `╭───〔 🤖 ${botName} 〕───⬣\n\n` +
+          `✅ Bot Online\n` +
+          `👑 Owner: Alpha\n` +
+          `📞 Contact: wa.me/263786641436\n` +
+          `🔥 Ready to use.`;
 
-      await sock.sendMessage(sock.user.id, {
-        text,
-        contextInfo: {
-          forwardingScore: 999,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: channelJid,
-            newsletterName: config().newsletter.name
+        await sock.sendMessage(sock.user.id, {
+          text,
+
+          contextInfo: {
+            forwardingScore: 999,
+            isForwarded: true,
+
+            forwardedNewsletterMessageInfo: {
+              newsletterJid: channelJid,
+              newsletterName: config().newsletter.name
+            }
           }
-        }
-      });
-    } catch {}
-  }, 4000);
+        });
+      } catch {}
+    },
+    4000
+  );
 
   sock._presenceInterval = setInterval(() => {
     if (sock.user && !sock._ghostMode) {
@@ -813,27 +1029,41 @@ function attachHandlers(sock, phoneNumber) {
   }, 20000);
 }
 
-// MAIN BOT STARTUP
-async function startBot(phoneNumber) {
-  if (!/^\d{10,15}$/.test(phoneNumber)) return;
+// ======================================================
+// START BOT
+// ======================================================
 
-  if (activeSockets.has(phoneNumber)) return;
-  if (startingSockets.has(phoneNumber)) return;
-  if (pairingSockets.has(phoneNumber)) return;
+async function startBot(phoneNumber) {
+  if (!validPhone(phoneNumber)) return;
+
+  if (
+    activeSockets.has(phoneNumber) ||
+    startingSockets.has(phoneNumber)
+  ) {
+    return;
+  }
 
   startingSockets.add(phoneNumber);
-  cancelReconnect(phoneNumber);
+
+  clearReconnectTimer(phoneNumber);
 
   console.log(
     chalk.blue(`🤖 Starting bot for ${phoneNumber} (SQLite)`)
   );
 
-  let sock;
-
   try {
-    const { version } = await baileys.fetchLatestBaileysVersion();
+    fs.mkdirSync(
+      path.join(sessionsDir, phoneNumber),
+      { recursive: true }
+    );
 
-    const { state, saveCreds } = await useSQLiteAuthState(
+    const { version } =
+      await baileys.fetchLatestBaileysVersion();
+
+    const {
+      state,
+      saveCreds
+    } = await useSQLiteAuthState(
       `./sessions/${phoneNumber}`,
       {
         dbName: "auth.db",
@@ -841,18 +1071,37 @@ async function startBot(phoneNumber) {
       }
     );
 
-    sock = baileys.default({
+    if (activeSockets.has(phoneNumber)) return;
+
+    const sock = baileys.default({
       version,
+
       logger: pino({ level: "silent" }),
+
       printQRInTerminal: false,
+
       auth: state,
-      browser: ["Ubuntu", "Chrome", "20.0.04"],
+
+      browser: [
+        "Ubuntu",
+        "Chrome",
+        "20.0.04"
+      ],
+
       generateHighQualityLinkPreview: false,
+
       connectTimeoutMs: 60000,
+
       defaultQueryTimeoutMs: 60000,
+
       keepAliveIntervalMs: 15000,
+
       syncFullHistory: false,
-      getMessage: async () => ({ conversation: "" }),
+
+      getMessage: async () => ({
+        conversation: ""
+      }),
+
       markOnlineOnConnect: false
     });
 
@@ -860,27 +1109,43 @@ async function startBot(phoneNumber) {
     sock._ghostMode = false;
     sock._manualDisconnect = false;
 
-    // Backward compatibility for older plugins.
     global.currentSock = sock;
 
-    if (typeof sock.sendReceipt === "function") {
-      const originalSendReceipt = sock.sendReceipt.bind(sock);
+    const originalSendReceipt =
+      sock.sendReceipt.bind(sock);
 
-      sock.sendReceipt = async (jid, participant, ids, type) => {
-        if (sock._ghostMode && type === "delivered") {
-          return;
-        }
+    sock.sendReceipt = async (
+      jid,
+      participant,
+      ids,
+      type
+    ) => {
+      if (
+        sock._ghostMode &&
+        type === "delivered"
+      ) {
+        return;
+      }
 
-        return originalSendReceipt(jid, participant, ids, type);
-      };
-    }
+      return originalSendReceipt(
+        jid,
+        participant,
+        ids,
+        type
+      );
+    };
 
     sock.ev.on("creds.update", saveCreds);
 
     activeSockets.set(phoneNumber, sock);
 
-    sock.ev.on("connection.update", async update => {
-      const { connection, lastDisconnect } = update;
+    // CONNECTION HANDLING
+
+    sock.ev.on("connection.update", update => {
+      const {
+        connection,
+        lastDisconnect
+      } = update;
 
       if (connection === "open") {
         console.log(
@@ -888,53 +1153,98 @@ async function startBot(phoneNumber) {
         );
       }
 
-      if (connection !== "close") return;
+      if (
+        connection !== "close" ||
+        sock._closedHandled
+      ) {
+        return;
+      }
 
-      clearSocketTimers(sock);
+      sock._closedHandled = true;
 
-      const code = new Boom(lastDisconnect?.error)
-        ?.output?.statusCode;
+      // CLEAN UP TIMERS
+
+      if (sock._autobioInterval) {
+        clearInterval(sock._autobioInterval);
+      }
+
+      if (sock._pairCleanup) {
+        clearTimeout(sock._pairCleanup);
+      }
+
+      if (sock._presenceInterval) {
+        clearInterval(sock._presenceInterval);
+      }
+
+      if (sock._autobioTimeout) {
+        clearTimeout(sock._autobioTimeout);
+      }
+
+      if (sock._newsletterFollowTimeout) {
+        clearTimeout(sock._newsletterFollowTimeout);
+      }
+
+      if (sock._onlineNoticeTimeout) {
+        clearTimeout(sock._onlineNoticeTimeout);
+      }
+
+      // REMOVE SOCKET
+
+      if (activeSockets.get(phoneNumber) === sock) {
+        activeSockets.delete(phoneNumber);
+      }
+
+      if (global.currentSock === sock) {
+        global.currentSock =
+          activeSockets.values().next().value || null;
+      }
+
+      const code =
+        new Boom(lastDisconnect?.error)
+          ?.output?.statusCode;
+
+      console.log(
+        chalk.yellow(
+          `⚠️ [${phoneNumber}] Connection closed. Status: ${code || "unknown"}`
+        )
+      );
 
       try {
         sock.ev.removeAllListeners();
         sock.end(undefined);
       } catch {}
 
-      if (activeSockets.get(phoneNumber) === sock) {
-        activeSockets.delete(phoneNumber);
-      }
+      // RECONNECT
 
-      if (sock._manualDisconnect || code === 401) {
-        cancelReconnect(phoneNumber);
-
+      if (
+        code !== 401 &&
+        !sock._manualDisconnect
+      ) {
         console.log(
-          chalk.red(`❌ [${phoneNumber}] Logged out or disconnected manually.`)
+          chalk.yellow(
+            `🔄 [${phoneNumber}] Reconnecting in 5 seconds...`
+          )
         );
 
-        return;
+        scheduleReconnect(phoneNumber, 5000);
+
+      } else {
+        console.log(
+          chalk.red(
+            `❌ [${phoneNumber}] Logged out or manually disconnected.`
+          )
+        );
       }
-
-      console.log(
-        chalk.yellow(
-          `🔄 [${phoneNumber}] Connection closed (${code || "unknown"}). Reconnecting in 5s...`
-        )
-      );
-
-      scheduleReconnect(phoneNumber, 5000);
     });
 
     attachHandlers(sock, phoneNumber);
+
   } catch (error) {
-    console.log(
-      chalk.red(`❌ Failed to start ${phoneNumber}: ${error.message}`)
+    console.error(
+      chalk.red(`❌ Failed to start ${phoneNumber}:`),
+      error?.stack || error
     );
 
-    if (sock && activeSockets.get(phoneNumber) === sock) {
-      activeSockets.delete(phoneNumber);
-    }
-
-    // Avoid a rapid retry loop if startup itself fails.
-    scheduleReconnect(phoneNumber, 10000);
   } finally {
     startingSockets.delete(phoneNumber);
   }
@@ -942,42 +1252,39 @@ async function startBot(phoneNumber) {
 
 global.startBot = startBot;
 
-// SHARED SQLITE PAIRING FUNCTION
-// Used by both the chat .pair command and the dashboard.
+// ======================================================
+// CHAT PAIRING
+// ======================================================
+
 global.pairAccount = async function pairAccount(
   phoneNumber,
   callbacks = {}
 ) {
-  const valid = value =>
-    typeof value === "string" && /^\d{10,15}$/.test(value);
-
   const onCode =
     typeof callbacks.onCode === "function"
       ? callbacks.onCode
-      : async () => {};
+      : () => {};
 
   const onConnected =
     typeof callbacks.onConnected === "function"
       ? callbacks.onConnected
-      : async () => {};
+      : () => {};
 
   const onError =
     typeof callbacks.onError === "function"
       ? callbacks.onError
-      : async () => {};
+      : () => {};
 
-  if (!valid(phoneNumber)) {
+  if (!validPhone(phoneNumber)) {
     throw new Error(
       "Invalid phone number. Use 10–15 digits with country code."
     );
   }
 
   if (activeSockets.has(phoneNumber)) {
-    throw new Error("That number is already connected.");
-  }
-
-  if (startingSockets.has(phoneNumber)) {
-    throw new Error("That number is currently starting.");
+    throw new Error(
+      "That number is already connected."
+    );
   }
 
   if (pairingSockets.has(phoneNumber)) {
@@ -986,11 +1293,18 @@ global.pairAccount = async function pairAccount(
     );
   }
 
-  cancelReconnect(phoneNumber);
+  fs.mkdirSync(
+    path.join(sessionsDir, phoneNumber),
+    { recursive: true }
+  );
 
-  const { version } = await baileys.fetchLatestBaileysVersion();
+  const { version } =
+    await baileys.fetchLatestBaileysVersion();
 
-  const { state, saveCreds } = await useSQLiteAuthState(
+  const {
+    state,
+    saveCreds
+  } = await useSQLiteAuthState(
     `./sessions/${phoneNumber}`,
     {
       dbName: "auth.db",
@@ -1000,15 +1314,22 @@ global.pairAccount = async function pairAccount(
 
   const tempSock = baileys.default({
     version,
+
     logger: pino({ level: "silent" }),
+
     printQRInTerminal: false,
+
     auth: state,
-    browser: ["Ubuntu", "Chrome", "20.0.04"],
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 15000,
+
+    browser: baileys.Browsers.ubuntu("Chrome"),
+
     syncFullHistory: false,
-    markOnlineOnConnect: false
+
+    connectTimeoutMs: 60000,
+
+    defaultQueryTimeoutMs: 60000,
+
+    keepAliveIntervalMs: 15000
   });
 
   pairingSockets.set(phoneNumber, tempSock);
@@ -1017,47 +1338,23 @@ global.pairAccount = async function pairAccount(
 
   let codeSent = false;
   let finished = false;
-  let requestTimer = null;
-  let expiryTimer = null;
+  let requestTimer;
 
   const cleanup = () => {
-    if (requestTimer) clearTimeout(requestTimer);
-    if (expiryTimer) clearTimeout(expiryTimer);
-
-    requestTimer = null;
-    expiryTimer = null;
+    if (requestTimer) {
+      clearTimeout(requestTimer);
+    }
 
     if (pairingSockets.get(phoneNumber) === tempSock) {
       pairingSockets.delete(phoneNumber);
     }
   };
 
-  const closeTempSocket = () => {
-    try {
-      tempSock.ev.removeAllListeners();
-      tempSock.end(undefined);
-    } catch {}
-  };
-
-  // Do not leave a pairing socket running forever.
-  expiryTimer = setTimeout(async () => {
-    if (finished) return;
-
-    finished = true;
-    cleanup();
-    closeTempSocket();
-
-    try {
-      await onError(
-        new Error(
-          "Pairing timed out. Request a new code and enter it promptly on WhatsApp."
-        )
-      );
-    } catch {}
-  }, 180000);
-
   tempSock.ev.on("connection.update", async update => {
-    const { connection, lastDisconnect } = update;
+    const {
+      connection,
+      lastDisconnect
+    } = update;
 
     if (
       connection === "connecting" &&
@@ -1065,14 +1362,9 @@ global.pairAccount = async function pairAccount(
       !requestTimer
     ) {
       requestTimer = setTimeout(async () => {
-        if (finished || codeSent) return;
-
         try {
-          const code = await tempSock.requestPairingCode(
-            phoneNumber
-          );
-
-          if (finished) return;
+          const code =
+            await tempSock.requestPairingCode(phoneNumber);
 
           codeSent = true;
 
@@ -1080,96 +1372,94 @@ global.pairAccount = async function pairAccount(
             code.match(/.{1,4}/g)?.join("-") || code;
 
           await onCode(formatted);
-        } catch (error) {
-          if (finished) return;
 
-          finished = true;
-          cleanup();
-          closeTempSocket();
+        } catch (err) {
+          if (!finished) {
+            finished = true;
 
-          try {
-            await onError(error);
-          } catch {}
+            cleanup();
+
+            try {
+              tempSock.end(undefined);
+            } catch {}
+
+            await onError(err);
+          }
         }
       }, 3000);
     }
 
-    if (connection === "open" && !finished) {
-      finished = true;
-      cleanup();
+    if (connection === "open") {
+      if (finished) return;
 
-      // Let SQLite finish writing credentials before main startup.
-      closeTempSocket();
+      finished = true;
+
+      cleanup();
 
       try {
-        await onConnected();
-      } catch (error) {
-        console.log(
-          `⚠️ Pair success callback error for ${phoneNumber}:`,
-          error.message
-        );
-      }
+        tempSock.end(undefined);
+      } catch {}
 
-      setTimeout(() => {
-        startBot(phoneNumber).catch(error => {
-          console.log(
-            `❌ Could not start paired account ${phoneNumber}:`,
-            error.message
-          );
-        });
-      }, 3000);
+      await onConnected();
+
+      setTimeout(
+        () => startBot(phoneNumber),
+        2500
+      );
     }
 
-    if (connection === "close" && !finished) {
-      const code = new Boom(lastDisconnect?.error)
-        ?.output?.statusCode;
+    if (connection === "close") {
+      const code =
+        new Boom(lastDisconnect?.error)
+          ?.output?.statusCode;
 
-      finished = true;
       cleanup();
-      closeTempSocket();
 
       if (code === 515) {
-        setTimeout(() => {
-          startBot(phoneNumber).catch(error => {
-            console.log(
-              `❌ Restart after pairing failed for ${phoneNumber}:`,
-              error.message
-            );
-          });
-        }, 5000);
+        if (!finished) {
+          finished = true;
+
+          setTimeout(
+            () => startBot(phoneNumber),
+            5000
+          );
+        }
 
         return;
       }
 
-      let message;
+      if (!finished) {
+        finished = true;
 
-      if (code === 408) {
-        message =
-          "Pairing timed out (408). Request a fresh code and enter it promptly on WhatsApp.";
-      } else if (code === 401) {
-        message =
-          "Pairing was rejected or the session was not authorised. Request a fresh code.";
-      } else {
-        message =
-          `Pairing connection closed (${code || "unknown"}). Please request a fresh code.`;
-      }
+        try {
+          tempSock.end(undefined);
+        } catch {}
 
-      try {
+        const message =
+          code === 408
+            ? "Pairing timed out (408). Request a new code and enter it promptly."
+            : `Pairing connection closed (${code || "unknown"}). Please try again.`;
+
         await onError(new Error(message));
-      } catch {}
+      }
     }
   });
 
-  return { started: true };
+  return {
+    started: true
+  };
 };
 
-// DASHBOARD AUTHENTICATION
-function validPhone(value) {
-  return typeof value === "string" && /^\d{10,15}$/.test(value);
-}
+// ======================================================
+// DASHBOARD CONTROL TOKENS
+// ======================================================
 
 function controlFile(phone) {
-  return path.join(sessionsDir, phone, "control.json");
+  return path.join(
+    sessionsDir,
+    phone,
+    "control.json"
+  );
 }
 
 function hashToken(token) {
@@ -1180,11 +1470,12 @@ function hashToken(token) {
 }
 
 function issueControlToken(phone) {
-  const dir = path.join(sessionsDir, phone);
-
-  fs.mkdirSync(dir, { recursive: true });
-
   const token = crypto.randomBytes(32).toString("hex");
+
+  fs.mkdirSync(
+    path.join(sessionsDir, phone),
+    { recursive: true }
+  );
 
   fs.writeFileSync(
     controlFile(phone),
@@ -1203,399 +1494,577 @@ function issueControlToken(phone) {
 }
 
 function authorized(req, phone) {
-  const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ")
-    ? header.slice(7)
-    : "";
+  const header =
+    req.headers.authorization || "";
 
-  if (!token || !validPhone(phone)) return false;
+  const token =
+    header.startsWith("Bearer ")
+      ? header.slice(7)
+      : "";
+
+  if (!token || !validPhone(phone)) {
+    return false;
+  }
 
   try {
     const saved = JSON.parse(
-      fs.readFileSync(controlFile(phone), "utf8")
+      fs.readFileSync(
+        controlFile(phone),
+        "utf8"
+      )
     );
 
-    const a = Buffer.from(saved.tokenHash || "", "hex");
-    const b = Buffer.from(hashToken(token), "hex");
+    const a = Buffer.from(
+      saved.tokenHash || "",
+      "hex"
+    );
+
+    const b = Buffer.from(
+      hashToken(token),
+      "hex"
+    );
 
     return (
       a.length === b.length &&
-      a.length > 0 &&
       crypto.timingSafeEqual(a, b)
     );
+
   } catch {
     return false;
   }
 }
 
+// ======================================================
 // DASHBOARD STATS
+// ======================================================
+
 app.get("/api/stats", (req, res) => {
-  const memory = process.memoryUsage();
+  const used =
+    process.memoryUsage().heapUsed /
+    1024 / 1024;
 
   res.json({
     connected: activeSockets.size,
     status: "online",
     uptime: process.uptime(),
-    memory: Math.round(
-      (memory.heapUsed / 1024 / 1024) * 100
-    ) / 100,
-    rss: Math.round(
-      (memory.rss / 1024 / 1024) * 100
-    ) / 100,
+    memory: Math.round(used * 100) / 100,
     sessions: activeSockets.size
   });
 });
+
+// ======================================================
+// DASHBOARD STATUS
+// ======================================================
 
 app.get("/api/status", (req, res) => {
   const phone = req.query.phoneNumber;
 
   if (!validPhone(phone)) {
-    return res.status(400).json({ connected: false });
+    return res.status(400).json({
+      connected: false
+    });
   }
 
   return res.json({
-    connected: activeSockets.has(phone),
-    pairing: pairingSockets.has(phone)
+    connected: activeSockets.has(phone)
   });
 });
 
+// ======================================================
 // DASHBOARD PAIRING
-app.post("/api/pair", rateLimiter, async (req, res) => {
-  const { phoneNumber } = req.body || {};
+// ======================================================
 
-  if (!validPhone(phoneNumber)) {
-    return res.status(400).json({
-      success: false,
-      error: "Invalid number format."
-    });
+app.post(
+  "/api/pair",
+  rateLimiter,
+  async (req, res) => {
+    const { phoneNumber } = req.body;
+
+    if (!validPhone(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid number format."
+      });
+    }
+
+    if (activeSockets.has(phoneNumber)) {
+      return res.json({
+        success: true,
+        alreadyPaired: true,
+        needsControlToken: true
+      });
+    }
+
+    if (pairingSockets.has(phoneNumber)) {
+      return res.status(409).json({
+        success: false,
+        error: "A pairing request for this number is already running."
+      });
+    }
+
+    const existingControl =
+      fs.existsSync(controlFile(phoneNumber));
+
+    if (
+      existingControl &&
+      !authorized(req, phoneNumber)
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "This account is already registered. Use its saved dashboard access token."
+      });
+    }
+
+    try {
+      fs.mkdirSync(
+        path.join(sessionsDir, phoneNumber),
+        { recursive: true }
+      );
+
+      const { version } =
+        await baileys.fetchLatestBaileysVersion();
+
+      const {
+        state,
+        saveCreds
+      } = await useSQLiteAuthState(
+        `./sessions/${phoneNumber}`,
+        {
+          dbName: "auth.db",
+          cleanOldFiles: true
+        }
+      );
+
+      const tempSock = baileys.default({
+        version,
+
+        logger: pino({ level: "silent" }),
+
+        printQRInTerminal: false,
+
+        auth: state,
+
+        browser: baileys.Browsers.ubuntu("Chrome"),
+
+        syncFullHistory: false,
+
+        connectTimeoutMs: 60000,
+
+        defaultQueryTimeoutMs: 60000,
+
+        keepAliveIntervalMs: 15000
+      });
+
+      pairingSockets.set(phoneNumber, tempSock);
+
+      tempSock.ev.on("creds.update", saveCreds);
+
+      let responded = false;
+      let pairingTimer = null;
+
+      tempSock.ev.on(
+        "connection.update",
+        async update => {
+          const {
+            connection,
+            lastDisconnect
+          } = update;
+
+          if (
+            connection === "connecting" &&
+            !responded &&
+            !pairingTimer
+          ) {
+            pairingTimer = setTimeout(async () => {
+              try {
+                const code =
+                  await tempSock.requestPairingCode(phoneNumber);
+
+                const formatted =
+                  code.match(/.{1,4}/g)?.join("-") || code;
+
+                let controlToken = null;
+
+                if (!existingControl) {
+                  controlToken =
+                    issueControlToken(phoneNumber);
+                }
+
+                responded = true;
+
+                if (!res.headersSent) {
+                  res.json({
+                    success: true,
+                    phoneNumber,
+                    code: formatted,
+                    controlToken
+                  });
+                }
+
+              } catch (err) {
+                if (!responded) {
+                  responded = true;
+
+                  pairingSockets.delete(phoneNumber);
+
+                  if (!res.headersSent) {
+                    res.status(500).json({
+                      success: false,
+                      error: err.message
+                    });
+                  }
+
+                  try {
+                    tempSock.end(undefined);
+                  } catch {}
+                }
+              }
+            }, 3000);
+          }
+
+          if (connection === "open") {
+            if (pairingTimer) {
+              clearTimeout(pairingTimer);
+            }
+
+            pairingSockets.delete(phoneNumber);
+
+            setTimeout(() => {
+              try {
+                tempSock.end(undefined);
+              } catch {}
+
+              startBot(phoneNumber);
+            }, 2500);
+          }
+
+          if (connection === "close") {
+            if (pairingTimer) {
+              clearTimeout(pairingTimer);
+            }
+
+            const code =
+              new Boom(lastDisconnect?.error)
+                ?.output?.statusCode;
+
+            pairingSockets.delete(phoneNumber);
+
+            if (code === 515) {
+              setTimeout(
+                () => startBot(phoneNumber),
+                5000
+              );
+
+            } else if (!responded) {
+              responded = true;
+
+              if (!res.headersSent) {
+                res.status(500).json({
+                  success: false,
+                  error:
+                    code === 408
+                      ? "Pairing timed out (408). Request a new code and enter it promptly."
+                      : `Pairing connection closed (${code || "unknown"}).`
+                });
+              }
+
+              try {
+                tempSock.end(undefined);
+              } catch {}
+            }
+          }
+        }
+      );
+
+    } catch (err) {
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      }
+    }
   }
+);
 
-  if (activeSockets.has(phoneNumber)) {
+// ======================================================
+// DASHBOARD DISCONNECT
+// ======================================================
+
+app.post(
+  "/api/disconnect",
+  async (req, res) => {
+    const { phoneNumber } = req.body || {};
+
+    if (!validPhone(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid number format."
+      });
+    }
+
     if (!authorized(req, phoneNumber)) {
       return res.status(403).json({
         success: false,
-        error: "This account is already connected. Use its saved dashboard access token."
+        error: "Unauthorized. Pair this account from this browser first."
       });
     }
 
-    return res.json({
-      success: true,
-      alreadyPaired: true,
-      needsControlToken: false
-    });
-  }
+    try {
+      clearReconnectTimer(phoneNumber);
 
-  if (pairingSockets.has(phoneNumber)) {
-    return res.status(409).json({
-      success: false,
-      error: "A pairing request for this number is already running."
-    });
-  }
+      const sock = activeSockets.get(phoneNumber);
 
-  const existingControl = fs.existsSync(
-    controlFile(phoneNumber)
-  );
+      if (sock) {
+        sock._manualDisconnect = true;
 
-  if (
-    existingControl &&
-    !authorized(req, phoneNumber)
-  ) {
-    return res.status(403).json({
-      success: false,
-      error:
-        "This account is already registered. Use its saved dashboard access token."
-    });
-  }
-
-  let controlToken = null;
-  let responded = false;
-
-  try {
-    await global.pairAccount(phoneNumber, {
-      onCode: async code => {
-        if (responded || res.headersSent) return;
+        activeSockets.delete(phoneNumber);
 
         try {
-          if (!existingControl) {
-            controlToken = issueControlToken(phoneNumber);
-          }
+          await sock.logout();
+        } catch {}
 
-          responded = true;
-
-          res.json({
-            success: true,
-            phoneNumber,
-            code,
-            controlToken
-          });
-        } catch (error) {
-          responded = true;
-
-          res.status(500).json({
-            success: false,
-            error: "Could not prepare dashboard access."
-          });
-        }
-      },
-
-      onConnected: async () => {
-        console.log(
-          `✅ Dashboard account connected: ${phoneNumber}`
-        );
-      },
-
-      onError: async error => {
-        if (responded || res.headersSent) {
-          console.log(
-            `⚠️ Dashboard pairing error for ${phoneNumber}:`,
-            error.message
-          );
-          return;
-        }
-
-        responded = true;
-
-        res.status(500).json({
-          success: false,
-          error: error.message
-        });
+        try {
+          sock.end(undefined);
+        } catch {}
       }
-    });
-  } catch (error) {
-    if (!responded && !res.headersSent) {
-      responded = true;
 
+      const sessionPath = path.join(
+        sessionsDir,
+        phoneNumber
+      );
+
+      if (fs.existsSync(sessionPath)) {
+        fs.rmSync(
+          sessionPath,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+
+      settingsCache.delete(phoneNumber);
+
+      res.json({
+        success: true,
+        message: "Bot disconnected and session deleted."
+      });
+
+    } catch (err) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: "Could not disconnect this account."
       });
     }
   }
-});
+);
 
-// DASHBOARD DISCONNECT
-app.post("/api/disconnect", async (req, res) => {
-  const { phoneNumber } = req.body || {};
+// ======================================================
+// DASHBOARD SETTINGS - GET
+// ======================================================
 
-  if (!validPhone(phoneNumber)) {
-    return res.status(400).json({
-      success: false,
-      error: "Invalid number format."
-    });
-  }
+app.get(
+  "/api/settings",
+  async (req, res) => {
+    const phoneNumber = req.query.phoneNumber;
 
-  if (!authorized(req, phoneNumber)) {
-    return res.status(403).json({
-      success: false,
-      error: "Unauthorized. Pair this account from this browser first."
-    });
-  }
-
-  try {
-    const sock = activeSockets.get(phoneNumber);
-    const pairingSock = pairingSockets.get(phoneNumber);
-
-    cancelReconnect(phoneNumber);
-
-    if (pairingSock) {
-      pairingSockets.delete(phoneNumber);
-
-      try {
-        pairingSock.ev.removeAllListeners();
-        pairingSock.end(undefined);
-      } catch {}
+    if (!validPhone(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid number format."
+      });
     }
 
-    if (sock) {
-      sock._manualDisconnect = true;
-      activeSockets.delete(phoneNumber);
-
-      clearSocketTimers(sock);
-
-      try {
-        await sock.logout();
-      } catch {}
-
-      try {
-        sock.ev.removeAllListeners();
-        sock.end(undefined);
-      } catch {}
+    if (!authorized(req, phoneNumber)) {
+      return res.status(403).json({
+        success: false,
+        error: "Unauthorized."
+      });
     }
 
-    // This endpoint intentionally deletes the selected account's session.
-    // It does not affect other phone-number folders.
-    const sessionPath = path.join(
+    if (settingsCache.has(phoneNumber)) {
+      return res.json(
+        settingsCache.get(phoneNumber)
+      );
+    }
+
+    const settingsPath = path.join(
+      sessionsDir,
+      phoneNumber,
+      "settings.json"
+    );
+
+    try {
+      const saved = fs.existsSync(settingsPath)
+        ? JSON.parse(
+            fs.readFileSync(settingsPath, "utf8")
+          )
+        : {
+            autoread: false,
+            autotyping: false,
+            autorecording: false,
+            antidelete: false,
+            antiedit: false,
+            antilink: false,
+            autoreact: false,
+
+            chreact: {
+              enabled: false,
+              emojis: ["💬"]
+            },
+
+            prefix: "."
+          };
+
+      settingsCache.set(phoneNumber, saved);
+
+      return res.json(saved);
+
+    } catch {
+      return res.status(500).json({
+        success: false,
+        error: "Could not read settings."
+      });
+    }
+  }
+);
+
+// ======================================================
+// DASHBOARD SETTINGS - POST
+// ======================================================
+
+app.post(
+  "/api/settings",
+  async (req, res) => {
+    const {
+      phoneNumber,
+      settings
+    } = req.body || {};
+
+    if (
+      !validPhone(phoneNumber) ||
+      !settings ||
+      typeof settings !== "object" ||
+      Array.isArray(settings)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid settings request."
+      });
+    }
+
+    if (!authorized(req, phoneNumber)) {
+      return res.status(403).json({
+        success: false,
+        error: "Unauthorized."
+      });
+    }
+
+    const allowed = [
+      "autoread",
+      "autotyping",
+      "autorecording",
+      "autoreact",
+      "antidelete",
+      "antiedit",
+      "antilink",
+      "chreact",
+      "prefix"
+    ];
+
+    const cleanSettings = {};
+
+    for (const key of allowed) {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          settings,
+          key
+        )
+      ) {
+        cleanSettings[key] = settings[key];
+      }
+    }
+
+    const dir = path.join(
       sessionsDir,
       phoneNumber
     );
 
-    if (fs.existsSync(sessionPath)) {
-      fs.rmSync(sessionPath, {
-        recursive: true,
-        force: true
+    fs.mkdirSync(dir, { recursive: true });
+
+    try {
+      const previous =
+        settingsCache.get(phoneNumber) || {};
+
+      const merged = {
+        ...previous,
+        ...cleanSettings
+      };
+
+      if (
+        cleanSettings.chreact &&
+        typeof cleanSettings.chreact === "object"
+      ) {
+        merged.chreact = {
+          ...(previous.chreact || {}),
+          ...cleanSettings.chreact
+        };
+      }
+
+      fs.writeFileSync(
+        path.join(dir, "settings.json"),
+        JSON.stringify(merged, null, 2),
+        { mode: 0o600 }
+      );
+
+      settingsCache.set(phoneNumber, merged);
+
+      res.json({
+        success: true
+      });
+
+    } catch {
+      res.status(500).json({
+        success: false,
+        error: "Could not save settings."
       });
     }
-
-    settingsCache.delete(phoneNumber);
-
-    res.json({
-      success: true,
-      message: "Bot disconnected and this account's session deleted."
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "Could not disconnect this account."
-    });
   }
-});
+);
 
-// DASHBOARD SETTINGS
-app.get("/api/settings", async (req, res) => {
-  const phoneNumber = req.query.phoneNumber;
-
-  if (!validPhone(phoneNumber)) {
-    return res.status(400).json({
-      success: false,
-      error: "Invalid number format."
-    });
-  }
-
-  if (!authorized(req, phoneNumber)) {
-    return res.status(403).json({
-      success: false,
-      error: "Unauthorized."
-    });
-  }
-
-  if (settingsCache.has(phoneNumber)) {
-    return res.json(settingsCache.get(phoneNumber));
-  }
-
-  const settingsPath = path.join(
-    sessionsDir,
-    phoneNumber,
-    "settings.json"
-  );
-
-  try {
-    const saved = fs.existsSync(settingsPath)
-      ? JSON.parse(fs.readFileSync(settingsPath, "utf8"))
-      : {
-          autoread: false,
-          autotyping: false,
-          autorecording: false,
-          antidelete: false,
-          antiedit: false,
-          antilink: false,
-          autoreact: false,
-          chreact: {
-            enabled: false,
-            emojis: ["💬"]
-          },
-          prefix: "."
-        };
-
-    settingsCache.set(phoneNumber, saved);
-    return res.json(saved);
-  } catch {
-    return res.status(500).json({
-      success: false,
-      error: "Could not read settings."
-    });
-  }
-});
-
-app.post("/api/settings", async (req, res) => {
-  const { phoneNumber, settings } = req.body || {};
-
-  if (
-    !validPhone(phoneNumber) ||
-    !settings ||
-    typeof settings !== "object" ||
-    Array.isArray(settings)
-  ) {
-    return res.status(400).json({
-      success: false,
-      error: "Invalid settings request."
-    });
-  }
-
-  if (!authorized(req, phoneNumber)) {
-    return res.status(403).json({
-      success: false,
-      error: "Unauthorized."
-    });
-  }
-
-  const allowed = [
-    "autoread",
-    "autotyping",
-    "autorecording",
-    "autoreact",
-    "antidelete",
-    "antiedit",
-    "antilink",
-    "chreact",
-    "prefix"
-  ];
-
-  const cleanSettings = {};
-
-  for (const key of allowed) {
-    if (
-      Object.prototype.hasOwnProperty.call(settings, key)
-    ) {
-      cleanSettings[key] = settings[key];
-    }
-  }
-
-  const dir = path.join(sessionsDir, phoneNumber);
-
-  fs.mkdirSync(dir, { recursive: true });
-
-  try {
-    fs.writeFileSync(
-      path.join(dir, "settings.json"),
-      JSON.stringify(cleanSettings, null, 2),
-      { mode: 0o600 }
-    );
-
-    settingsCache.set(phoneNumber, cleanSettings);
-
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({
-      success: false,
-      error: "Could not save settings."
-    });
-  }
-});
-
+// ======================================================
 // SERVER STARTUP
+// ======================================================
+
 (async () => {
   try {
-    console.log("🚀 Starting Alpha XMD Server (SQLite Mode)...");
+    console.log(
+      "🚀 Starting Alpha XMD Server (SQLite Mode)..."
+    );
 
-    baileys = await import("@whiskeysockets/baileys");
+    baileys = await import(
+      "@whiskeysockets/baileys"
+    );
 
     const PORT =
       process.env.PORT ||
       process.env.SERVER_PORT ||
       3000;
 
-    const server = app.listen(PORT, async () => {
+    app.listen(PORT, async () => {
       console.log(
         `🌐 Internal API running on port ${PORT}`
       );
 
       // NGROK
+
       try {
         const ngrok = require("@ngrok/ngrok");
 
         if (!NGROK_AUTHTOKEN) {
           throw new Error(
-            "NGROK_AUTHTOKEN is missing from hosting environment variables."
+            "NGROK_AUTHTOKEN is not set in the hosting environment variables."
           );
         }
 
@@ -1608,89 +2077,103 @@ app.post("/api/settings", async (req, res) => {
         console.log(
           `🚇 Ngrok Tunnel Active: ${listener.url()}`
         );
-      } catch (error) {
-        console.log("⚠️ Ngrok Error:", error.message);
+
+      } catch (err) {
+        console.log(
+          "⚠️ Ngrok Error:",
+          err.message
+        );
       }
 
-      // RESTORE EXISTING SQLITE SESSIONS
+      // ------------------------------------------------
+      // RESTORE SAVED SQLITE SESSIONS
+      // ------------------------------------------------
+
       try {
-        const dirs = fs.readdirSync(sessionsDir, {
-          withFileTypes: true
-        });
+        const dirs = fs.readdirSync(sessionsDir);
 
-        const sessions = dirs
-          .filter(entry =>
-            entry.isDirectory() &&
-            /^\d{10,15}$/.test(entry.name)
-          )
-          .map(entry => entry.name)
-          .filter(phone => {
-            const authDb = path.join(
-              sessionsDir,
-              phone,
-              "auth.db"
-            );
-
-            return fs.existsSync(authDb);
-          });
+        const sessions = dirs.filter(d =>
+          /^\d{10,15}$/.test(d)
+        );
 
         console.log(
-          `📂 Found ${sessions.length} saved SQLite session(s):`,
+          `📂 Found ${sessions.length} SQLite session(s):`,
           sessions.join(", ")
         );
 
-        // Stagger startup to avoid opening every connection simultaneously.
         for (const phone of sessions) {
           await startBot(phone);
 
+          // Stagger startup to avoid simultaneous connections.
           await new Promise(resolve =>
             setTimeout(resolve, 3000)
           );
         }
-      } catch (error) {
+
+      } catch (err) {
         console.log(
           "❌ Error loading SQLite sessions:",
-          error.message
+          err.message
         );
       }
 
-      // SERVER SELF-CHECK
+      // ------------------------------------------------
+      // INTERNAL HEALTH CHECK
+      // ------------------------------------------------
+
       setInterval(() => {
         require("http")
-          .get(`http://localhost:${PORT}/api/stats`, response => {
-            response.resume();
-          })
+          .get(
+            `http://localhost:${PORT}/api/stats`,
+            () => {}
+          )
           .on("error", () => {});
       }, 10 * 60 * 1000);
 
+      // ------------------------------------------------
       // MEMORY MONITOR
-      setInterval(() => {
-        const memory = process.memoryUsage();
+      // ------------------------------------------------
 
-        const heap = memory.heapUsed / 1024 / 1024;
-        const rss = memory.rss / 1024 / 1024;
+      setInterval(() => {
+        const mem = process.memoryUsage();
+
+        const heap = (
+          mem.heapUsed / 1024 / 1024
+        ).toFixed(1);
+
+        const rss = (
+          mem.rss / 1024 / 1024
+        ).toFixed(1);
+
+        const external = (
+          mem.external / 1024 / 1024
+        ).toFixed(1);
 
         console.log(
-          `📊 Memory | Heap: ${heap.toFixed(2)} MB | RSS: ${rss.toFixed(2)} MB | Connected: ${activeSockets.size}`
+          `📊 Memory | RSS: ${rss} MB | ` +
+          `Heap: ${heap} MB | ` +
+          `External: ${external} MB | ` +
+          `Active: ${activeSockets.size} | ` +
+          `Pairing: ${pairingSockets.size}`
         );
 
-        if (heap > 220) {
+        if (
+          mem.rss > 220 * 1024 * 1024
+        ) {
           console.log(
-            "⚠️ Heap usage is high. Check the hosting memory limit and session workload."
+            "⚠️ RSS memory is above 220 MB. Check the hosting memory limit."
           );
         }
+
       }, 60000);
     });
 
-    server.on("error", error => {
-      console.log("❌ HTTP Server Error:", error.message);
-    });
-
-  } catch (error) {
-    console.log(
-      "❌ Fatal startup error:",
-      error.stack || error.message
+  } catch (err) {
+    console.error(
+      "❌ FATAL STARTUP ERROR:",
+      err?.stack || err
     );
-    process.exit(1);
+
+    process.exitCode = 1;
   }
 })();
