@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
+const tenant = require("./library/tenant");
 
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
@@ -33,53 +34,30 @@ async function checkAdmin(sock, chatId, senderId, botId) {
     }
 }
 
-const isUserBanned = (sender) => {
-    try {
-        const bp = './database/banned.json';
-        if (!fs.existsSync(bp)) { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(bp, '{}'); }
-        const b = JSON.parse(fs.readFileSync(bp)); return b[clean(sender)] ? true : false;
-    } catch { return false; }
+const isUserBanned = (sender, sock) => {
+    try { const b = tenant.read(sock, 'banned.json', {}); return !!b[clean(sender)]; } catch { return false; }
 };
-
-function isTempOwnerBase(sender) {
+function isTempOwnerBase(sender, sock) {
     try {
-        const op = './database/owners.json';
-        if (!fs.existsSync(op)) return false;
-        const o = JSON.parse(fs.readFileSync(op));
+        const o = tenant.read(sock, 'owners.json', { tempOwners: [] });
         const senderBase = clean(sender.split('@')[0].split(':')[0]);
-        return o.tempOwners?.includes(senderBase);
+        return (o.tempOwners || []).includes(senderBase);
     } catch { return false; }
 }
-
-const bwPath = './database/badwords.json', gbwPath = './database/badwords_global.json';
-try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(bwPath)) fs.writeFileSync(bwPath, '{}'); if (!fs.existsSync(gbwPath)) fs.writeFileSync(gbwPath, '[]'); } catch {}
-const loadGlobalBadWords = () => { try { return JSON.parse(fs.readFileSync(gbwPath, 'utf-8')); } catch { return []; } };
-const getGroupBW = (chatId) => { try { const d = JSON.parse(fs.readFileSync(bwPath)); return d[chatId] || { enabled: false, words: [] }; } catch { return { enabled: false, words: [] }; } };
-const containsBadWord = (text, chatId) => {
-    const cfg = getGroupBW(chatId); if (!cfg.enabled) return false;
-    const all = [...loadGlobalBadWords(), ...(cfg.words||[])];
+const loadGlobalBadWords = (sock) => { try { return tenant.read(sock, 'badwords_global.json', []); } catch { return []; } };
+const getGroupBW = (chatId, sock) => { try { const d = tenant.read(sock, 'badwords.json', {}); return d[chatId] || { enabled: false, words: [] }; } catch { return { enabled: false, words: [] }; } };
+const containsBadWord = (text, chatId, sock) => {
+    const cfg = getGroupBW(chatId, sock); if (!cfg.enabled) return false;
+    const all = [...loadGlobalBadWords(sock), ...(cfg.words || [])];
     return all.some(w => text.toLowerCase().includes(w.toLowerCase()));
 };
 
 const containsLink = (text) => /https?:\/\/[^\s]+|wa\.me\/[^\s]+|chat\.whatsapp\.com\/[^\s]+/gi.test(text);
 
-const dbPath = './database/groupSettings.json';
-try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); fs.writeFileSync(dbPath, '{}', { flag: 'a' }); } catch {}
-const getGroupSettings = (chatId) => { try { return JSON.parse(fs.readFileSync(dbPath))[chatId] || {}; } catch { return {}; } };
-
-const settingsPath = path.join(process.cwd(), 'database', 'settings.json');
-try { if (!fs.existsSync('./database')) fs.mkdirSync('./database', { recursive: true }); if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, '{}'); } catch {}
-const getGlobalSettings = () => {
-    try { const s = JSON.parse(fs.readFileSync(settingsPath)); return s.global || {}; } catch { return {}; }
-};
-const setGlobalSettings = (newGlobal) => {
-    try {
-        const s = JSON.parse(fs.readFileSync(settingsPath));
-        s.global = newGlobal;
-        fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2));
-    } catch {}
-};
-const getGlobalMode = () => getGlobalSettings().mode || 'public';
+const getGroupSettings = (chatId, sock) => { try { return tenant.read(sock, 'groupSettings.json', {})[chatId] || {}; } catch { return {}; } };
+const getGlobalSettings = (sock) => { try { return tenant.read(sock, 'settings.json', {}); } catch { return {}; } };
+const setGlobalSettings = (sock, newGlobal) => { try { tenant.write(sock, 'settings.json', newGlobal); } catch {} };
+const getGlobalMode = (sock) => getGlobalSettings(sock).mode || 'public';
 
 const saveSessionSetting = (sock, key, value) => {
     try {
@@ -147,15 +125,17 @@ module.exports = async (sock, m) => {
         };
 
         const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
+        m.isOwner = tenant.isAccountOwner(m.sender, sock) || isTempOwnerBase(m.sender, sock);
         const sessionSettingsPath = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
         let gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: "." };
         try { if(fs.existsSync(sessionSettingsPath)) gs = { ...gs, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; } catch {}
 
         // 🎯 GHOST MODE: skip read receipt when ghost is ON so sender stays at one tick
-        if (gs.autoread && !global.ghostMode) { try { await sock.readMessages([m.key]); } catch {} }
+        if (gs.autoread && !sock._ghostMode) { try { await sock.readMessages([m.key]); } catch {} }
 
         // 🎯 GHOST MODE: skip typing presence when ghost is ON to avoid leaking activity
-        if (gs.autotyping && !global.ghostMode) { 
+        if (gs.autotyping && !sock._ghostMode) { 
             try { 
                 await sock.presenceSubscribe(m.chat);
                 await sock.sendPresenceUpdate("composing", m.chat); 
@@ -163,7 +143,7 @@ module.exports = async (sock, m) => {
             } catch(e){} 
         }
         // 🎯 GHOST MODE: skip recording presence when ghost is ON to avoid leaking activity
-        if (gs.autorecording && !global.ghostMode) { 
+        if (gs.autorecording && !sock._ghostMode) { 
             try { 
                 await sock.presenceSubscribe(m.chat);
                 await sock.sendPresenceUpdate("recording", m.chat); 
@@ -183,9 +163,9 @@ module.exports = async (sock, m) => {
 
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
-                const gsets = getGroupSettings(m.chat);
+                const gsets = getGroupSettings(m.chat, sock);
 
-                if (containsBadWord(m.text, m.chat)) {
+                if (containsBadWord(m.text, m.chat, sock)) {
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
                     return;
@@ -217,14 +197,13 @@ module.exports = async (sock, m) => {
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
 
-        const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
-        const isOwner = senderNum === botNum || config.owner.includes(senderNum) || isTempOwnerBase(m.sender);
+        const isOwner = m.isOwner;
 
-        if (cmdName !== 'mode' && getGlobalMode() === 'private' && !isOwner) return;
+        if (cmdName !== 'mode' && getGlobalMode(sock) === 'private' && !isOwner) return;
 
         await reactRandom(sock, m);
 
-        if (cmdName !== 'unbanuser' && cmdName !== 'unban' && isUserBanned(m.sender) && !isOwner)
+        if (cmdName !== 'unbanuser' && cmdName !== 'unban' && isUserBanned(m.sender, sock) && !isOwner)
             return reply(deny.banned);
 
         let isSenderAdmin = false;
