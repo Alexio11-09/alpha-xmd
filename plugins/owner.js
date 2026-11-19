@@ -1,13 +1,13 @@
 const fs=require('fs'),{exec}=require('child_process'),os=require('os'),path=require('path'),{downloadContentFromMessage}=require('@whiskeysockets/baileys'),cl=j=>j?j.replace(/[^0-9]/g,''):'';
-const op='./database/owners.json';
-[op].forEach(p=>{if(!fs.existsSync(path.dirname(p)))fs.mkdirSync(path.dirname(p),{recursive:!0});if(!fs.existsSync(p))fs.writeFileSync(p,JSON.stringify({tempOwners:[]}))});
-const LO=()=>{try{return JSON.parse(fs.readFileSync(op))}catch{return{tempOwners:[]}}},SO=d=>fs.writeFileSync(op,JSON.stringify(d,null,2)),T=(s,m)=>m.mentionedJid?.[0]||m.quoted?.sender||(s?s.replace(/[^0-9]/g,'')+'@s.whatsapp.net':null);
+const tenant=require('../library/tenant');
+const dbPath=(sock,name)=>tenant.fileOf(sock,name);
+const LO=(sock)=>tenant.read(sock,'owners.json',{tempOwners:[]}),SO=(data,sock)=>tenant.write(sock,'owners.json',data),T=(s,m)=>m.mentionedJid?.[0]||m.quoted?.sender||(s?s.replace(/[^0-9]/g,'')+'@s.whatsapp.net':null);
 
 module.exports=[
 {command:"botip",aliases:["serverip","myip","getip"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{exec('curl -s ifconfig.me',(e,o)=>{e?exec('curl -s ipinfo.io/ip',(e2,o2)=>r(`🌐 ${o2.trim()}`)):r(`🌐 ${o.trim()}`)})}},
 {command:"restart",aliases:["reboot","reload"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{await r("🔄 Restarting session...");setTimeout(async()=>{try{await s.end(undefined)}catch(e){}},2000)}},
-{command:"update",aliases:["up"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{await r("🔄 Updating...");try{exec('git pull');r("✅ Updated. Restarting...");setTimeout(()=>process.exit(0),2000)}catch(e){r(`❌ ${e.message}`)}}},
-{command:"shutdown",aliases:["stop","kill"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{await r("🔴 Shutting down...");setTimeout(()=>process.exit(0),1500)}},
+{command:"update",aliases:["up"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{await r("🔄 Checking repository update...");exec('git pull',(e,out)=>{if(e)return r(`❌ Update failed: ${e.message}`);r(`✅ Git pull finished. Restart the hosting process to load changes.\n${String(out).slice(0,1200)}`)})}},
+{command:"shutdown",aliases:["stop","kill"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{await r("🔴 Disconnecting this WhatsApp session only...");setTimeout(()=>{s._manualDisconnect=true;try{s.logout()}catch(e){try{s.end(undefined)}catch{}}},1500)}},
 {command:"eval",aliases:[">","exec"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ Code?");try{let res=eval(a.join(" "));typeof res==='object'&&(res=JSON.stringify(res,null,2));r(`✅ ${String(res).substring(0,1000)}`)}catch(e){r(`❌ ${e.message}`)}}},
 {command:"bc",aliases:["broadcast"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ Msg?");let msg=a.join(" "),chats=Object.keys(await s.groupFetchAllParticipating());if(!chats.length)return r("❌ No groups.");r(`📢 ${chats.length} groups...`);let ok=0,fl=0;for(let c of chats){try{await s.sendMessage(c,{text:`📢 BROADCAST\n\n${msg}`});ok++}catch{fl++};await new Promise(r=>setTimeout(r,500))}r(`✅ ${ok} | ❌ ${fl}`)}},
 {command:"join",aliases:["enter"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0])return r("❌ Link?");let code=a[0].split('/').pop().replace(/\?.*/,'');try{r(`✅ Joined: ${await s.groupAcceptInvite(code)}`)}catch(e){r(`❌ ${e.message}`)}}},
@@ -16,27 +16,27 @@ module.exports=[
 {command:"unblock",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let target;if(m.isGroup){if(!a[0]&&!m.quoted)return r("❌ Tag a user or reply to their message.");target=T(a[0],m)}else{target=a[0]?T(a[0],m):m.chat}if(!target)return r("❌ Invalid target.");let unblockJid=target;if(m.isGroup){try{const meta=await s.groupMetadata(m.chat),num=target.split('@')[0].replace(/[^0-9]/g,''),p=meta.participants.find(x=>{const id=x.id?x.id.split('@')[0].replace(/[^0-9]/g,''):'',pn=x.phoneNumber?x.phoneNumber.split('@')[0].replace(/[^0-9]/g,''):'',lid=x.lid?x.lid.split('@')[0].replace(/[^0-9]/g,''):'';return id===num||pn===num||lid===num});if(p){if(p.lid)unblockJid=p.lid;else if(p.id)unblockJid=p.id}}catch(e){}}try{await s.updateBlockStatus(unblockJid,"unblock");r(`✅ Unblocked @${target.split('@')[0]}`)}catch(e){try{await s.updateBlockStatus(target,"unblock");r(`✅ Unblocked @${target.split('@')[0]}`)}catch(e2){r(`❌ Failed to unblock: ${e2.message}`)}}}},
 {command:"blocklist",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{let b=await s.fetchBlocklist();if(!b.length)return r("📋 None.");let t=`🚫 ${b.length}\n\n`;b.forEach(u=>t+=`• @${u.split('@')[0]}\n`);s.sendMessage(m.chat,{text:t,mentions:b})}catch(e){r(`❌ ${e.message}`)}}},
 {command:"pm",aliases:["msg"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{if(!a[0]||!a[1])return r("❌ .pm <num> <msg>");try{await s.sendMessage(a[0].replace(/[^0-9]/g,'')+'@s.whatsapp.net',{text:a.slice(1).join(" ")});r("✅ Sent")}catch(e){r(`❌ ${e.message}`)}}},
-{command:"addowner",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[0],m);if(!t)return r("❌ Target?");let o=LO(),n=cl(t);if(!o.tempOwners.includes(n)){o.tempOwners.push(n);SO(o);r(`👑 Added @${t.split('@')[0]}`)}else r("❌ Already owner.")}},
-{command:"delowner",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[0],m);if(!t)return r("❌ Target?");let o=LO(),n=cl(t),i=o.tempOwners.indexOf(n);if(i>-1){o.tempOwners.splice(i,1);SO(o);r(`✅ Removed @${t.split('@')[0]}`)}else r("❌ Not owner.")}},
-{command:"owners",category:"owner",owner:!0,execute:async(s,m,{reply:r,config:cfg})=>{let o=LO(),t=`👑 OWNERS\n\n🔷 Main: ${cfg.owner.join(', ')}\n`;if(o.tempOwners.length){t+=`\n🔶 Temp:\n`;o.tempOwners.forEach(x=>t+=`• ${x}\n`)}r(t)}},
+{command:"addowner",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[0],m);if(!t)return r("❌ Target?");let o=LO(s),n=cl(t);if(!o.tempOwners.includes(n)){o.tempOwners.push(n);SO(o,s);r(`👑 Added @${t.split('@')[0]}`)}else r("❌ Already owner.")}},
+{command:"delowner",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[0],m);if(!t)return r("❌ Target?");let o=LO(s),n=cl(t),i=o.tempOwners.indexOf(n);if(i>-1){o.tempOwners.splice(i,1);SO(o,s);r(`✅ Removed @${t.split('@')[0]}`)}else r("❌ Not owner.")}},
+{command:"owners",category:"owner",owner:!0,execute:async(s,m,{reply:r,config:cfg})=>{let o=LO(s),t=`👑 OWNERS\n\n🔷 Main: ${cfg.owner.join(', ')}\n`;if(o.tempOwners.length){t+=`\n🔶 Temp:\n`;o.tempOwners.forEach(x=>t+=`• ${x}\n`)}r(t)}},
 {command:"getchannel",aliases:["cjid"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let m2=a[0]?.match(/channel\/([^\/\?]+)/);if(!m2)return r("❌ Link?");r(`✅ \`${m2[1]+'@newsletter'}\``)}},
-{command:"anticall",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/anticall.json';if(!fs.existsSync(p))fs.writeFileSync(p,'{"enabled":0,"block":0}');let db=a[0]?.toLowerCase(),arg2=a[1]?.toLowerCase();if(!db){let d=JSON.parse(fs.readFileSync(p));return r(`📵 *Anti-Call Status*\n\nStatus: ${d.enabled?'ON':'OFF'}\nMode: ${d.block?'BLOCK':'WARN'}\n\nUsage:\n.anticall on/off\n.anticall block on/off`)}if(db==='block'){if(arg2==='on'||arg2==='off'){let d=JSON.parse(fs.readFileSync(p));d.block=arg2==='on'?1:0;d.enabled=1;fs.writeFileSync(p,JSON.stringify(d,null,2));r(`📵 *Anti-Call Block* is now *${arg2.toUpperCase()}*`)}else{let d=JSON.parse(fs.readFileSync(p));r(`Usage: .anticall block on/off\nCurrent: ${d.block?'ON':'OFF'}`)}}else if(db==='on'||db==='off'){let d=JSON.parse(fs.readFileSync(p));d.enabled=db==='on'?1:0;if(db==='off')d.block=0;fs.writeFileSync(p,JSON.stringify(d,null,2));r(`📵 *Anti-Call* is now *${db.toUpperCase()}* (Mode: ${d.block?'BLOCK':'WARN'})`)}}},
+{command:"anticall",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'anticall.json');if(!fs.existsSync(p))fs.writeFileSync(p,'{"enabled":0,"block":0}');let db=a[0]?.toLowerCase(),arg2=a[1]?.toLowerCase();if(!db){let d=JSON.parse(fs.readFileSync(p));return r(`📵 *Anti-Call Status*\n\nStatus: ${d.enabled?'ON':'OFF'}\nMode: ${d.block?'BLOCK':'WARN'}\n\nUsage:\n.anticall on/off\n.anticall block on/off`)}if(db==='block'){if(arg2==='on'||arg2==='off'){let d=JSON.parse(fs.readFileSync(p));d.block=arg2==='on'?1:0;d.enabled=1;fs.writeFileSync(p,JSON.stringify(d,null,2));r(`📵 *Anti-Call Block* is now *${arg2.toUpperCase()}*`)}else{let d=JSON.parse(fs.readFileSync(p));r(`Usage: .anticall block on/off\nCurrent: ${d.block?'ON':'OFF'}`)}}else if(db==='on'||db==='off'){let d=JSON.parse(fs.readFileSync(p));d.enabled=db==='on'?1:0;if(db==='off')d.block=0;fs.writeFileSync(p,JSON.stringify(d,null,2));r(`📵 *Anti-Call* is now *${db.toUpperCase()}* (Mode: ${d.block?'BLOCK':'WARN'})`)}}},
 {command:"hack",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[0],m);if(!t)return r('❌ Target?');let n=t.split('@')[0];for(let i of[`🔍 0%`, `🛰️ 20%`, `🔓 40%`, `📡 60%`, `🗂️ 80%`, `✅ ${n} hacked! 😂`]){await s.sendMessage(m.chat,{text:i},{quoted:m});await new Promise(x=>setTimeout(x,1000))}}},
 {command:"poststatus",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{try{if(m.quoted){let b=await s.downloadMediaMessage(m.quoted),t=Object.keys(m.quoted.message)[0];if(t.includes('image')||t.includes('video')){await s.sendMessage('status@broadcast',{[t.includes('image')?'image':'video']:b,caption:a.join(' ')},{statusJidList:[s.user.id]});r('✅ Posted')}}else if(a[0]){await s.sendMessage('status@broadcast',{text:a.join(' ')},{statusJidList:[s.user.id]});r('✅ Posted')}}catch(e){r(`❌ ${e.message}`)}}},
 {command:"cleartmp",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{let t=os.tmpdir(),c=0;fs.readdirSync(t).forEach(f=>{if(f.startsWith('pair_')){fs.rmSync(path.join(t,f),{recursive:1,force:1});c++}});r(`🧹 ${c} files`)}catch(e){r(`❌ ${e.message}`)}}},
-{command:"autosticker",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/autosticker.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🖼️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🖼️ ${d.enabled?'ON':'OFF'}`)}}},
-{command:"autovoice",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/autovoice.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🎤 ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🎤 ${d.enabled?'ON':'OFF'}`)}}},
-{command:"dmblocker",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/dmblocker.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🚫 ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🚫 ${d.enabled?'ON':'OFF'}`)}}},
-{command:"antispam",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antispam.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ ${d.enabled?'ON':'OFF'}`)}}},
-{command:"chatbot",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/chatbot.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🤖 ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🤖 ${d.enabled?'ON':'OFF'}`)}}},
+{command:"autosticker",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'autosticker.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🖼️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🖼️ ${d.enabled?'ON':'OFF'}`)}}},
+{command:"autovoice",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'autovoice.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🎤 ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🎤 ${d.enabled?'ON':'OFF'}`)}}},
+{command:"dmblocker",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'dmblocker.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🚫 ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🚫 ${d.enabled?'ON':'OFF'}`)}}},
+{command:"antispam",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'antispam.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ ${d.enabled?'ON':'OFF'}`)}}},
+{command:"chatbot",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'chatbot.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🤖 ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🤖 ${d.enabled?'ON':'OFF'}`)}}},
 {command:"clear",aliases:["purge"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{const lastMsg=m.quoted||m;await s.chatModify({clear:true,lastMessages:[{key:lastMsg.key,messageTimestamp:lastMsg.messageTimestamp}]},m.chat);}catch(e){console.log("Clear error:",e.message)}}},
 {command:"clearsession",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{let d=path.join(__dirname,'..','sessions',m.sender.split('@')[0].split(':')[0]);if(fs.existsSync(d))fs.rmSync(d,{recursive:true,force:true});await r("✅ Cleared. Disconnecting...");setTimeout(async()=>{try{await s.logout()}catch{}},2000)}},
-{command:"sudo",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[1],m),c=a[0]?.toLowerCase();if(c==='add'&&t){let o=LO(),n=cl(t);if(!o.tempOwners.includes(n)){o.tempOwners.push(n);SO(o);r(`👑 Added @${t.split('@')[0]}`)}}else if(c==='del'&&t){let o=LO(),n=cl(t),i=o.tempOwners.indexOf(n);if(i>-1){o.tempOwners.splice(i,1);SO(o);r(`✅ Removed @${t.split('@')[0]}`)}}else r("Usage: .sudo add/del @user")}},
+{command:"sudo",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let t=T(a[1],m),c=a[0]?.toLowerCase();if(c==='add'&&t){let o=LO(s),n=cl(t);if(!o.tempOwners.includes(n)){o.tempOwners.push(n);SO(o,s);r(`👑 Added @${t.split('@')[0]}`)}}else if(c==='del'&&t){let o=LO(s),n=cl(t),i=o.tempOwners.indexOf(n);if(i>-1){o.tempOwners.splice(i,1);SO(o,s);r(`✅ Removed @${t.split('@')[0]}`)}}else r("Usage: .sudo add/del @user")}},
 {command:"bothosting",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("🖥️ Coming soon.")}},
 {command:"webzip",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("📦 Dev.")}},
-{command:"antiblock",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antiblock.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ ${d.enabled?'ON':'OFF'}`)}}},
+{command:"antiblock",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'antiblock.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ ${d.enabled?'ON':'OFF'}`)}}},
 {command:"autobio",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
-    const p='./database/autobio.json';
+    const p=dbPath(s,'autobio.json');
     if(!fs.existsSync(p))fs.writeFileSync(p,'{"enabled":0}');
     let c=a[0]?.toLowerCase();
     if(c==='on'||c==='off'){
@@ -50,7 +50,7 @@ module.exports=[
 {command:"ghost",aliases:["freeze","fakeseen"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
     const val = a[0]?.toLowerCase();
     if (val === 'on') {
-        global.ghostMode = true;
+        s._ghostMode = true;
         try {
             await s.updateLastSeenPrivacy('none').catch(() => {});
             await s.updateOnlinePrivacy('match_last_seen').catch(() => {});
@@ -58,11 +58,11 @@ module.exports=[
             await s.sendPresenceUpdate('unavailable').catch(() => {});
             return r(`👻 *Ghost Mode ON*\n\n✅ Last Seen → HIDDEN\n✅ Online → HIDDEN\n✅ Read Receipts → DISABLED (no blue ticks from ANY device)\n✅ Bot stays OFFLINE → sender gets ONE tick\n✅ Bot still replies normally`);
         } catch (e) {
-            global.ghostMode = false;
+            s._ghostMode = false;
             return r(`❌ Failed to set ghost mode: ${e.message}`);
         }
     } else if (val === 'off') {
-        global.ghostMode = false;
+        s._ghostMode = false;
         try {
             await s.updateLastSeenPrivacy('all').catch(() => {});
             await s.updateOnlinePrivacy('all').catch(() => {});
@@ -73,7 +73,7 @@ module.exports=[
             return r(`❌ Failed: ${e.message}`);
         }
     } else {
-        return r(`Usage: .ghost on/off\nCurrent: ${global.ghostMode ? 'ON' : 'OFF'}`);
+        return r(`Usage: .ghost on/off\nCurrent: ${s._ghostMode ? 'ON' : 'OFF'}`);
     }
 }},
 {command:"deljunk",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{try{let t=os.tmpdir(),c=0;fs.readdirSync(t).forEach(f=>{if(f.startsWith('junk_')){fs.rmSync(path.join(t,f),{recursive:1,force:1});c++}});r(`🗑️ ${c} files`)}catch{r("❌ Failed")}}},
@@ -86,9 +86,9 @@ module.exports=[
 {command:"ppprivacy",category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{r("🔒 Can't change")}},
 {command:"readreceipts",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{r(a[0]==='on'?"ON":"OFF")}},
 {command:"delete",aliases:["del"],category:"owner",owner:!0,execute:async(s,m,{reply:r})=>{if(!m.quoted||(!m.isBotAdmin&&!m.isAdmin))return;try{await s.sendMessage(m.chat,{delete:m.quoted.key});r("🗑️ Deleted")}catch{}}},
-{command:"antigroupmention",aliases:["antigm"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antigroupmention.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ Antigroupmention ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ Antigroupmention is ${d.enabled?'ON':'OFF'}`)}}},
-{command:"antibot",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antibot.json',c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🤖 Antibot ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🤖 Antibot is ${d.enabled?'ON':'OFF'}`)}}},
-{command:"antiforeign",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p='./database/antiforeign.json';if(!a[0])return r("Usage: .antiforeign on/off\n.antiforeign +233");let c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🚫 Antiforeign ${c.toUpperCase()}`)}else if(c.startsWith('+')){fs.writeFileSync(p,`{"enabled":1,"code":"${c.replace('+','')}"}`);r(`🚫 Antiforeign enabled for +${c.replace('+','')}`)}else{r(`❌ Invalid input.`)}}},
+{command:"antigroupmention",aliases:["antigm"],category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'antigroupmention.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🛡️ Antigroupmention ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🛡️ Antigroupmention is ${d.enabled?'ON':'OFF'}`)}}},
+{command:"antibot",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'antibot.json'),c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🤖 Antibot ${c.toUpperCase()}`)}else{let d=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{enabled:0};r(`🤖 Antibot is ${d.enabled?'ON':'OFF'}`)}}},
+{command:"antiforeign",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{let p=dbPath(s,'antiforeign.json');if(!a[0])return r("Usage: .antiforeign on/off\n.antiforeign +233");let c=a[0]?.toLowerCase();if(c==='on'||c==='off'){fs.writeFileSync(p,`{"enabled":${c==='on'?1:0}}`);r(`🚫 Antiforeign ${c.toUpperCase()}`)}else if(c.startsWith('+')){fs.writeFileSync(p,`{"enabled":1,"code":"${c.replace('+','')}"}`);r(`🚫 Antiforeign enabled for +${c.replace('+','')}`)}else{r(`❌ Invalid input.`)}}},
 {command:"channel",category:"owner",owner:!0,execute:async(s,m,{args:a,reply:r})=>{
     if(!a[0]) return r("Usage:\n.channel react <link>\n.channel vote <link> <option_number>\n.channel automation <link> on/off");
     const sub = a[0].toLowerCase();
@@ -129,8 +129,8 @@ module.exports=[
         if (isNaN(optIndex)) return r("❌ Provide a valid option number (e.g., 1 for first option).");
         
         try {
-            if (global.pollCache && global.pollCache.has(msgId)) {
-                const pollMsg = global.pollCache.get(msgId);
+            if (global.pollCache && global.pollCache.has(`${tenant.phoneOf(s)}:${msgId}`)) {
+                const pollMsg = global.pollCache.get(`${tenant.phoneOf(s)}:${msgId}`);
                 const options = pollMsg.message.pollCreationMessage.options;
                 if (optIndex < 1 || optIndex > options.length) return r("❌ Invalid option number.");
                 const selectedOption = options[optIndex - 1].optionName;
@@ -151,7 +151,7 @@ module.exports=[
     if (sub === 'automation') {
         const status = a[2]?.toLowerCase();
         if (status !== 'on' && status !== 'off') return r("❌ Use on/off.");
-        const p = './database/channel_automation.json';
+        const p = dbPath(s,'channel_automation.json');
         let db = {};
         if (fs.existsSync(p)) { try { db = JSON.parse(fs.readFileSync(p)); } catch(e){} }
         if (status === 'on') { db[jid] = true; r(`✅ Automation ON for this channel.`); }
