@@ -1,39 +1,60 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Alpha-XMD | Control Center</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALPHA-XMD | Control Center</title>
 <meta name="description" content="Alpha-XMD WhatsApp bot control center.">
 <meta name="theme-color" content="#10111a">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ALPHA-XMD | Control Center">
+<meta property="og:description" content="Alpha-XMD WhatsApp bot control center.">
+<meta property="og:image" content="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ALPHA-XMD | Control Center">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg">
 <link rel="icon" href="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/css/intlTelInput.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
 <style>
-:root{--bg:#0b0c12;--panel:#12141e;--panel2:#181b27;--line:#272b3a;--text:#f4f5fb;--muted:#9298aa;--accent:#ff477e;--accent2:#9b5cff;--good:#20d996;--bad:#ff647c;--shadow:0 18px 55px #0005}
+:root{
+ --bg:#0b0c12;--panel:#12141e;--panel2:#171a26;--line:#272b3a;
+ --text:#f4f5fb;--muted:#9298aa;--accent:#ff477e;--accent2:#9b5cff;
+ --good:#20d996;--bad:#ff647c;--shadow:0 18px 55px #0005;
+}
+body.light{
+ --bg:#f2f3f8;--panel:#fff;--panel2:#f7f7fb;--line:#e0e2eb;
+ --text:#202333;--muted:#70778b;--shadow:0 12px 35px #25294412;
+}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(ellipse at 70% -15%,#49204455,transparent 38%),var(--bg);color:var(--text);font:14px 'DM Sans',sans-serif;min-height:100vh}
-button,input{font:inherit}
+body{
+ margin:0;background:radial-gradient(ellipse at 70% -15%,#49204435,transparent 38%),var(--bg);
+ color:var(--text);font:14px 'DM Sans',sans-serif;min-height:100vh;transition:.25s;
+}
+button,input,select{font:inherit}
 button,a{-webkit-tap-highlight-color:transparent}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
-.sidebar{border-right:1px solid var(--line);background:#0e1018ef;padding:24px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;z-index:5}
+.sidebar{border-right:1px solid var(--line);background:var(--panel);padding:24px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;z-index:5}
 .brand{display:flex;align-items:center;gap:11px;padding:0 10px 28px;font:700 19px 'Space Grotesk'}
-.brand img{width:38px;height:38px;border-radius:12px;object-fit:cover}
-.brand em{font-style:normal;color:var(--accent)}
-.nav-label{color:#656b7d;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:12px 12px 8px}
+.brand img,.top-brand img{width:42px;height:42px;border-radius:12px;object-fit:cover;border:1px solid #ffffff22;box-shadow:0 0 18px #ff477e30}
+.brand em,.top-brand em{font-style:normal;color:var(--accent)}
+.nav-label{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.5px;padding:12px}
 .nav{display:grid;gap:5px}
 .nav button{border:0;background:transparent;color:var(--muted);padding:12px;border-radius:11px;text-align:left;display:flex;gap:12px;align-items:center;cursor:pointer;font-weight:600}
-.nav button:hover,.nav button.active{background:#ff477e18;color:#ff7199}
-.nav .ico{width:20px;text-align:center;font-size:16px}
+.nav button:hover,.nav button.active{background:#ff477e18;color:var(--accent)}
+.nav .ico{width:20px;text-align:center}
 .side-bottom{margin-top:auto;border-top:1px solid var(--line);padding:18px 10px 0;color:var(--muted);font-size:12px;line-height:1.7}
 .main{min-width:0;padding:28px clamp(16px,4vw,48px) 50px;max-width:1500px;width:100%;margin:auto}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:30px}
-.eyebrow{color:var(--accent);font-size:11px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase}
+.top-brand{display:flex;align-items:center;gap:11px;margin-bottom:5px}
+.top-brand span{font:700 19px 'Space Grotesk'}
 .topbar h1{font:700 clamp(25px,3vw,34px) 'Space Grotesk';margin:5px 0}
 .sub{color:var(--muted);margin:0}
-.top-actions{display:flex;align-items:center;gap:10px}
+.top-actions{display:flex;align-items:center;gap:9px}
 .pill{display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--line);border-radius:30px;background:var(--panel);color:var(--muted);font-size:12px}
 .pulse{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 12px var(--good)}
 .icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);width:39px;height:39px;border-radius:11px;cursor:pointer}
@@ -42,9 +63,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 @keyframes up{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 .grid{display:grid;gap:16px}
 .stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:20px}
-.card{background:linear-gradient(145deg,#171a26,#11131c);border:1px solid var(--line);border-radius:17px;padding:20px;box-shadow:var(--shadow);min-width:0}
+.card{background:linear-gradient(145deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:17px;padding:20px;box-shadow:var(--shadow);min-width:0}
 .stat-head{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;font-weight:600}
-.stat-icon{font-size:18px}
 .stat-value{font:700 29px 'Space Grotesk';margin:14px 0 4px}
 .stat-foot{font-size:11px;color:var(--muted)}
 .two{grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr)}
@@ -53,20 +73,21 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .card-title span{color:var(--muted);font-size:11px}
 .btn{border:0;border-radius:10px;padding:12px 16px;background:linear-gradient(110deg,var(--accent),var(--accent2));color:white;font-weight:700;cursor:pointer}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn.secondary{background:#242838;border:1px solid var(--line);color:var(--text)}
+.btn.secondary{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
 .btn.danger{background:#ff647c18;border:1px solid #ff647c66;color:#ff8295}
 .field{margin:13px 0}
 .field label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:8px}
-.field input,.field select{width:100%;padding:13px;background:#0d0f17;border:1px solid var(--line);border-radius:10px;color:var(--text)}
+.field input,.field select,.search-input{width:100%;padding:13px;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--text)}
 .iti{width:100%}
-.iti__country-list{background:#171a26;color:white;border-color:var(--line);max-width:calc(100vw - 30px)}
+.iti__country-list{background:var(--panel2);color:var(--text);border-color:var(--line);max-width:calc(100vw - 30px)}
 .iti__selected-dial-code{color:var(--text)}
-.feedback{display:none;padding:12px;border-radius:10px;margin-top:13px;background:#252938;color:var(--muted);line-height:1.5}
+.feedback{display:none;padding:12px;border-radius:10px;margin-top:13px;background:var(--panel2);line-height:1.5}
 .feedback.show{display:block}
 .feedback.error{background:#ff647c16;color:#ff91a1}
 .feedback.success{background:#20d99616;color:#56e9b5}
-.pair-code{display:none;margin-top:15px;padding:15px;border:1px dashed #56516a;border-radius:12px;text-align:center}
+.pair-code{display:none;margin-top:15px;padding:15px;border:1px dashed #8b719e;border-radius:12px;text-align:center}
 .pair-code strong{display:block;font:700 26px 'Space Grotesk';letter-spacing:4px;margin:9px}
+.qr-image{display:block;max-width:210px;width:100%;margin:14px auto;border-radius:12px;background:white;padding:8px}
 .row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .row .btn{flex:1}
 .mini{font-size:11px;color:var(--muted);line-height:1.6}
@@ -75,210 +96,667 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .status-line span:first-child{color:var(--muted)}
 .tag{font-size:11px;padding:5px 9px;border-radius:20px;background:#20d99618;color:var(--good)}
 .tag.off{background:#ff647c18;color:#ff8497}
-.bar{height:7px;border-radius:20px;background:#282c3b;overflow:hidden;margin:12px 0}
+.bar{height:7px;border-radius:20px;background:var(--line);overflow:hidden;margin:12px 0}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:20px}
 .setting{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;border-bottom:1px solid var(--line)}
-.setting:last-child{border:0}
 .setting b{display:block;font-size:13px}
 .setting small{display:block;color:var(--muted);margin-top:4px;font-size:11px}
 .switch{position:relative;width:43px;height:24px;flex-shrink:0}
 .switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;background:#3a3e4e;border-radius:30px;cursor:pointer;transition:.2s}
+.slider{position:absolute;inset:0;background:#777;border-radius:30px;cursor:pointer;transition:.2s}
 .slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
 .switch input:checked+.slider{background:var(--accent)}
 .switch input:checked+.slider:before{transform:translateX(19px)}
 .section-head{display:flex;justify-content:space-between;align-items:end;margin:5px 0 18px}
 .section-head p{color:var(--muted);margin:6px 0 0}
 .activity{display:grid;gap:10px}
-.activity-item{display:flex;gap:12px;padding:13px;background:#0e1018;border:1px solid var(--line);border-radius:11px}
-.activity-item .bullet{color:var(--accent)}
+.activity-item{display:flex;gap:12px;padding:13px;background:var(--panel2);border:1px solid var(--line);border-radius:11px}
 .activity-item small{display:block;color:var(--muted);margin-top:4px}
 .feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .feature h3{font:600 15px 'Space Grotesk';margin:9px 0}
 .feature p{color:var(--muted);font-size:12px;line-height:1.6;margin:0}
-.codeblock{background:#090b11;border:1px solid var(--line);padding:14px;border-radius:10px;color:#b9c0d5;overflow:auto;font:12px monospace}
-.toast{position:fixed;right:20px;bottom:20px;background:#202433;border:1px solid var(--line);border-radius:12px;padding:13px 16px;box-shadow:var(--shadow);z-index:20;display:none}
+.codeblock{background:var(--bg);border:1px solid var(--line);padding:14px;border-radius:10px;color:var(--muted);overflow:auto;font:12px monospace}
+.support-footer{display:block;border-top:1px solid var(--line);padding:25px 0 18px;margin-top:42px;color:var(--muted)}
+.support-heading{display:flex;align-items:center;gap:10px;margin-bottom:16px;color:var(--text);font:600 18px 'Space Grotesk'}
+.support-heading i{color:var(--accent)}
+.social-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.social-link{display:flex;align-items:center;gap:12px;min-width:0;padding:14px 16px;border:1px solid var(--line);border-radius:13px;background:var(--panel);color:var(--text);text-decoration:none;font-weight:700;transition:.2s}
+.social-link:hover{transform:translateY(-2px);border-color:var(--accent);background:#ff477e12}
+.social-link i{width:25px;text-align:center;font-size:21px;color:var(--accent)}
+.social-link span{overflow-wrap:anywhere}
+.social-note{font-size:11px;color:var(--muted);margin:14px 0 0;line-height:1.6}
+.copyright-footer{border-top:1px solid var(--line);padding-top:17px;margin-top:18px;color:var(--muted);font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 16px;box-shadow:var(--shadow);z-index:20;display:none;max-width:90vw}
 .toast.show{display:block}
 .mobile-menu{display:none}
-footer{border-top:1px solid var(--line);padding-top:20px;margin-top:35px;color:#656b7d;font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.plugin-card{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.plugin-card small{display:block;color:var(--muted);margin-top:5px}
+.search-wrap{margin-bottom:15px}
+.search-input{max-width:420px}
+.notification-list{display:grid;gap:9px}
+
+/* FLOATING WHATSAPP SUPPORT BUTTON */
+.floating-whatsapp{
+ position:fixed;
+ right:24px;
+ bottom:25px;
+ z-index:9999;
+ display:flex;
+ align-items:center;
+ gap:11px;
+ padding:13px 19px;
+ border-radius:50px;
+ background:#25D366;
+ color:white;
+ text-decoration:none;
+ font-weight:700;
+ box-shadow:0 8px 28px #25D36655;
+ transition:.25s ease;
+}
+.floating-whatsapp svg{
+ width:27px;
+ height:27px;
+ flex-shrink:0;
+}
+.floating-whatsapp:hover{
+ transform:translateY(-5px);
+ background:#128C7E;
+ box-shadow:0 12px 35px #25D36677;
+}
+@media(max-width:600px){
+ .floating-whatsapp{
+  right:17px;
+  bottom:18px;
+  width:56px;
+  height:56px;
+  padding:0;
+  justify-content:center;
+ }
+ .floating-whatsapp span{display:none}
+ .floating-whatsapp svg{width:31px;height:31px}
+}
+
 @media(max-width:1050px){.stats{grid-template-columns:repeat(2,1fr)}.feature-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){.app{display:block}.sidebar{position:fixed;left:-270px;width:250px;transition:left .25s;box-shadow:var(--shadow)}.sidebar.open{left:0}.mobile-menu{display:inline-block}.main{padding:20px 14px 35px}.topbar{align-items:flex-start}.topbar h1{font-size:25px}.top-actions{gap:6px}.pill{padding:8px;font-size:10px}.two{grid-template-columns:1fr}.feature-grid{grid-template-columns:1fr}.stats{gap:10px}.card{padding:16px}.stat-value{font-size:25px}}
-@media(max-width:390px){.stats{grid-template-columns:1fr 1fr}.stat-value{font-size:22px}}
+@media(max-width:760px){
+ .app{display:block}.sidebar{position:fixed;left:-270px;width:250px;transition:left .25s;box-shadow:var(--shadow)}
+ .sidebar.open{left:0}.mobile-menu{display:inline-block}.main{padding:20px 14px 35px}
+ .topbar{align-items:flex-start}.topbar h1{font-size:25px}.top-actions{gap:6px}
+ .pill{padding:8px;font-size:10px}.two{grid-template-columns:1fr}
+ .feature-grid{grid-template-columns:1fr}.stats{gap:10px}.card{padding:16px}
+ .stat-value{font-size:25px}.social-links{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:420px){.social-links{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.stat-value{font-size:22px}}
 </style>
 </head>
+
 <body>
 <div class="app">
 <aside class="sidebar" id="sidebar">
-<div class="brand"><img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg" alt=""><span>ALPHA<em>-XMD</em></span></div>
-<div class="nav-label">WORKSPACE</div>
-<div class="nav">
-<button class="active" data-page="overview"><span class="ico">▦</span>Overview</button>
-<button data-page="pairing"><span class="ico">⌁</span>Device pairing</button>
-<button data-page="settings"><span class="ico">⚙</span>Bot settings</button>
-<button data-page="monitor"><span class="ico">◉</span>Server monitor</button>
-<button data-page="activity"><span class="ico">≡</span>Activity log</button>
-</div>
-<div class="nav-label">RESOURCES</div>
-<div class="nav">
-<button data-page="features"><span class="ico">✦</span>Features</button>
-<button data-page="docs"><span class="ico">▤</span>Documentation</button>
-<button data-page="support"><span class="ico">♡</span>Support</button>
-</div>
-<div class="side-bottom">Alpha-XMD Control Center<br><span id="sideApi">Connecting to API…</span><br>© <span id="year"></span> Alpha Tech</div>
+ <div class="brand">
+  <img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg" alt="ALPHA-XMD">
+  <span>ALPHA<em>-XMD</em></span>
+ </div>
+ <div class="nav-label">WORKSPACE</div>
+ <div class="nav">
+  <button class="active" data-page="overview"><span class="ico"><i class="fa-solid fa-border-all"></i></span>Overview</button>
+  <button data-page="pairing"><span class="ico"><i class="fa-solid fa-link"></i></span>Device pairing</button>
+  <button data-page="settings"><span class="ico"><i class="fa-solid fa-gear"></i></span>Bot settings</button>
+  <button data-page="plugins"><span class="ico"><i class="fa-solid fa-puzzle-piece"></i></span>Plugin manager</button>
+  <button data-page="monitor"><span class="ico"><i class="fa-solid fa-chart-line"></i></span>Server monitor</button>
+  <button data-page="activity"><span class="ico"><i class="fa-solid fa-list"></i></span>Activity log</button>
+  <button data-page="notifications"><span class="ico"><i class="fa-regular fa-bell"></i></span>Notifications</button>
+ </div>
+ <div class="nav-label">RESOURCES</div>
+ <div class="nav">
+  <button data-page="features"><span class="ico"><i class="fa-solid fa-wand-magic-sparkles"></i></span>Features</button>
+  <button data-page="docs"><span class="ico"><i class="fa-solid fa-book"></i></span>Documentation</button>
+ </div>
+ <div class="side-bottom">
+  Alpha-XMD Control Center<br><span id="sideApi">Connecting to API…</span><br>
+  © <span id="year"></span> Alpha Tech
+ </div>
 </aside>
+
 <main class="main">
 <header class="topbar">
-<div><div class="eyebrow">ALPHA TECH / CONTROL PANEL</div><h1 id="pageTitle">Overview</h1><p class="sub" id="pageSub">Your bot operations at a glance.</p></div>
-<div class="top-actions"><button class="icon-btn mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">☰</button><div class="pill"><i class="pulse" id="apiDot"></i><span id="apiLabel">Checking API</span></div></div>
+ <div>
+  <div class="top-brand">
+   <img src="https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg" alt="ALPHA-XMD">
+   <span>ALPHA<em>-XMD</em></span>
+  </div>
+  <h1 id="pageTitle">Overview</h1>
+  <p class="sub" id="pageSub">Your bot operations at a glance.</p>
+ </div>
+ <div class="top-actions">
+  <button class="icon-btn mobile-menu" onclick="toggleSidebar()" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button>
+  <div class="pill"><i class="pulse" id="apiDot"></i><span id="apiLabel">Checking API</span></div>
+  <button class="icon-btn" onclick="toggleTheme()" title="Toggle dark/light theme" aria-label="Toggle theme"><i id="themeIcon" class="fa-solid fa-sun"></i></button>
+  <button class="icon-btn" onclick="refreshAll()" title="Refresh"><i class="fa-solid fa-rotate"></i></button>
+ </div>
 </header>
+
 <section class="page active" id="page-overview">
-<div class="grid stats">
-<div class="card"><div class="stat-head">Active sessions <span class="stat-icon">⌁</span></div><div class="stat-value" id="statSessions">—</div><div class="stat-foot">Connected WhatsApp accounts</div></div>
-<div class="card"><div class="stat-head">Server uptime <span class="stat-icon">◷</span></div><div class="stat-value" id="statUptime">—</div><div class="stat-foot">Time since last restart</div></div>
-<div class="card"><div class="stat-head">Heap memory <span class="stat-icon">▥</span></div><div class="stat-value" id="statMemory">—</div><div class="stat-foot">Node.js heap usage</div></div>
-<div class="card"><div class="stat-head">Pending pairings <span class="stat-icon">⌗</span></div><div class="stat-value" id="statPairing">—</div><div class="stat-foot">Pairing requests in progress</div></div>
-</div>
-<div class="grid two">
-<div class="card">
-<div class="card-title"><h2>Quick device pairing</h2><span>WhatsApp multi-device</span></div>
-<p class="mini">Enter your WhatsApp number with the correct country code to generate a pairing code.</p>
-<div class="field"><label>PHONE NUMBER</label><input id="phoneQuick" type="tel" placeholder="Enter phone number"></div>
-<button class="btn" id="pairQuick" onclick="pairDevice('quick')">Generate pairing code →</button>
-<div class="feedback" id="pairFeedback"></div>
-<div class="pair-code" id="pairCode"><span class="mini">YOUR WHATSAPP PAIRING CODE</span><strong id="codeValue">----</strong><button class="btn secondary" onclick="copyCode('quick')">Copy code</button></div>
-</div>
-<div class="card">
-<div class="card-title"><h2>System status</h2><span>Live overview</span></div>
-<div class="status-line"><span>API connection</span><b class="tag off" id="apiState">Checking</b></div>
-<div class="status-line"><span>Bot process</span><b class="tag off" id="botState">Checking</b></div>
-<div class="status-line"><span>Runtime</span><b id="nodeVersion">—</b></div>
-<div class="status-line"><span>Last checked</span><b id="lastChecked">—</b></div>
-<button class="btn secondary" style="width:100%;margin-top:15px" onclick="refreshAll()">Refresh status</button>
-</div>
-</div>
+ <div class="grid stats">
+  <div class="card"><div class="stat-head">ACTIVE SESSIONS <i class="fa-solid fa-mobile-screen"></i></div><div class="stat-value" id="statSessions">—</div><div class="stat-foot">Currently connected devices</div></div>
+  <div class="card"><div class="stat-head">SERVER UPTIME <i class="fa-regular fa-clock"></i></div><div class="stat-value" id="statUptime">—</div><div class="stat-foot">Since the last restart</div></div>
+  <div class="card"><div class="stat-head">HEAP MEMORY <i class="fa-solid fa-memory"></i></div><div class="stat-value" id="statMemory">—</div><div class="stat-foot">Node.js heap usage</div></div>
+  <div class="card"><div class="stat-head">PENDING PAIRINGS <i class="fa-solid fa-link"></i></div><div class="stat-value" id="statPairing">—</div><div class="stat-foot">Pair requests in progress</div></div>
+ </div>
+ <div class="grid two">
+  <div class="card">
+   <div class="card-title"><h2>Quick connect</h2><span>WhatsApp linked devices</span></div>
+   <div class="field"><label for="phoneQuick">WHATSAPP PHONE NUMBER</label><input type="tel" id="phoneQuick" autocomplete="tel"></div>
+   <button class="btn" id="pairQuick" onclick="pairDevice()">Generate pairing code →</button>
+   <div id="pairFeedback" class="feedback" role="status"></div>
+   <div id="pairCode" class="pair-code"><div class="mini">Enter this code in WhatsApp → Linked devices → Link a device</div><strong id="codeValue">----</strong><button class="btn secondary" onclick="copyCode()">Copy code</button></div>
+   <div class="mini" style="margin-top:13px">Your phone number is used only to link and manage your session.</div>
+  </div>
+  <div class="card">
+   <div class="card-title"><h2>System status</h2><span>Live checks</span></div>
+   <div class="status-line"><span>API service</span><b class="tag" id="apiState">Checking</b></div>
+   <div class="status-line"><span>Bot process</span><b class="tag" id="botState">Checking</b></div>
+   <div class="status-line"><span>Runtime</span><b id="nodeVersion">—</b></div>
+   <div class="status-line"><span>Last checked</span><b id="lastChecked">—</b></div>
+  </div>
+ </div>
 </section>
+
 <section class="page" id="page-pairing">
-<div class="section-head"><div><h2>Device pairing</h2><p>Connect a WhatsApp account to Alpha-XMD.</p></div></div>
-<div class="grid two">
-<div class="card">
-<div class="card-title"><h2>Link a new device</h2></div>
-<div class="field"><label>WHATSAPP NUMBER</label><input id="phoneFull" type="tel" placeholder="Enter phone number"></div>
-<button class="btn" id="pairFull" onclick="pairDevice('full')">Generate pairing code →</button>
-<div class="feedback" id="pairFeedbackFull"></div>
-<div class="pair-code" id="pairCodeFull"><span class="mini">YOUR PAIRING CODE</span><strong id="codeValueFull">----</strong><button class="btn secondary" onclick="copyCode('full')">Copy code</button></div>
-<p class="mini">On WhatsApp, open Linked devices → Link a device → Link with phone number instead. Enter the code shown here.</p>
-</div>
-<div class="card">
-<div class="card-title"><h2>Saved device</h2><span>Current browser</span></div>
-<div class="status-line"><span>Phone number</span><b id="savedPhone">Not linked</b></div>
-<div class="status-line"><span>Connection</span><b class="tag off" id="savedStatus">Unknown</b></div>
-<button class="btn danger" style="width:100%;margin-top:15px" onclick="disconnectDevice()">Disconnect saved device</button>
-<p class="mini">Disconnecting removes the saved session from the bot. Only use this when you intend to unlink the device.</p>
-</div>
-</div>
+ <div class="grid two">
+  <div class="card">
+   <div class="card-title"><h2>Link a WhatsApp device</h2><span>Secure pairing</span></div>
+   <div class="field"><label for="phoneFull">PHONE NUMBER</label><input type="tel" id="phoneFull" autocomplete="tel"></div>
+   <button class="btn" id="pairFull" onclick="pairDevice('full')">Generate pairing code →</button>
+   <div id="pairFeedbackFull" class="feedback" role="status"></div>
+   <div id="pairCodeFull" class="pair-code">
+    <div class="mini">Enter the code in WhatsApp → Linked devices</div>
+    <strong id="codeValueFull">----</strong>
+    <button class="btn secondary" onclick="copyCode('full')">Copy code</button>
+    <img id="pairQr" class="qr-image" alt="WhatsApp pairing QR code" hidden>
+   </div>
+  </div>
+  <div class="card">
+   <div class="card-title"><h2>Current browser session</h2><span>Private to this browser</span></div>
+   <div class="status-line"><span>Saved number</span><b id="savedPhone">Not linked</b></div>
+   <div class="status-line"><span>Connection</span><b class="tag off" id="savedStatus">Unknown</b></div>
+   <button class="btn secondary" style="width:100%;margin-top:15px" onclick="checkSavedSession()">Check connection</button>
+   <button class="btn danger" style="width:100%;margin-top:9px" onclick="disconnectDevice()">Disconnect device</button>
+   <p class="mini" style="margin-top:12px">The dashboard never lists other users' phone numbers.</p>
+  </div>
+ </div>
 </section>
+
 <section class="page" id="page-settings">
-<div class="section-head"><div><h2>Bot settings</h2><p>Manage settings for the linked account.</p></div><span class="mini" id="settingsFor">No linked account</span></div>
-<div class="card">
-<div class="card-title"><h2>Automation & protection</h2><span>Account settings</span></div>
-<div id="settingsList"><p class="mini">Pair your device in this browser first.</p></div>
-<div class="field"><label>COMMAND PREFIX</label><input id="prefix" maxlength="5" value="." placeholder="."></div>
-<button class="btn" onclick="saveSettings()">Save settings</button>
-</div>
+ <div class="card">
+  <div class="card-title"><h2>Bot behaviour</h2><span id="settingsFor">Link a device first</span></div>
+  <div id="settingsNotice" class="feedback"></div>
+  <div id="settingsList"><p class="mini">Pair your device in this browser, then load your settings here.</p></div>
+  <div class="field"><label for="prefix">COMMAND PREFIX</label><input id="prefix" maxlength="4" value="." placeholder="."></div>
+  <div class="row"><button class="btn" onclick="saveSettings()">Save settings</button><button class="btn secondary" onclick="loadSettings()">Reload</button></div>
+  <p class="mini" style="margin-top:12px">Settings are saved to the linked account using your private dashboard access token.</p>
+ </div>
 </section>
+
+<section class="page" id="page-plugins">
+ <div class="card">
+  <div class="card-title"><h2>Plugin manager</h2><button class="btn secondary" onclick="loadPlugins()">Refresh plugins</button></div>
+  <div class="search-wrap"><input class="search-input" id="pluginSearch" placeholder="Search plugins..." oninput="filterPlugins()"></div>
+  <div id="pluginList" class="grid"><p class="mini">Load plugins from your bot server.</p></div>
+  <p class="mini" style="margin-top:15px">Plugin management requires the backend plugin API to be enabled.</p>
+ </div>
+</section>
+
 <section class="page" id="page-monitor">
-<div class="section-head"><div><h2>Server monitor</h2><p>Runtime information reported by the bot server.</p></div><button class="btn secondary" onclick="fetchHealth()">Refresh</button></div>
-<div class="grid stats">
-<div class="card"><div class="stat-head">Health status</div><div class="stat-value"><span class="tag off" id="healthTag">Checking</span></div><div class="stat-foot">API health endpoint</div></div>
-<div class="card"><div class="stat-head">Active sessions</div><div class="stat-value" id="healthSessions">—</div><div class="stat-foot">Connected accounts</div></div>
-<div class="card"><div class="stat-head">Pending pairings</div><div class="stat-value" id="healthPairings">—</div><div class="stat-foot">Current pairing requests</div></div>
-<div class="card"><div class="stat-head">Uptime</div><div class="stat-value" id="healthUptime">—</div><div class="stat-foot">Process uptime</div></div>
-</div>
-<div class="card">
-<div class="card-title"><h2>Memory usage</h2><span>Node.js process</span></div>
-<div class="status-line"><span>Heap used</span><b id="heapText">—</b></div>
-<div class="bar"><i id="heapBar"></i></div>
-<div class="status-line"><span>Heap total</span><b id="heapTotal">—</b></div>
-<div class="status-line"><span>Resident memory (RSS)</span><b id="rssText">—</b></div>
-<div class="status-line"><span>Node version</span><b id="nodeText">—</b></div>
-</div>
+ <div class="grid two">
+  <div class="card">
+   <div class="card-title"><h2>Resource monitor</h2><span>Live process data</span></div>
+   <div class="status-line"><span>Heap used</span><b id="heapText">—</b></div>
+   <div class="bar"><i id="heapBar"></i></div>
+   <div class="status-line"><span>Heap allocated</span><b id="heapTotal">—</b></div>
+   <div class="status-line"><span>Resident memory (RSS)</span><b id="rssText">—</b></div>
+   <div class="status-line"><span>CPU usage</span><b id="cpuText">Not provided</b></div>
+   <div class="status-line"><span>Node.js version</span><b id="nodeText">—</b></div>
+  </div>
+  <div class="card">
+   <div class="card-title"><h2>Service health</h2><span>API health endpoint</span></div>
+   <div class="status-line"><span>Health</span><b class="tag" id="healthTag">Waiting</b></div>
+   <div class="status-line"><span>Active sessions</span><b id="healthSessions">—</b></div>
+   <div class="status-line"><span>Pending pairings</span><b id="healthPairings">—</b></div>
+   <div class="status-line"><span>Uptime</span><b id="healthUptime">—</b></div>
+   <button class="btn secondary" style="width:100%;margin-top:15px" onclick="fetchHealth()">Run health check</button>
+  </div>
+ </div>
+ <p class="mini" style="margin-top:15px">Values are supplied by the running Node.js process.</p>
 </section>
+
 <section class="page" id="page-activity">
-<div class="section-head"><div><h2>Activity log</h2><p>Actions recorded in this browser only.</p></div><button class="btn secondary" onclick="clearActivity()">Clear log</button></div>
-<div class="card"><div class="activity" id="activityList"><p class="mini">No activity recorded yet.</p></div></div>
+ <div class="card">
+  <div class="card-title"><h2>Recent dashboard activity</h2><button class="btn secondary" onclick="clearActivity()">Clear history</button></div>
+  <div id="activityList" class="activity"></div>
+  <p class="mini" style="margin-top:15px">Activity is stored locally in this browser.</p>
+ </div>
 </section>
+
+<section class="page" id="page-notifications">
+ <div class="card">
+  <div class="card-title"><h2>Notifications</h2><button class="btn secondary" onclick="clearNotifications()">Clear all</button></div>
+  <div id="notificationList" class="notification-list"></div>
+ </div>
+</section>
+
 <section class="page" id="page-features">
-<div class="section-head"><div><h2>Features</h2><p>Tools available in the Alpha-XMD project.</p></div></div>
-<div class="grid feature-grid">
-<div class="card feature"><div>⌁</div><h3>Multi-device pairing</h3><p>Connect a WhatsApp account using a phone-number pairing code.</p></div>
-<div class="card feature"><div>⚙</div><h3>Bot automation</h3><p>Configure supported automation options from the dashboard.</p></div>
-<div class="card feature"><div>◉</div><h3>Server monitoring</h3><p>View uptime, memory usage, sessions and runtime status.</p></div>
-<div class="card feature"><div>✦</div><h3>Group tools</h3><p>Use supported group management and moderation commands.</p></div>
-<div class="card feature"><div>▤</div><h3>Media tools</h3><p>Use the bot's available media and download commands.</p></div>
-<div class="card feature"><div>♡</div><h3>Personal settings</h3><p>Manage the available settings for your linked account.</p></div>
-</div>
+ <div class="section-head"><div><h2>Alpha-XMD features</h2><p>Tools available through the WhatsApp bot.</p></div></div>
+ <div class="grid feature-grid">
+  <div class="card feature"><i class="fa-solid fa-wand-magic-sparkles"></i><h3>AI & creation</h3><p>AI assistants and creative utilities available through supported bot commands.</p></div>
+  <div class="card feature"><i class="fa-solid fa-photo-film"></i><h3>Media utilities</h3><p>Media search, download and sticker tools, depending on plugin availability.</p></div>
+  <div class="card feature"><i class="fa-solid fa-users"></i><h3>Group management</h3><p>Moderation, member tools and group automation features.</p></div>
+  <div class="card feature"><i class="fa-solid fa-bullhorn"></i><h3>Channel tools</h3><p>Channel reactions and supported channel automation.</p></div>
+  <div class="card feature"><i class="fa-solid fa-gears"></i><h3>Chat automation</h3><p>Autoread, typing indicators, recording indicators and other configurable behaviours.</p></div>
+  <div class="card feature"><i class="fa-solid fa-terminal"></i><h3>Owner tools</h3><p>Owner commands and maintenance features configured in the bot repository.</p></div>
+ </div>
 </section>
+
 <section class="page" id="page-docs">
-<div class="section-head"><div><h2>Documentation</h2><p>Quick instructions for connecting your WhatsApp.</p></div></div>
-<div class="card">
-<h3>How to pair your device</h3>
-<p class="mini">1. Enter your phone number using the country selector.<br>2. Generate a pairing code.<br>3. Open WhatsApp on your phone.<br>4. Go to Linked devices → Link a device → Link with phone number instead.<br>5. Enter the code shown on this dashboard.</p>
-<h3>Dashboard access</h3>
-<p class="mini">The browser stores a private control token when a new pairing is created. Keep your browser data safe. If you clear it, you may lose access to account settings and disconnect controls.</p>
-<h3>API status</h3>
-<pre class="codeblock">GET /api/stats
-GET /api/health
-GET /api/status?phoneNumber=YOUR_NUMBER</pre>
-</div>
+ <div class="card">
+  <div class="card-title"><h2>Getting started</h2><span>Quick guide</span></div>
+  <ol style="padding-left:20px;line-height:2.1;color:var(--muted)">
+   <li>Enter your WhatsApp number with the correct country selected.</li>
+   <li>Generate a pairing code and wait for it to appear.</li>
+   <li>Open WhatsApp on your phone.</li>
+   <li>Go to <b>Linked devices → Link a device → Link with phone number instead</b>.</li>
+   <li>Enter the code shown by Alpha-XMD.</li>
+   <li>Keep the original browser if you want to manage settings or disconnect later.</li>
+  </ol>
+  <div class="card-title" style="margin-top:25px"><h2>Dashboard API</h2><span>Current routes</span></div>
+  <div class="codeblock">
+   GET /api/stats<br>GET /api/health<br>GET /api/status?phoneNumber=…<br>
+   POST /api/pair<br>POST /api/disconnect<br>
+   GET /api/settings?phoneNumber=…<br>POST /api/settings<br>
+   GET /api/plugins<br>POST /api/plugins/toggle
+  </div>
+  <p class="mini" style="margin-top:13px">Private account routes require the dashboard access token issued during first pairing.</p>
+ </div>
 </section>
-<section class="page" id="page-support">
-<div class="section-head"><div><h2>Support</h2><p>Official Alpha-XMD project links.</p></div></div>
-<div class="card">
-<h3>Alpha-XMD</h3>
-<p class="mini">For project updates and support, use the official project resources.</p>
-<div class="row">
-<a class="btn" href="https://github.com/Alexio11-09/alpha-xmd" target="_blank" rel="noopener">GitHub repository</a>
-<a class="btn secondary" href="https://whatsapp.com/channel/0029VbCHc4kB4hdVt7JDX10a" target="_blank" rel="noopener">WhatsApp channel</a>
-</div>
-</div>
-</section>
-<footer><span>Alpha-XMD Control Center</span><span>© <span id="yearFooter"></span> Alpha Tech</span></footer>
+
+<footer class="support-footer">
+ <div class="support-heading"><i class="fa-solid fa-headset"></i> ALPHA-XMD SUPPORT & COMMUNITY</div>
+ <div class="social-links">
+  <a class="social-link" href="https://whatsapp.com/channel/0029Vb7nHdBFnSzBDbvL6y1X" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp Channel</span></a>
+  <a class="social-link" href="https://github.com/Alexio11-09/alpha-xmd" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>GitHub Repository</span></a>
+  <a class="social-link" href="https://youtube.com/@alexiomhungu?si=A1P4tX8uTL-i9nPt" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-youtube"></i><span>YouTube</span></a>
+  <a class="social-link" href="https://www.instagram.com/voidgallery_09?bqrl=OGh4eG51bWNqcHdz" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-instagram"></i><span>Instagram</span></a>
+  <a class="social-link" href="https://www.facebook.com/profile.php?id=61595727230598&mibextid=ZbWKwL" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-facebook"></i><span>Facebook</span></a>
+  <a class="social-link" href="https://t.me/AlphaXmd" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-telegram"></i><span>Telegram</span></a>
+ </div>
+ <p class="social-note">Follow Alpha-XMD for updates, announcements, support and project releases.</p>
+ <div class="copyright-footer">
+  <span>© <span id="yearFooter"></span> ALPHA-XMD · Built by Alpha Tech</span>
+  <span>Control Center · Secure session management</span>
+ </div>
+</footer>
 </main>
 </div>
-<div class="toast" id="toast"></div>
+
+<!-- FLOATING WHATSAPP SUPPORT BUTTON -->
+<a
+ href="https://wa.me/263784969735?text=Hello%20Alpha-XMD%20Support%2C%20I%20visited%20your%20control%20panel%20and%20would%20like%20assistance.%20Please%20help%20me%20with%20my%20enquiry."
+ class="floating-whatsapp"
+ target="_blank"
+ rel="noopener noreferrer"
+ aria-label="Contact Alpha-XMD Support"
+ title="Contact Alpha-XMD Support"
+>
+ <svg viewBox="0 0 32 32" aria-hidden="true">
+  <path fill="currentColor" d="M16 .5C7.45.5.5 7.45.5 16c0 2.73.72 5.4 2.08 7.75L.5 31.5l7.95-2.08A15.4 15.4 0 0 0 16 31.5c8.55 0 15.5-6.95 15.5-15.5S24.55.5 16 .5Zm0 28.3c-2.35 0-4.65-.63-6.65-1.83l-.48-.28-4.72 1.24 1.26-4.6-.31-.5A12.76 12.76 0 1 1 16 28.8Zm7-9.55c-.38-.19-2.2-1.08-2.54-1.2-.34-.13-.59-.19-.84.19-.25.38-.97 1.2-1.19 1.45-.22.25-.44.28-.81.09-.38-.19-1.6-.59-3.05-1.88-1.13-1-1.89-2.24-2.11-2.62-.22-.38-.02-.58.17-.77.17-.17.38-.44.56-.66.19-.22.25-.38.38-.63.13-.25.06-.47-.03-.66-.09-.19-.84-2.02-1.15-2.77-.3-.72-.61-.62-.84-.63h-.72c-.25 0-.66.09-1 .47s-1.31 1.28-1.31 3.11 1.34 3.61 1.53 3.86c.19.25 2.63 4.02 6.37 5.64.89.38 1.59.61 2.13.78.89.28 1.7.24 2.34.15.71-.11 2.2-.9 2.52-1.77.31-.88.31-1.63.22-1.78-.09-.16-.34-.25-.72-.44Z"/>
+ </svg>
+ <span>Contact Support</span>
+</a>
+
+<div class="toast" id="toast" role="status"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/intlTelInput.min.js"></script>
 <script>
+const AU=(window.ALPHA_XMD_API_URL||'https://itinerary-splashy-flyer.ngrok-free.dev').replace(/\/+$/,'');
 const $=id=>document.getElementById(id);
-const DEFAULT_API='https://itinerary-splashy-flyer.ngrok-free.dev';
-const AU=(window.ALPHA_XMD_API_URL||localStorage.getItem('alpha-xmd-api')||DEFAULT_API).replace(/\/+$/,'');
-const phoneInputs={};let currentPhone='',currentCode='';
-const tokenKey=p=>'alpha-xmd-token-'+p;
-const tokenFor=p=>localStorage.getItem(tokenKey(p));
-const titles={overview:['Overview','Your bot operations at a glance.'],pairing:['Device pairing','Connect and manage your WhatsApp device.'],settings:['Bot settings','Configure supported bot settings.'],monitor:['Server monitor','Live server health and runtime information.'],activity:['Activity log','Recent actions recorded in this browser.'],features:['Features','Explore Alpha-XMD capabilities.'],docs:['Documentation','Pairing instructions and API reference.'],support:['Support','Official Alpha-XMD project links.']};
-function nav(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$('pageTitle').textContent=titles[page][0];$('pageSub').textContent=titles[page][1];$('sidebar').classList.remove('open');if(page==='settings')loadSettings();if(page==='pairing')checkSavedSession();if(page==='monitor')fetchHealth()}
+let phoneInputs={},currentCode='',currentPhone='',pluginsCache=[];
+
+const tokenKey=p=>`alpha-xmd-control-${p}`;
+const tokenFor=p=>localStorage.getItem(tokenKey(p))||'';
+
+const titles={
+ overview:['Overview','Your bot operations at a glance.'],
+ pairing:['Device pairing','Link and manage your WhatsApp device.'],
+ settings:['Bot settings','Configure the behaviours of your linked bot.'],
+ plugins:['Plugin manager','View and manage installed bot plugins.'],
+ monitor:['Server monitor','Live health and resource information.'],
+ activity:['Activity log','Recent actions from this browser.'],
+ notifications:['Notifications','Dashboard alerts and updates.'],
+ features:['Features','Explore Alpha-XMD capabilities.'],
+ docs:['Documentation','Pairing instructions and API reference.']
+};
+
+function nav(page){
+ document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));
+ document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
+ $('pageTitle').textContent=titles[page][0];
+ $('pageSub').textContent=titles[page][1];
+ $('sidebar').classList.remove('open');
+ if(page==='settings')loadSettings();
+ if(page==='pairing')checkSavedSession();
+ if(page==='monitor')fetchHealth();
+ if(page==='plugins')loadPlugins();
+ if(page==='notifications')renderNotifications();
+}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.page)));
 function toggleSidebar(){$('sidebar').classList.toggle('open')}
-function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
-function activity(msg){let a=[];try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}a.unshift({msg,time:new Date().toLocaleString()});localStorage.setItem('alpha-xmd-activity',JSON.stringify(a.slice(0,30)));renderActivity()}
-function renderActivity(){let a=[];try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}$('activityList').innerHTML=a.length?a.map(x=>`<div class="activity-item"><span class="bullet">●</span><div>${escapeHtml(x.msg)}<small>${escapeHtml(x.time)}</small></div></div>`).join(''):'<p class="mini">No activity recorded yet.</p>'}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function clearActivity(){localStorage.removeItem('alpha-xmd-activity');renderActivity()}
-function feedback(id,msg,type='info'){const e=$(id);e.textContent=msg;e.className='feedback show '+type}
-async function api(path,opts={}){const r=await fetch(AU+path,{...opts,headers:{'ngrok-skip-browser-warning':'true',...(opts.headers||{})},signal:opts.signal||AbortSignal.timeout(15000)});let d;try{d=await r.json()}catch{throw Error('Server returned an unreadable response.')}if(!r.ok)throw Error(d.error||d.message||`Request failed (${r.status})`);return d}
-function fmtUptime(n){n=Math.max(0,Math.floor(Number(n)||0));let d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d}d ${h}h`:`${h}h ${m}m`}
-async function refreshAll(){try{const d=await api('/api/stats');$('apiLabel').textContent='API Online';$('apiState').textContent='Online';$('apiState').className='tag';$('botState').textContent='Running';$('botState').className='tag';$('apiDot').style.background='var(--good)';$('sideApi').textContent='API connected';$('statSessions').textContent=d.sessions??d.connected??0;$('statUptime').textContent=fmtUptime(d.uptime);$('statMemory').textContent=d.memory!=null?d.memory+' MB':'—';$('statPairing').textContent=d.pairing??'—';$('nodeVersion').textContent=d.node||'Node.js';$('lastChecked').textContent=new Date().toLocaleTimeString();if(d.rss!=null)$('rssText').textContent=d.rss+' MB';if(d.memory!=null)$('heapText').textContent=d.memory+' MB';if(d.node)$('nodeText').textContent=d.node;await fetchHealth(false)}catch(e){$('apiLabel').textContent='API Offline';$('apiState').textContent='Offline';$('apiState').className='tag off';$('botState').textContent='Unavailable';$('botState').className='tag off';$('apiDot').style.background='var(--bad)';$('sideApi').textContent='API unavailable';$('lastChecked').textContent=new Date().toLocaleTimeString();console.warn(e)}}
-async function fetchHealth(show=true){try{const d=await api('/api/health');$('healthTag').textContent=d.status||'Healthy';$('healthTag').className='tag';$('healthSessions').textContent=d.activeSessions??'—';$('healthPairings').textContent=d.pendingPairings??'—';$('healthUptime').textContent=fmtUptime(d.uptime);if(d.memory){$('heapText').textContent=d.memory.heapUsed+' MB';$('heapTotal').textContent=d.memory.heapTotal+' MB';$('rssText').textContent=d.memory.rss+' MB';$('nodeText').textContent=d.node||'—';let pct=d.memory.heapTotal?Math.min(100,d.memory.heapUsed/d.memory.heapTotal*100):0;$('heapBar').style.width=pct+'%'}if(show)toast('Health check completed')}catch(e){$('healthTag').textContent='Unavailable';$('healthTag').className='tag off';if(show)toast(e.message)}}
-function initPhone(id){const el=$(id);if(!el||!window.intlTelInput)return;phoneInputs[id]=window.intlTelInput(el,{initialCountry:'zw',separateDialCode:true,utilsScript:'https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/utils.js',dropdownContainer:document.body})}
-function validPhone(id){const iti=phoneInputs[id];if(!iti||!iti.isValidNumber())throw Error('Enter a valid phone number with the correct country code.');return iti.getNumber().replace('+','').replace(/\D/g,'')}
-async function pairDevice(which='quick'){const id=which==='full'?'phoneFull':'phoneQuick',btn=$(which==='full'?'pairFull':'pairQuick'),fb=which==='full'?'pairFeedbackFull':'pairFeedback',box=which==='full'?'pairCodeFull':'pairCode',code=which==='full'?'codeValueFull':'codeValue';try{const phone=validPhone(id);currentPhone=phone;btn.disabled=true;btn.textContent='Connecting…';feedback(fb,'Contacting Alpha-XMD server…');$(box).style.display='none';const d=await api('/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phoneNumber:phone})});if(d.alreadyPaired){localStorage.setItem('alpha-xmd-last-phone',phone);feedback(fb,'This number is already connected. Check the session panel.','success');activity('Checked an already-connected device');await checkSavedSession();return}if(!d.code)throw Error('The server did not return a pairing code.');if(d.controlToken)localStorage.setItem(tokenKey(phone),d.controlToken);localStorage.setItem('alpha-xmd-last-phone',phone);currentCode=d.code;$(code).textContent=d.code;$(box).style.display='block';feedback(fb,'Pairing code generated. Open WhatsApp → Linked devices and enter the code.','success');activity('Generated a WhatsApp pairing code')}catch(e){feedback(fb,e.message,'error')}finally{btn.disabled=false;btn.textContent='Generate pairing code →'}}
-async function copyCode(which='quick'){const id=which==='full'?'codeValueFull':'codeValue';const v=$(id).textContent;if(!v||v==='----')return;try{await navigator.clipboard.writeText(v);toast('Pairing code copied')}catch{toast('Select and copy the code manually')}}
-async function checkSavedSession(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';$('savedPhone').textContent=p?`+${p}`:'Not linked';if(!p){$('savedStatus').textContent='Unknown';$('savedStatus').className='tag off';return}try{const d=await api('/api/status?phoneNumber='+encodeURIComponent(p));$('savedStatus').textContent=d.connected?'Connected':'Disconnected';$('savedStatus').className='tag'+(d.connected?'':' off')}catch(e){$('savedStatus').textContent='Unavailable';$('savedStatus').className='tag off'}}
-async function disconnectDevice(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';if(!p||!tokenFor(p)){toast('No saved dashboard access token in this browser');return}if(!confirm('Disconnect this WhatsApp device? This removes its saved session.'))return;try{await api('/api/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},body:JSON.stringify({phoneNumber:p})});localStorage.removeItem(tokenKey(p));localStorage.removeItem('alpha-xmd-last-phone');currentPhone='';activity('Disconnected the saved WhatsApp device');toast('Device disconnected');checkSavedSession()}catch(e){toast(e.message)}}
-const settingDefs=[['autoread','Auto read','Automatically mark incoming messages as read.'],['autotyping','Auto typing','Show typing status while preparing a response.'],['autorecording','Auto recording','Show recording status where supported.'],['autoreact','Auto react','Enable automatic message reactions.'],['antidelete','Anti-delete','Keep supported deleted-message notifications.'],['antiedit','Anti-edit','Track supported edited-message changes.'],['antilink','Anti-link','Enable configured group link protection.']];
+
+/* THEME */
+function applyTheme(theme){
+ document.body.classList.toggle('light',theme==='light');
+ $('themeIcon').className=theme==='light'?'fa-solid fa-moon':'fa-solid fa-sun';
+ localStorage.setItem('alpha-xmd-theme',theme);
+}
+function toggleTheme(){
+ const next=document.body.classList.contains('light')?'dark':'light';
+ applyTheme(next);
+ toast(next==='light'?'Light theme enabled':'Dark theme enabled');
+ activity('Changed dashboard appearance to '+next+' mode');
+}
+
+/* TOASTS + NOTIFICATIONS */
+function toast(msg){
+ const t=$('toast');t.textContent=msg;t.classList.add('show');
+ clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+function notify(msg){
+ let a=[];
+ try{a=JSON.parse(localStorage.getItem('alpha-xmd-notifications')||'[]')}catch{}
+ a.unshift({msg,time:new Date().toLocaleString()});
+ localStorage.setItem('alpha-xmd-notifications',JSON.stringify(a.slice(0,30)));
+}
+function renderNotifications(){
+ let a=[];
+ try{a=JSON.parse(localStorage.getItem('alpha-xmd-notifications')||'[]')}catch{}
+ $('notificationList').innerHTML=a.length?a.map(x=>
+  `<div class="notification">${escapeHtml(x.msg)}<small style="display:block;color:var(--muted);margin-top:5px">${escapeHtml(x.time)}</small></div>`
+ ).join(''):'<p class="mini">No notifications yet.</p>';
+}
+function clearNotifications(){
+ localStorage.removeItem('alpha-xmd-notifications');renderNotifications();toast('Notifications cleared');
+}
+
+/* ACTIVITY */
+function activity(msg){
+ let a=[];
+ try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}
+ a.unshift({msg,time:new Date().toLocaleString()});
+ localStorage.setItem('alpha-xmd-activity',JSON.stringify(a.slice(0,30)));
+ renderActivity();notify(msg);
+}
+function renderActivity(){
+ let a=[];
+ try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}
+ $('activityList').innerHTML=a.length
+ ?a.map(x=>`<div class="activity-item"><span style="color:var(--accent)">●</span><div>${escapeHtml(x.msg)}<small>${escapeHtml(x.time)}</small></div></div>`).join('')
+ :'<p class="mini">No activity recorded yet.</p>';
+}
+function clearActivity(){
+ localStorage.removeItem('alpha-xmd-activity');renderActivity();toast('Activity history cleared');
+}
+function escapeHtml(s){
+ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function feedback(id,msg,type='info'){
+ const e=$(id);e.textContent=msg;e.className='feedback show '+type;
+}
+
+/* API */
+async function api(path,opts={}){
+ const r=await fetch(AU+path,{
+  ...opts,
+  headers:{'ngrok-skip-browser-warning':'true',...(opts.headers||{})},
+  signal:opts.signal||AbortSignal.timeout(15000)
+ });
+ let d;
+ try{d=await r.json()}catch{throw Error('Server returned an unreadable response.')}
+ if(!r.ok)throw Error(d.error||d.message||`Request failed (${r.status})`);
+ return d;
+}
+function fmtUptime(n){
+ n=Math.max(0,Math.floor(Number(n)||0));
+ let d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);
+ return d?`${d}d ${h}h`:`${h}h ${m}m`;
+}
+
+/* DASHBOARD */
+async function refreshAll(){
+ try{
+  const d=await api('/api/stats');
+  $('apiLabel').textContent='API Online';$('apiState').textContent='Online';$('apiState').className='tag';
+  $('botState').textContent='Running';$('botState').className='tag';
+  $('apiDot').style.background='var(--good)';$('sideApi').textContent='API connected';
+  $('statSessions').textContent=d.sessions??d.connected??0;
+  $('statUptime').textContent=fmtUptime(d.uptime);
+  $('statMemory').textContent=d.memory!=null?d.memory+' MB':'—';
+  $('statPairing').textContent=d.pairing??'—';
+  $('nodeVersion').textContent=d.node||'Node.js';
+  $('lastChecked').textContent=new Date().toLocaleTimeString();
+  if(d.rss!=null)$('rssText').textContent=d.rss+' MB';
+  if(d.memory!=null)$('heapText').textContent=d.memory+' MB';
+  if(d.cpu!=null)$('cpuText').textContent=d.cpu+'%';
+  if(d.node)$('nodeText').textContent=d.node;
+  await fetchHealth(false);
+ }catch(e){
+  $('apiLabel').textContent='API Offline';$('apiState').textContent='Offline';$('apiState').className='tag off';
+  $('botState').textContent='Unavailable';$('botState').className='tag off';
+  $('apiDot').style.background='var(--bad)';$('sideApi').textContent='API unavailable';
+  $('lastChecked').textContent=new Date().toLocaleTimeString();
+  console.warn(e);
+ }
+}
+async function fetchHealth(show=true){
+ try{
+  const d=await api('/api/health');
+  $('healthTag').textContent=d.status||'Healthy';$('healthTag').className='tag';
+  $('healthSessions').textContent=d.activeSessions??'—';
+  $('healthPairings').textContent=d.pendingPairings??'—';
+  $('healthUptime').textContent=fmtUptime(d.uptime);
+  if(d.memory){
+   $('heapText').textContent=d.memory.heapUsed+' MB';
+   $('heapTotal').textContent=d.memory.heapTotal+' MB';
+   $('rssText').textContent=d.memory.rss+' MB';
+   $('nodeText').textContent=d.node||'—';
+   let pct=d.memory.heapTotal?Math.min(100,d.memory.heapUsed/d.memory.heapTotal*100):0;
+   $('heapBar').style.width=pct+'%';
+  }
+  if(d.cpu!=null)$('cpuText').textContent=d.cpu+'%';
+  if(show)toast('Health check completed');
+ }catch(e){
+  $('healthTag').textContent='Unavailable';$('healthTag').className='tag off';
+  if(show)toast(e.message);
+ }
+}
+
+/* PHONE INPUT + PAIRING */
+function initPhone(id){
+ const el=$(id);if(!el||!window.intlTelInput)return;
+ phoneInputs[id]=window.intlTelInput(el,{
+  initialCountry:'zw',separateDialCode:true,
+  utilsScript:'https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/js/utils.js',
+  dropdownContainer:document.body
+ });
+}
+function validPhone(id){
+ const iti=phoneInputs[id];
+ if(!iti||!iti.isValidNumber())throw Error('Enter a valid phone number with the correct country code.');
+ return iti.getNumber().replace('+','').replace(/\D/g,'');
+}
+async function pairDevice(which='quick'){
+ const id=which==='full'?'phoneFull':'phoneQuick';
+ const btn=$(which==='full'?'pairFull':'pairQuick');
+ const fb=which==='full'?'pairFeedbackFull':'pairFeedback';
+ const box=which==='full'?'pairCodeFull':'pairCode';
+ const code=which==='full'?'codeValueFull':'codeValue';
+ try{
+  const phone=validPhone(id);currentPhone=phone;
+  btn.disabled=true;btn.textContent='Connecting…';
+  feedback(fb,'Contacting Alpha-XMD server…');$(box).style.display='none';
+  const d=await api('/api/pair',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({phoneNumber:phone})
+  });
+  if(d.alreadyPaired){
+   localStorage.setItem('alpha-xmd-last-phone',phone);
+   feedback(fb,'This number is already connected. Check the session panel.','success');
+   activity('Checked an already-connected device');await checkSavedSession();return;
+  }
+  if(!d.code)throw Error('The server did not return a pairing code.');
+  if(d.controlToken)localStorage.setItem(tokenKey(phone),d.controlToken);
+  localStorage.setItem('alpha-xmd-last-phone',phone);
+  currentCode=d.code;$(code).textContent=d.code;$(box).style.display='block';
+  const qr=d.qr||d.qrCode||d.qrcode;
+  const qrImg=which==='full'?$ ('pairQr'):null;
+  if(qrImg&&qr){
+   qrImg.src=qr.startsWith('data:')?qr:'data:image/png;base64,'+qr;
+   qrImg.hidden=false;
+  }
+  feedback(fb,'Pairing code generated. Open WhatsApp → Linked devices and enter the code.','success');
+  activity('Generated a WhatsApp pairing code');
+ }catch(e){feedback(fb,e.message,'error')}
+ finally{btn.disabled=false;btn.textContent='Generate pairing code →'}
+}
+async function copyCode(which='quick'){
+ const id=which==='full'?'codeValueFull':'codeValue';const v=$(id).textContent;
+ if(!v||v==='----')return;
+ try{await navigator.clipboard.writeText(v);toast('Pairing code copied')}
+ catch{toast('Select and copy the code manually')}
+}
+async function checkSavedSession(){
+ const p=localStorage.getItem('alpha-xmd-last-phone')||'';
+ $('savedPhone').textContent=p?`+${p}`:'Not linked';
+ if(!p){$('savedStatus').textContent='Unknown';$('savedStatus').className='tag off';return}
+ try{
+  const d=await api('/api/status?phoneNumber='+encodeURIComponent(p));
+  $('savedStatus').textContent=d.connected?'Connected':'Disconnected';
+  $('savedStatus').className='tag'+(d.connected?'':' off');
+ }catch(e){$('savedStatus').textContent='Unavailable';$('savedStatus').className='tag off'}
+}
+async function disconnectDevice(){
+ const p=localStorage.getItem('alpha-xmd-last-phone')||'';
+ if(!p||!tokenFor(p)){toast('No saved dashboard access token in this browser');return}
+ if(!confirm('Disconnect this WhatsApp device? This removes its saved session.'))return;
+ try{
+  await api('/api/disconnect',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},
+   body:JSON.stringify({phoneNumber:p})
+  });
+  localStorage.removeItem(tokenKey(p));localStorage.removeItem('alpha-xmd-last-phone');
+  currentPhone='';activity('Disconnected the saved WhatsApp device');
+  toast('Device disconnected');checkSavedSession();
+ }catch(e){toast(e.message)}
+}
+
+/* BOT SETTINGS */
+const settingDefs=[
+ ['autoread','Auto read','Automatically mark incoming messages as read.'],
+ ['autotyping','Auto typing','Show typing status while preparing a response.'],
+ ['autorecording','Auto recording','Show recording status where supported.'],
+ ['autoreact','Auto react','Enable automatic message reactions.'],
+ ['antidelete','Anti-delete','Keep supported deleted-message notifications.'],
+ ['antiedit','Anti-edit','Track supported edited-message changes.'],
+ ['antilink','Anti-link','Enable configured group link protection.'],
+ ['autostatus','Auto status view','Automatically view supported status updates.'],
+ ['alwaysonline','Always online','Keep the bot presence online where supported.']
+];
 let loadedSettings={};
-async function loadSettings(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';const host=$('settingsList');if(!p||!tokenFor(p)){host.innerHTML='<p class="mini">Pair your device in this browser first. The private access token is required to load settings.</p>';$('settingsFor').textContent='No linked account';return}try{const d=await api('/api/settings?phoneNumber='+encodeURIComponent(p),{headers:{'Authorization':'Bearer '+tokenFor(p)}});loadedSettings=d||{};$('settingsFor').textContent='Account +'+p;host.innerHTML=settingDefs.map(([k,n,desc])=>`<div class="setting"><div><b>${n}</b><small>${desc}</small></div><label class="switch"><input type="checkbox" data-setting="${k}" ${loadedSettings[k]===true?'checked':''}><span class="slider"></span></label></div>`).join('');$('prefix').value=loadedSettings.prefix||'.'}catch(e){host.innerHTML='<p class="mini">'+escapeHtml(e.message)+'</p>';$('settingsFor').textContent='Could not load'}}
-async function saveSettings(){const p=localStorage.getItem('alpha-xmd-last-phone')||'';if(!p||!tokenFor(p)){toast('Pair a device in this browser first');return}const settings={};document.querySelectorAll('[data-setting]').forEach(x=>settings[x.dataset.setting]=x.checked);settings.prefix=$('prefix').value.trim()||'.';try{await api('/api/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},body:JSON.stringify({phoneNumber:p,settings})});activity('Saved bot settings');toast('Bot settings saved')}catch(e){toast(e.message)}}
-document.addEventListener('DOMContentLoaded',()=>{const y=new Date().getFullYear();$('year').textContent=y;$('yearFooter').textContent=y;initPhone('phoneQuick');initPhone('phoneFull');renderActivity();refreshAll();setInterval(refreshAll,10000)});
+async function loadSettings(){
+ const p=localStorage.getItem('alpha-xmd-last-phone')||'';
+ const host=$('settingsList');
+ if(!p||!tokenFor(p)){
+  host.innerHTML='<p class="mini">Pair your device in this browser first. The private access token is required to load settings.</p>';
+  $('settingsFor').textContent='No linked account';return;
+ }
+ try{
+  const d=await api('/api/settings?phoneNumber='+encodeURIComponent(p),{
+   headers:{'Authorization':'Bearer '+tokenFor(p)}
+  });
+  loadedSettings=d||{};$('settingsFor').textContent='Account +'+p;
+  host.innerHTML=settingDefs.map(([k,n,desc])=>
+   `<div class="setting"><div><b>${n}</b><small>${desc}</small></div><label class="switch"><input type="checkbox" data-setting="${k}" ${loadedSettings[k]===true?'checked':''}><span class="slider"></span></label></div>`
+  ).join('');
+  $('prefix').value=loadedSettings.prefix||'.';
+ }catch(e){
+  host.innerHTML='<p class="mini">'+escapeHtml(e.message)+'</p>';
+  $('settingsFor').textContent='Could not load';
+ }
+}
+async function saveSettings(){
+ const p=localStorage.getItem('alpha-xmd-last-phone')||'';
+ if(!p||!tokenFor(p)){toast('Pair a device in this browser first');return}
+ const settings={};
+ document.querySelectorAll('[data-setting]').forEach(x=>settings[x.dataset.setting]=x.checked);
+ settings.prefix=$('prefix').value.trim()||'.';
+ try{
+  await api('/api/settings',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},
+   body:JSON.stringify({phoneNumber:p,settings})
+  });
+  activity('Saved bot settings');toast('Bot settings saved');
+ }catch(e){toast(e.message)}
+}
+
+/* PLUGIN MANAGER */
+async function loadPlugins(){
+ const host=$('pluginList');
+ host.innerHTML='<p class="mini">Loading plugins…</p>';
+ try{
+  const d=await api('/api/plugins');
+  pluginsCache=Array.isArray(d)?d:(d.plugins||[]);
+  renderPlugins(pluginsCache);
+ }catch(e){
+  host.innerHTML='<p class="mini">Plugin API is not available yet. Your backend must provide GET /api/plugins.</p>';
+ }
+}
+function renderPlugins(list){
+ $('pluginList').innerHTML=list.length?list.map((p,i)=>{
+  const name=typeof p==='string'?p:(p.name||p.filename||'Unnamed plugin');
+  const enabled=typeof p==='string'?true:p.enabled!==false;
+  return `<div class="plugin-card">
+   <div><b>${escapeHtml(name)}</b><small>${enabled?'Enabled':'Disabled'}</small></div>
+   <label class="switch"><input type="checkbox" ${enabled?'checked':''} onchange="togglePlugin('${escapeHtml(name).replace(/'/g,"\\'")}',this.checked)"><span class="slider"></span></label>
+  </div>`;
+ }).join(''):'<p class="mini">No plugins were returned by the server.</p>';
+}
+function filterPlugins(){
+ const q=$('pluginSearch').value.toLowerCase();
+ renderPlugins(pluginsCache.filter(p=>(typeof p==='string'?p:(p.name||p.filename||'')).toLowerCase().includes(q)));
+}
+async function togglePlugin(name,enabled){
+ try{
+  const p=localStorage.getItem('alpha-xmd-last-phone')||'';
+  await api('/api/plugins/toggle',{
+   method:'POST',
+   headers:{'Content-Type':'application/json',...(tokenFor(p)?{'Authorization':'Bearer '+tokenFor(p)}:{})},
+   body:JSON.stringify({name,enabled})
+  });
+  activity(`${enabled?'Enabled':'Disabled'} plugin: ${name}`);
+  toast('Plugin updated');loadPlugins();
+ }catch(e){
+  toast('Plugin action failed: '+e.message);loadPlugins();
+ }
+}
+
+/* STARTUP */
+document.addEventListener('DOMContentLoaded',()=>{
+ const y=new Date().getFullYear();
+ $('year').textContent=y;$('yearFooter').textContent=y;
+ applyTheme(localStorage.getItem('alpha-xmd-theme')||'dark');
+ initPhone('phoneQuick');initPhone('phoneFull');
+ renderActivity();renderNotifications();refreshAll();
+ setInterval(refreshAll,10000);
+});
 </script>
 </body>
 </html>
