@@ -58,7 +58,7 @@ console.error = (...args) => {
 // NGROK CONFIGURATION
 // ======================================================
 
-const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || "";
+const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || "3L4Ccoik7R16ilMsfKycK2OZkmC_7qvF29reP3BEE19h42nyk";
 const NGROK_DOMAIN =
   process.env.NGROK_DOMAIN ||
   "itinerary-splashy-flyer.ngrok-free.dev";
