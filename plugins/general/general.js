@@ -5,6 +5,11 @@ const os = require('os');
 const path = require('path');
 const pino = require('pino');
 const { Boom } = require('@hapi/boom');
+const {
+    proto,
+    generateWAMessageFromContent
+} = require('@whiskeysockets/baileys');
+
 const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -27,12 +32,19 @@ const getCountry = async (m, sock) => {
             if (m.isGroup) {
                 try {
                     const metadata = await sock.groupMetadata(m.chat);
-                    const participant = metadata.participants.find(p => p.id === targetJid || p.lid === targetJid);
+                    const participant = metadata.participants.find(
+                        p => p.id === targetJid || p.lid === targetJid
+                    );
+
                     if (participant) {
                         if (participant.phoneNumber) {
-                            cleanNumber = participant.phoneNumber.split('@')[0].replace(/[^0-9]/g, '');
+                            cleanNumber = participant.phoneNumber
+                                .split('@')[0]
+                                .replace(/[^0-9]/g, '');
                         } else if (participant.jid && !participant.jid.includes('@lid')) {
-                            cleanNumber = participant.jid.split('@')[0].replace(/[^0-9]/g, '');
+                            cleanNumber = participant.jid
+                                .split('@')[0]
+                                .replace(/[^0-9]/g, '');
                         }
                     }
                 } catch (e) {}
@@ -43,15 +55,16 @@ const getCountry = async (m, sock) => {
 
         const PhoneNumber = require('awesome-phonenumber');
         const pn = PhoneNumber('+' + cleanNumber);
-        
+
         if (pn.isValid() && pn.getRegionCode()) {
             const country = pn.getCountry();
             const flag = pn.getRegionCode().toUpperCase().replace(/./g, char =>
                 String.fromCodePoint(char.charCodeAt(0) + 127397)
             );
+
             return `${country} ${flag}`;
         }
-        
+
         return "Unknown 🌍";
     } catch (e) {
         return "Unknown 🌍";
@@ -63,17 +76,26 @@ module.exports = [
         command: "menu",
         aliases: ["help", "commands"],
         category: "general",
+
         execute: async (sock, m, { send }) => {
             try {
-                const loadMsg = await sock.sendMessage(m.chat, {
-                    text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
-                }, { quoted: m });
+                const loadMsg = await sock.sendMessage(
+                    m.chat,
+                    {
+                        text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
+                    },
+                    { quoted: m }
+                );
 
                 await new Promise(resolve => setTimeout(resolve, 700));
-                await sock.sendMessage(m.chat, {
-                    text: "⚡ Loaded 100% ████████████",
-                    edit: loadMsg.key
-                });
+
+                await sock.sendMessage(
+                    m.chat,
+                    {
+                        text: "⚡ Loaded 100% ████████████",
+                        edit: loadMsg.key
+                    }
+                );
 
                 const now = new Date();
                 const time = now.toLocaleTimeString();
@@ -608,7 +630,12 @@ ${config.settings.footer}
 
             } catch (err) {
                 console.log("Menu error:", err);
-                await sock.sendMessage(m.chat, { text: "❌ Menu failed to load" }, { quoted: m });
+
+                await sock.sendMessage(
+                    m.chat,
+                    { text: "❌ Menu failed to load" },
+                    { quoted: m }
+                );
             }
         }
     },
@@ -617,8 +644,12 @@ ${config.settings.footer}
         command: "ping",
         aliases: ["p"],
         category: "general",
+
         execute: async (sock, m, { reply }) => {
-            const latency = m.messageTimestamp ? (Date.now() - (m.messageTimestamp * 1000)) : '??';
+            const latency = m.messageTimestamp
+                ? (Date.now() - (m.messageTimestamp * 1000))
+                : '??';
+
             const pings = [
                 `🏓 Pong! ${latency}ms — faster than your WiFi on a good day.`,
                 `⚡ ${latency}ms — I'm basically speed.`,
@@ -626,6 +657,7 @@ ${config.settings.footer}
                 `🛰️ ${latency}ms — signal came from Mars, apparently.`,
                 `🤖 ${latency}ms — beep boop, I'm alive!`
             ];
+
             reply(R(pings));
         }
     },
@@ -634,10 +666,13 @@ ${config.settings.footer}
         command: "alive",
         aliases: ["online", "test"],
         category: "general",
+
         execute: async (sock, m, { reply }) => {
             const uptime = runtime(process.uptime());
             const memory = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
-            const ping = m.messageTimestamp ? (Date.now() - (m.messageTimestamp * 1000)) : '??';
+            const ping = m.messageTimestamp
+                ? (Date.now() - (m.messageTimestamp * 1000))
+                : '??';
 
             const quotes = [
                 `✅ I'm alive and kicking! ⏳ Uptime: ${uptime} | 🧠 RAM: ${memory}MB | 📡 Ping: ${ping}ms`,
@@ -655,6 +690,7 @@ ${config.settings.footer}
         command: "info",
         aliases: ["botinfo", "status"],
         category: "general",
+
         execute: async (sock, m, { reply }) => {
             const uptime = runtime(process.uptime());
             const memory = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
@@ -663,7 +699,9 @@ ${config.settings.footer}
             const nodeVersion = process.version;
             const botName = config.settings?.title || 'Alpha Bot';
             const owner = config.owner?.[0] || 'Unknown';
-            const ownerJid = owner.includes('@') ? owner : owner + '@s.whatsapp.net';
+            const ownerJid = owner.includes('@')
+                ? owner
+                : owner + '@s.whatsapp.net';
 
             const infos = [
                 `📊 *${botName} Info*\n\n⏳ Uptime: ${uptime}\n🧠 Memory: ${memory} MB\n💻 Platform: ${platform}\n🖥️ Host: ${hostname}\n🔧 Node.js: ${nodeVersion}\n👑 Owner: @${owner}`,
@@ -679,10 +717,13 @@ ${config.settings.footer}
         command: "owner",
         aliases: ["creator", "dev"],
         category: "general",
+
         execute: async (sock, m, { reply }) => {
             const ownerNumber = config.owner?.[0] || 'Unknown';
             const ownerName = config.settings?.title?.split(' ')[0] || 'Alpha';
-            const ownerJid = ownerNumber.includes('@') ? ownerNumber : ownerNumber + '@s.whatsapp.net';
+            const ownerJid = ownerNumber.includes('@')
+                ? ownerNumber
+                : ownerNumber + '@s.whatsapp.net';
 
             const messages = [
                 `👑 *Owner:* @${ownerNumber}\n👤 *Name:* ${ownerName}\n\n💬 DM anytime.`,
@@ -699,6 +740,7 @@ ${config.settings.footer}
         command: "repo",
         aliases: ["source", "github", "sc"],
         category: "general",
+
         execute: async (sock, m, { reply }) => {
             const repoLink = "https://GitHub.com/Alexio11-09/alpha-xmd";
             const ownerName = "Alpha";
@@ -715,31 +757,188 @@ ${config.settings.footer}
         }
     },
 
+    // =====================================================
+    // PAIR COMMAND
+    // Preserves the existing global.pairAccount() service.
+    // =====================================================
+
     {
         command: "pair",
         aliases: ["pairing", "session"],
         category: "general",
+
         execute: async (sock, m, { args, reply }) => {
-            if (!args[0]) return reply("❌ Provide a phone number with country code!\n\n📌 Example: .pair 263784969735");
-            const rawNumber = args[0].replace(/[^0-9]/g, "");
-            if (!/^\d{10,15}$/.test(rawNumber)) return reply("❌ Invalid phone number. Use 10–15 digits with country code.");
-            if (typeof global.pairAccount !== "function") {
-                return reply("❌ Pairing service is not ready. Please try again shortly.");
+            if (!args[0]) {
+                return reply(
+                    "❌ Provide a phone number with country code!\n\n" +
+                    "📌 Example: .pair 263784969735"
+                );
             }
 
-            await reply(`🔐 Requesting a WhatsApp pairing code for +${rawNumber}... Please wait.`);
+            const rawNumber = args[0].replace(/[^0-9]/g, "");
+
+            if (!/^\d{10,15}$/.test(rawNumber)) {
+                return reply(
+                    "❌ Invalid phone number. Use 10–15 digits with country code."
+                );
+            }
+
+            if (typeof global.pairAccount !== "function") {
+                return reply(
+                    "❌ Pairing service is not ready. Please try again shortly."
+                );
+            }
+
+            const channelContext = {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: "120363423969349257@newsletter",
+                    newsletterName: "Alpha XMD",
+                    serverMessageId: 1
+                }
+            };
+
+            const sendPairCode = async (formatted) => {
+                const cleanCode = String(formatted)
+                    .replace(/[^A-Z0-9]/gi, "");
+
+                const message = {
+                    viewOnceMessage: {
+                        message: {
+                            messageContextInfo: {
+                                deviceListMetadata: {},
+                                deviceListMetadataVersion: 2
+                            },
+
+                            interactiveMessage:
+                                proto.Message.InteractiveMessage.create({
+
+                                    body:
+                                        proto.Message.InteractiveMessage.Body.create({
+                                            text:
+                                                `🔐 *ALPHA XMD PAIRING*\n\n` +
+                                                `📞 *Number:* +${rawNumber}\n\n` +
+                                                `🔑 *Your pairing code:*\n` +
+                                                `*${formatted}*\n\n` +
+                                                `👇 Tap the button below to copy your code.\n\n` +
+                                                `📱 *HOW TO CONNECT*\n` +
+                                                `1. Open WhatsApp.\n` +
+                                                `2. Go to Linked Devices.\n` +
+                                                `3. Select Link with phone number.\n` +
+                                                `4. Enter the pairing code.\n\n` +
+                                                `⏱️ The code expires shortly.`
+                                        }),
+
+                                    footer:
+                                        proto.Message.InteractiveMessage.Footer.create({
+                                            text: "© Alpha XMD • Official Pairing"
+                                        }),
+
+                                    nativeFlowMessage:
+                                        proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                                            buttons: [
+                                                {
+                                                    name: "cta_copy",
+                                                    buttonParamsJson: JSON.stringify({
+                                                        display_text: "Copy Code",
+                                                        copy_code: cleanCode
+                                                    })
+                                                }
+                                            ]
+                                        }),
+
+                                    contextInfo: channelContext
+                                })
+                        }
+                    }
+                };
+
+                try {
+                    const generated = generateWAMessageFromContent(
+                        m.chat,
+                        message,
+                        {
+                            userJid: sock.user.id,
+                            quoted: m
+                        }
+                    );
+
+                    await sock.relayMessage(
+                        m.chat,
+                        generated.message,
+                        {
+                            messageId: generated.key.id
+                        }
+                    );
+
+                } catch (error) {
+                    console.error("Copy button error:", error);
+
+                    // Text fallback ensures the pairing code is still delivered.
+                    await sock.sendMessage(
+                        m.chat,
+                        {
+                            text:
+                                `🔐 *ALPHA XMD PAIRING*\n\n` +
+                                `📞 *Number:* +${rawNumber}\n` +
+                                `🔑 *PAIRING CODE:* \`${formatted}\`\n\n` +
+                                `📱 *HOW TO CONNECT*\n` +
+                                `1. Open WhatsApp.\n` +
+                                `2. Go to Linked Devices.\n` +
+                                `3. Select Link with phone number.\n` +
+                                `4. Enter the pairing code.\n\n` +
+                                `⏱️ The code expires shortly.\n\n` +
+                                `📢 *Alpha XMD Channel:*\n` +
+                                `https://whatsapp.com/channel/0029VbCHc4kB4hdVt7JDX10a`,
+                            contextInfo: channelContext
+                        },
+                        { quoted: m }
+                    );
+                }
+            };
+
+            await reply(
+                `🔐 Requesting a WhatsApp pairing code for +${rawNumber}...\n\n` +
+                `⏳ Please wait.`
+            );
+
             try {
                 await global.pairAccount(rawNumber, {
-                    onCode: async formatted => reply(
-                        `✅ *Pairing Code Ready*\n\n📞 *Number:* +${rawNumber}\n🔢 *Code:* *${formatted}*\n\n⏱️ The code expires shortly.\n📱 Open WhatsApp → Linked devices → Link with phone number → Enter this code.`
-                    ),
-                    onConnected: async () => reply(
-                        `🎉 *Successfully connected +${rawNumber}!*\n\nYour Alpha XMD account is starting now.`
-                    ),
-                    onError: async err => reply(`❌ Pairing failed: ${err.message || String(err)}`)
+
+                    onCode: async (formatted) => {
+                        await sendPairCode(formatted);
+                    },
+
+                    onConnected: async () => {
+                        await sock.sendMessage(
+                            m.chat,
+                            {
+                                text:
+                                    `🎉 *ALPHA XMD CONNECTED!*\n\n` +
+                                    `✅ Number: +${rawNumber}\n` +
+                                    `🟢 Your account has successfully connected.\n\n` +
+                                    `📢 *Alpha XMD Channel:*\n` +
+                                    `https://whatsapp.com/channel/0029VbCHc4kB4hdVt7JDX10a`,
+                                contextInfo: channelContext
+                            },
+                            { quoted: m }
+                        );
+                    },
+
+                    onError: async (err) => {
+                        await reply(
+                            `❌ *Pairing failed!*\n\n${err.message || String(err)}`
+                        );
+                    }
                 });
+
             } catch (err) {
-                return reply(`❌ ${err.message || String(err)}`);
+                console.error("Pair command error:", err);
+
+                return reply(
+                    `❌ ${err.message || String(err)}`
+                );
             }
         }
     }
