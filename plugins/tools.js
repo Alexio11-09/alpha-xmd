@@ -13,6 +13,21 @@ const cl = f => { try { fs.unlinkSync(f) } catch {} };
 // read a download stream into one Buffer (faster and lighter than Buffer.concat in a loop)
 const rd = async st => { const a = []; for await (const c of st) a.push(c); return Buffer.concat(a) };
 
+// view-once helpers
+const kindOf = t => t.includes('image') ? 'image' : t.includes('video') ? 'video' : 'audio';
+
+// try the direct download first; if that fails, try Baileys' own downloader (it can ask the phone to re-upload expired media)
+async function vvFetch(q, t, c) {
+  try { return await rd(await dl(c, kindOf(t))); }
+  catch (e1) {
+    try { return await q.download(); } catch (e2) { throw e1; }
+  }
+}
+
+const vvError = e => /40[34]|410|gone|not found|expired/i.test(String(e.message))
+  ? "❌ WhatsApp no longer has that media (it was already opened on this account, or it expired)."
+  : "❌ Failed: " + String(e.message).slice(0, 120);
+
 const up = async (b, f = 'img.png') => {
   const fd = new (require('form-data'))();
   fd.append('reqtype', 'fileupload');
@@ -249,30 +264,29 @@ module.exports = [
   const q = m.quoted;
   if (!q) return reply("❌ Reply view-once");
   const t = q.mtype, c = q.message?.[t];
-  if (!(c?.viewOnce || q.viewOnce)) return reply("❌ Not view-once");
+  if (!c) return reply("❌ I can't read that message");
+  if (!(c.viewOnce || q.viewOnce)) return reply("❌ Not view-once");
   try {
-    const st = await dl(c, t.includes('image') ? 'image' : t.includes('video') ? 'video' : 'audio');
-    const b = await rd(st);
+    const b = await vvFetch(q, t, c);
     if (t.includes('image')) await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
     else if (t.includes('video')) await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
     else { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply("✅ Voice saved"); }
-  } catch (e) { console.log('[VV]', e.message); reply("❌ Failed"); }
+  } catch (e) { console.log('[VV]', e.message); reply(vvError(e)); }
 } },
 
 { command: "vv2", category: "tools", execute: async (s, m) => {
   const q = m.quoted;
   if (!q) return;
   const t = q.mtype, c = q.message?.[t];
-  if (!(c?.viewOnce || q.viewOnce)) return;
+  if (!c || !(c.viewOnce || q.viewOnce)) return;
   try {
-    const st = await dl(c, t.includes('image') ? 'image' : t.includes('video') ? 'video' : 'audio');
-    const b = await rd(st);
+    const b = await vvFetch(q, t, c);
     const dest = await resolveDest(s, m);
     if (t.includes('image')) await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
     else if (t.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
     else await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
     await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
-  } catch (e) { console.log("VV2 Err:", e.message); }
+  } catch (e) { console.log("[VV2]", e.message); }
 } },
 
 { command: "url", category: "tools", execute: async (s, m, { reply }) => {
