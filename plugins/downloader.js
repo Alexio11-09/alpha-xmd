@@ -56,6 +56,37 @@ const B = c => ({
 
 const rm = f => { try { if (f && fs.existsSync(f)) fs.unlinkSync(f); } catch {} };
 
+// Some hosts (Wikimedia, Flickr...) block or throttle requests that have no proper
+// User-Agent, which is why .img sent one or two pictures and then failed.
+// We download the picture ourselves with a proper User-Agent and send the bytes.
+const IMG_UA = 'Mozilla/5.0 (compatible; AlphaBot/1.0; +https://github.com/Alexio11-09/alpha-xmd)';
+
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+async function fetchImage(url, max = 5 * 1024 * 1024) {
+  const r = await ax.get(url, {
+    responseType: 'arraybuffer', timeout: 15000, maxContentLength: max, maxBodyLength: max,
+    headers: { 'User-Agent': IMG_UA, 'Accept': 'image/*' }
+  });
+  const type = String(r.headers['content-type'] || '');
+  if (!/^image\/(jpeg|png|webp|gif)/i.test(type)) throw new Error('not an image: ' + type);
+  return Buffer.from(r.data);
+}
+
+// Send audio/video by link; if WhatsApp can't fetch the link itself, download it first and send the file
+async function sendMediaUrl(s, m, kind, url, extra, opts) {
+  try {
+    return await s.sendMessage(m.chat, { [kind]: { url }, ...extra }, opts);
+  } catch (e) {
+    console.log(`[${kind.toUpperCase()}] direct send failed (${e.message}), downloading first`);
+    const o = tmpFile('dl', kind === 'audio' ? '.mp3' : '.mp4');
+    try {
+      await dl(url, o);
+      return await s.sendMessage(m.chat, { [kind]: { url: o }, ...extra }, opts);
+    } finally { rm(o); }
+  }
+}
+
 // Look at the first bytes of the file to tell images from videos
 // (the old code treated everything as a video because the file name ended in .mp4)
 function sniffType(file) {
@@ -120,6 +151,7 @@ const API = {
   itunes:    process.env.ITUNES_API    || 'https://itunes.apple.com',
   wallhaven: process.env.WALLHAVEN_API || 'https://wallhaven.cc/api/v1',
   wikimedia: process.env.WIKIMEDIA_API || 'https://commons.wikimedia.org/w/api.php',
+  openverse: process.env.OPENVERSE_API || 'https://api.openverse.org/v1',
   pexels:    process.env.PEXELS_API    || 'https://api.pexels.com/v1'
 };
 
@@ -165,7 +197,7 @@ module.exports = [
     if (!audioUrl) { console.log('[PLAY] no audio URL returned for:', v.title); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); return reply('⚠️ No audio URL returned. The download service may be busy, try again in a minute.'); }
 
     await s.sendMessage(m.chat, { image: { url: v.thumbnail }, caption: `🎵 *${v.title}*\n\n👑 ${c.settings.title}`, contextInfo: B(c) }, { quoted: m });
-    await s.sendMessage(m.chat, { audio: { url: audioUrl }, mimetype: 'audio/mpeg', ptt: !1, fileName: v.title.replace(/[^a-zA-Z0-9]/g, '_') + '.mp3', contextInfo: { externalAdReply: { title: v.title, body: '🎧 Now playing', thumbnailUrl: v.thumbnail, mediaType: 1 } } }, { quoted: m });
+    await sendMediaUrl(s, m, 'audio', audioUrl, { mimetype: 'audio/mpeg', ptt: !1, fileName: v.title.replace(/[^a-zA-Z0-9]/g, '_') + '.mp3', contextInfo: { externalAdReply: { title: v.title, body: '🎧 Now playing', thumbnailUrl: v.thumbnail, mediaType: 1 } } }, { quoted: m });
     await s.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
   } catch (e) { console.log('play err:', e.message); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); reply('❌ Failed'); }
 } },
@@ -178,16 +210,43 @@ module.exports = [
     if (!t.startsWith('http')) { const sr = await yts(t); if (!sr.videos.length) return reply('❌ No videos'); u = sr.videos[0].url; }
     await s.sendMessage(m.chat, { react: { text: '⬇️', key: m.key } });
 
+    const caption = `✅ Downloaded\n👑 ${c.settings.title}`;
     const pick = v => v?.download?.downloadUrl || v?.url || v?.downloadUrl || null;
+    let sent = false;
+
+    // Provider 1: the same service .play uses
     let videoUrl = null;
-
-    try { videoUrl = pick(await ytdl.downloadVideo(u)); } catch (e) {}
+    try { videoUrl = pick(await ytdl.downloadVideo(u)); } catch (e) { console.log('[VIDEO] provider 1 error:', e.message); }
     if (!videoUrl) { try { videoUrl = pick(await ytdl.downloadVideo(u, 360)); } catch (e) {} }
-    if (!videoUrl) { await sleep(2000); try { videoUrl = pick(await ytdl.downloadVideo(u, 360)); } catch (e) {} }
 
-    if (!videoUrl) { console.log('[VIDEO] no video URL returned for:', u); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); return reply('⚠️ No video URL returned. The download service may be busy, try again in a minute.'); }
+    if (videoUrl) {
+      try {
+        await sendMediaUrl(s, m, 'video', videoUrl, { mimetype: 'video/mp4', fileName: 'video_' + Date.now() + '.mp4', caption, contextInfo: B(c) }, { quoted: m });
+        sent = true;
+      } catch (e) { console.log('[VIDEO] provider 1 send failed:', e.message); }
+    } else {
+      console.log('[VIDEO] provider 1 returned no URL for:', u);
+    }
 
-    await s.sendMessage(m.chat, { video: { url: videoUrl }, mimetype: 'video/mp4', fileName: 'video_' + Date.now() + '.mp4', caption: `✅ Downloaded\n👑 ${c.settings.title}`, contextInfo: B(c) }, { quoted: m });
+    // Provider 2 (independent service): download to disk, then send from disk
+    if (!sent) {
+      const o = tmpFile('yv');
+      try {
+        const result = await downloadVideo(u, o);
+        if (result && fs.existsSync(o)) {
+          const size = fs.statSync(o).size;
+          if (size > 64 * MB) {
+            await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
+            return reply(`⚠️ That video is ${fmtSize(size)}, which is too large for this bot (limit ${fmtSize(64 * MB)}).`);
+          }
+          await s.sendMessage(m.chat, { video: { url: o }, mimetype: 'video/mp4', fileName: 'video_' + Date.now() + '.mp4', caption, contextInfo: B(c) }, { quoted: m });
+          sent = true;
+        }
+      } catch (e) { console.log('[VIDEO] provider 2 failed:', e.message); }
+      finally { rm(o); }
+    }
+
+    if (!sent) { await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); return reply('⚠️ Could not download that video right now. Try again in a minute, or try a different video.'); }
     await s.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
   } catch (e) { console.log('video err:', e.message); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); reply('❌ Failed'); }
 } },
@@ -387,16 +446,20 @@ module.exports = [
       list = (d?.data || []).filter(x => x.path && Number(x.file_size || 0) <= MAX_IMG);
     }
 
-    list = list.slice(0, 3);
     if (!list.length) { await react(s, m, '❌'); return reply('❌ No wallpapers found for that. Try another word.'); }
 
-    for (let i = 0; i < list.length; i++) {
-      await s.sendMessage(m.chat, {
-        image: { url: list[i].path },
-        caption: `🖼️ ${q} (${i + 1}/${list.length})${list[i].resolution ? '\n📐 ' + list[i].resolution : ''}`
-      }, i === 0 ? { quoted: m } : {});
+    // a picture that fails to load is skipped, the next one is tried
+    let sent = 0;
+    for (const w of shuffle(list).slice(0, 8)) {
+      if (sent >= 3) break;
+      try {
+        const buf = await fetchImage(w.path, MAX_IMG);
+        await s.sendMessage(m.chat, { image: buf, caption: `🖼️ ${q}${w.resolution ? '\n📐 ' + w.resolution : ''}` }, sent === 0 ? { quoted: m } : {});
+        sent++;
+      } catch (e) { console.log('[WALLPAPER] skipped one:', e.message); }
     }
 
+    if (!sent) { await react(s, m, '❌'); return reply('❌ Could not load wallpapers right now. Try again in a moment.'); }
     await react(s, m, '✅');
   } catch (e) {
     console.log('[WALLPAPER] failed:', e.message);
@@ -407,8 +470,9 @@ module.exports = [
 
 // ======================================================
 // .img <query>
-// Uses Pexels when PEXELS_KEY is set (free key from pexels.com/api),
-// otherwise Wikimedia Commons (no key, but more encyclopedic images).
+// Sources: Pexels (if PEXELS_KEY is set), Openverse and Wikimedia Commons.
+// Results are mixed randomly so repeated searches don't give the same pictures,
+// and a picture that can't be loaded is skipped instead of stopping the command.
 // ======================================================
 { command: 'img', aliases: ['image', 'pic'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   if (!args[0]) return reply('❌ Usage: .img <query>');
@@ -419,34 +483,54 @@ module.exports = [
     let urls = [];
 
     if (process.env.PEXELS_KEY) {
-      const d = await getJson(`${API.pexels}/search`, { query: q, per_page: 5 }, { Authorization: process.env.PEXELS_KEY });
-      urls = (d?.photos || []).map(p => p.src?.large || p.src?.medium).filter(Boolean);
+      try {
+        const d = await getJson(`${API.pexels}/search`, { query: q, per_page: 15, page: 1 + Math.floor(Math.random() * 3) }, { Authorization: process.env.PEXELS_KEY });
+        urls.push(...(d?.photos || []).map(p => p.src?.large || p.src?.medium).filter(Boolean));
+      } catch (e) { console.log('[IMG] pexels failed:', e.message); }
     }
 
-    if (!urls.length) {
-      const d = await getJson(API.wikimedia, {
-        action: 'query', format: 'json', origin: '*',
-        generator: 'search', gsrsearch: `${q} filetype:bitmap`, gsrnamespace: 6, gsrlimit: 8,
-        prop: 'imageinfo', iiprop: 'url|mime', iiurlwidth: 1000
-      });
-
-      urls = Object.values(d?.query?.pages || {})
-        .map(p => p.imageinfo?.[0])
-        .filter(i => i && /^image\/(jpeg|png)$/.test(i.mime || ''))
-        .map(i => i.thumburl || i.url)
-        .filter(Boolean);
+    if (urls.length < 4) {
+      try {
+        const d = await getJson(API.openverse + '/images/', { q, page_size: 20, mature: false });
+        urls.push(...(d?.results || []).map(r => r.url || r.thumbnail).filter(Boolean));
+      } catch (e) { console.log('[IMG] openverse failed:', e.message); }
     }
 
-    urls = urls.slice(0, 4);
-    if (!urls.length) { await react(s, m, '❌'); return reply('❌ No images found for that.'); }
-
-    for (let i = 0; i < urls.length; i++) {
-      await s.sendMessage(m.chat, {
-        image: { url: urls[i] },
-        caption: `📸 ${q} (${i + 1}/${urls.length})`
-      }, i === 0 ? { quoted: m } : {});
+    if (urls.length < 4) {
+      try {
+        const wiki = async offset => {
+          const d = await getJson(API.wikimedia, {
+            action: 'query', format: 'json', origin: '*',
+            generator: 'search', gsrsearch: `${q} filetype:bitmap`, gsrnamespace: 6, gsrlimit: 20, gsroffset: offset,
+            prop: 'imageinfo', iiprop: 'url|mime', iiurlwidth: 1000
+          });
+          return Object.values(d?.query?.pages || {})
+            .map(p => p.imageinfo?.[0])
+            .filter(i => i && /^image\/(jpeg|png)$/.test(i.mime || ''))
+            .map(i => i.thumburl || i.url)
+            .filter(Boolean);
+        };
+        let w = await wiki(Math.floor(Math.random() * 30));
+        if (!w.length) w = await wiki(0);
+        urls.push(...w);
+      } catch (e) { console.log('[IMG] wikimedia failed:', e.message); }
     }
 
+    urls = shuffle([...new Set(urls)]);
+    if (!urls.length) { await react(s, m, '❌'); return reply('❌ No images found for that. Try another word.'); }
+
+    let sent = 0, tries = 0;
+    for (const u of urls) {
+      if (sent >= 4 || tries >= 14) break;
+      tries++;
+      try {
+        const buf = await fetchImage(u);
+        await s.sendMessage(m.chat, { image: buf, caption: `📸 ${q} (${sent + 1})` }, sent === 0 ? { quoted: m } : {});
+        sent++;
+      } catch (e) { console.log('[IMG] skipped one:', e.message); }
+    }
+
+    if (!sent) { await react(s, m, '❌'); return reply('❌ Could not load any pictures for that. Try another word.'); }
     await react(s, m, '✅');
   } catch (e) {
     console.log('[IMG] failed:', e.message);
