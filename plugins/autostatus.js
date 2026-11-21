@@ -10,7 +10,8 @@ const defaults = () => ({
 });
 
 const cacheByAccount = new Map();
-const statusCacheByAccount = new Map();
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function accountKey(sock) {
     return tenant.phoneOf(sock) || 'unknown';
@@ -31,7 +32,8 @@ function getConfig(sock) {
 
     const merged = { ...defaults(), ...c };
 
-    cacheByAccount.set(key, merged);
+    // Only cache for a real, identified account
+    if (key !== 'unknown') cacheByAccount.set(key, merged);
     return merged;
 }
 
@@ -84,7 +86,10 @@ async function reactToStatus(s, statusKey) {
     }
 }
 
-async function handleStatusUpdate(s, st) {
+// ---------------------------------------------------------------
+// Process one status (view + optional reaction)
+// ---------------------------------------------------------------
+async function processStatus(s, st) {
     const conf = getConfig(s);
 
     if (!conf.enabled) return;
@@ -94,102 +99,63 @@ async function handleStatusUpdate(s, st) {
     if (!m || !m.key) return;
     if (m.key.remoteJid !== 'status@broadcast') return;
 
-    const p =
-        m.key.participantAlt ||
-        m.key.participant ||
-        m.key.remoteJid;
-
-    const key = accountKey(s);
-
-    let accountCache =
-        statusCacheByAccount.get(key) || new Map();
-
-    accountCache.set(p, m);
-
-    if (accountCache.size > 100) {
-        accountCache.delete(accountCache.keys().next().value);
-    }
-
-    statusCacheByAccount.set(key, accountCache);
-
-    let originalSendReceipt;
-    let patched = false;
-    let fakeReceiptSent = false;
-
+    // View the status.
+    // NOTE: Baileys' readMessages() uses an internal receipt function, so the
+    // old "fake timestamp" patch of s.sendReceipt never took effect and a normal
+    // read receipt was always sent. The dead patch (and its noisy log line)
+    // has been removed; behaviour is unchanged.
     try {
-        if (typeof s.sendReceipt !== 'function') {
-            throw new Error('sendReceipt is unavailable');
-        }
-
-        originalSendReceipt = s.sendReceipt;
-
-        // Temporarily intercept status read receipts.
-        s.sendReceipt = async function (jid, participant, ids, type) {
-            if (jid === 'status@broadcast' && type === 'read') {
-                for (const id of ids) {
-                    await s.sendNode({
-                        tag: 'receipt',
-                        attrs: {
-                            id,
-                            to: participant || jid,
-                            type: 'read',
-                            t: '0'
-                        }
-                    });
-
-                    fakeReceiptSent = true;
-                }
-
-                return;
-            }
-
-            return originalSendReceipt.call(
-                this,
-                jid,
-                participant,
-                ids,
-                type
-            );
-        };
-
-        patched = true;
-
-        // Trigger the intercepted receipt.
         await s.readMessages([m.key]);
-
-        if (fakeReceiptSent) {
-            console.log(
-                '[AUTOSTATUS] Modified status receipt sent (t=0).'
-            );
-        } else {
-            console.log(
-                '[AUTOSTATUS] No modified receipt was confirmed.'
-            );
-        }
-
     } catch (e) {
-        console.log(
-            '[AUTOSTATUS] Fake timestamp attempt failed:',
-            e.message
-        );
-
-        // IMPORTANT:
-        // Do not send a normal read receipt as a fallback.
-        // That could send the actual viewing time.
-    } finally {
-        // Always restore the original function.
-        if (patched) {
-            s.sendReceipt = originalSendReceipt;
-        }
+        console.log('[AUTOSTATUS] View failed:', e.message);
     }
 
     // Keep the existing reaction delay.
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await delay(500);
 
     try {
         await reactToStatus(s, m.key);
     } catch (err) {
         console.log('[AUTOSTATUS] Reaction error:', err.message);
+    }
+}
+
+// ---------------------------------------------------------------
+// Queue per account so a burst of statuses (e.g. after a reconnect)
+// is handled one at a time instead of all at once.
+// ---------------------------------------------------------------
+const queues = new Map();
+const pending = new Map();
+
+function handleStatusUpdate(s, st) {
+    const m = st.messages ? st.messages[0] : st;
+    if (!m || !m.key) return Promise.resolve();
+
+    // Ignore old backlog statuses (older than 10 minutes)
+    const ts = Number(m.messageTimestamp || 0);
+    if (ts && Date.now() / 1000 - ts > 600) return Promise.resolve();
+
+    const key = accountKey(s);
+
+    // Cap the backlog per account
+    if ((pending.get(key) || 0) >= 20) return Promise.resolve();
+    pending.set(key, (pending.get(key) || 0) + 1);
+
+    const next = (queues.get(key) || Promise.resolve())
+        .then(() => processStatus(s, st))
+        .catch(() => {})
+        .finally(() => pending.set(key, Math.max(0, (pending.get(key) || 1) - 1)));
+
+    queues.set(key, next);
+    return next;
+}
+
+// Lets index.js skip receiving statuses entirely for accounts that don't use this feature
+function isEnabled(s) {
+    try {
+        return !!getConfig(s).enabled;
+    } catch {
+        return false;
     }
 }
 
@@ -268,3 +234,4 @@ module.exports = [{
 }];
 
 module.exports.handleStatusUpdate = handleStatusUpdate;
+module.exports.isEnabled = isEnabled;
