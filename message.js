@@ -6,17 +6,35 @@ const tenant = require("./library/tenant");
 
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
+// ======================================================
+// GROUP ADMIN LOOKUP (cached for 60s, admins only)
+// ======================================================
+const adminCache = new Map();
+
+async function getAdmins(sock, chatId) {
+    const botKey = String(sock.user?.id || "").split(/[:@]/)[0];
+    const key = botKey + ":" + chatId;
+    const hit = adminCache.get(key);
+    if (hit && Date.now() - hit.t < 60000) return hit.data;
+
+    const md = await sock.groupMetadata(chatId);
+    const data = (md.participants || []).filter(p => p.admin === "admin" || p.admin === "superadmin");
+
+    adminCache.set(key, { t: Date.now(), data });
+    if (adminCache.size > 100) adminCache.delete(adminCache.keys().next().value);
+    return data;
+}
+
 async function checkAdmin(sock, chatId, senderId, botId) {
     try {
-        const metadata = await sock.groupMetadata(chatId);
-        const participants = metadata.participants || [];
+        const participants = await getAdmins(sock, chatId);
         const senderBase = senderId.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
         const botBase = botId.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
         let isSenderAdmin = false;
         let isBotAdmin = false;
 
         for (const p of participants) {
-            const pIds = [p.id, p.lid, p.phoneNumber, p.jid].filter(Boolean); 
+            const pIds = [p.id, p.lid, p.phoneNumber, p.jid].filter(Boolean);
             let isSenderMatch = false;
             let isBotMatch = false;
             for (const pId of pIds) {
@@ -59,10 +77,29 @@ const getGlobalSettings = (sock) => { try { return tenant.read(sock, 'settings.j
 const setGlobalSettings = (sock, newGlobal) => { try { tenant.write(sock, 'settings.json', newGlobal); } catch {} };
 const getGlobalMode = (sock) => getGlobalSettings(sock).mode || 'public';
 
+// ======================================================
+// SESSION SETTINGS FILE (cached for 5s)
+// ======================================================
+const sessCache = new Map();
+
+function readSessionSettings(botNum) {
+    const hit = sessCache.get(botNum);
+    if (hit && Date.now() - hit.t < 5000) return hit.v;
+
+    let v = {};
+    try {
+        const p = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
+        if (fs.existsSync(p)) v = JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch {}
+
+    sessCache.set(botNum, { t: Date.now(), v });
+    return v;
+}
+
 const saveSessionSetting = (sock, key, value) => {
     try {
         const botNum = sock.user.id.split('@')[0].split(':')[0];
-        const dir = path.join(process.cwd(), 'sessions', botNum); 
+        const dir = path.join(process.cwd(), 'sessions', botNum);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
         const p = path.join(dir, 'settings.json');
@@ -70,13 +107,17 @@ const saveSessionSetting = (sock, key, value) => {
         try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
         s[key] = value;
         fs.writeFileSync(p, JSON.stringify(s, null, 2));
+        sessCache.delete(botNum);
         return true;
-    } catch(e) { 
-        console.log("Save error:", e); 
-        return false; 
+    } catch(e) {
+        console.log("Save error:", e);
+        return false;
     }
 };
 
+// ======================================================
+// COMMAND LOADING
+// ======================================================
 const commands = [];
 const loadCommands = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -92,6 +133,45 @@ const loadCommands = (dir) => {
 loadCommands(path.join(__dirname, "plugins"));
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
+
+// ======================================================
+// SECURITY: commands only the MAIN owner may run.
+// (Every paired account counts as "owner" of its own session, but these
+// commands act on the whole shared process, so they are restricted.)
+// ======================================================
+const MAIN_ONLY = new Set([
+    "eval", "restart", "shutdown", "update",
+    "clearsession", "cleartmp", "deljunk", "disk",
+    "sudo", "addowner", "delowner"
+]);
+
+// ======================================================
+// HEAVY TASK QUEUE: downloads / ffmpeg / image tools run one at a time
+// across ALL sessions so memory spikes can't stack up.
+// ======================================================
+const HEAVY = new Set([
+    "play", "video", "spotify", "tiktok", "instagram", "facebook", "ytpost",
+    "pindl", "mediafire", "gdrive", "ringtone", "apk", "movie", "dlmovie",
+    "dlseries", "gitclone", "shazam", "img", "wallpaper",
+    "sticker", "toimg", "removebg", "blur", "smeme", "wasted", "take", "steal",
+    "attp", "ttp", "ss", "stickertelegram", "imgscan",
+    "tomp3", "tovideo", "toppt", "topdf", "vv", "vv2",
+    "deep", "smooth", "fat", "blown", "radio", "robot", "chipmunk",
+    "nightcore", "earrape", "bass", "reverse", "slow", "fast", "baby", "demon"
+]);
+
+let heavyQueue = Promise.resolve();
+let heavyPending = 0;
+const HEAVY_TIMEOUT = 180000;
+
+function runHeavy(job) {
+    const run = heavyQueue.then(() => Promise.race([
+        job(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("Task timed out")), HEAVY_TIMEOUT))
+    ]));
+    heavyQueue = run.catch(() => {});
+    return run;
+}
 
 const deny = {
     owner: "😂 Only the bot owner can do that.",
@@ -110,45 +190,44 @@ module.exports = async (sock, m) => {
     try {
         const contextInfo = { forwardingScore:999, isForwarded:true, forwardedNewsletterMessageInfo:{ newsletterJid: config.newsletter.id + "@newsletter", newsletterName: config.newsletter.name } };
 
-        const reply = async (text, extra={}) => { 
-            try { return await sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); } 
-            catch (e) { 
-                try { return await sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } catch (e2) { console.log("Reply error:", e2.message); } 
-            } 
+        const reply = async (text, extra={}) => {
+            try { return await sock.sendMessage(m.chat, { text, contextInfo, ...extra }, { quoted: m }); }
+            catch (e) {
+                try { return await sock.sendMessage(m.chat, { text, ...extra }, { quoted: m }); } catch (e2) { console.log("Reply error:", e2.message); }
+            }
         };
 
-        const send = async (data) => { 
-            try { return await sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); } 
-            catch (e) { 
-                try { return await sock.sendMessage(m.chat, data, { quoted: m }); } catch(e2) { console.log("Send error:", e2.message); } 
-            } 
+        const send = async (data) => {
+            try { return await sock.sendMessage(m.chat, { ...data, contextInfo }, { quoted: m }); }
+            catch (e) {
+                try { return await sock.sendMessage(m.chat, data, { quoted: m }); } catch(e2) { console.log("Send error:", e2.message); }
+            }
         };
 
         const botNum = sock.user.id.split('@')[0].split(':')[0];
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
         m.isOwner = tenant.isAccountOwner(m.sender, sock) || isTempOwnerBase(m.sender, sock);
-        const sessionSettingsPath = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
-        let gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: "." };
-        try { if(fs.existsSync(sessionSettingsPath)) gs = { ...gs, ...JSON.parse(fs.readFileSync(sessionSettingsPath, "utf8")) }; } catch {}
+
+        const gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: ".", ...readSessionSettings(botNum) };
 
         // 🎯 GHOST MODE: skip read receipt when ghost is ON so sender stays at one tick
         if (gs.autoread && !sock._ghostMode) { try { await sock.readMessages([m.key]); } catch {} }
 
         // 🎯 GHOST MODE: skip typing presence when ghost is ON to avoid leaking activity
-        if (gs.autotyping && !sock._ghostMode) { 
-            try { 
+        if (gs.autotyping && !sock._ghostMode) {
+            try {
                 await sock.presenceSubscribe(m.chat);
-                await sock.sendPresenceUpdate("composing", m.chat); 
-                await new Promise(r => setTimeout(r, 3000)); 
-            } catch(e){} 
+                await sock.sendPresenceUpdate("composing", m.chat);
+                await new Promise(r => setTimeout(r, 1000));
+            } catch(e){}
         }
         // 🎯 GHOST MODE: skip recording presence when ghost is ON to avoid leaking activity
-        if (gs.autorecording && !sock._ghostMode) { 
-            try { 
+        if (gs.autorecording && !sock._ghostMode) {
+            try {
                 await sock.presenceSubscribe(m.chat);
-                await sock.sendPresenceUpdate("recording", m.chat); 
-                await new Promise(r => setTimeout(r, 3000)); 
-            } catch(e){} 
+                await sock.sendPresenceUpdate("recording", m.chat);
+                await new Promise(r => setTimeout(r, 1000));
+            } catch(e){}
         }
 
         const prefix = m.prefix || config.prefix || ".";
@@ -166,17 +245,27 @@ module.exports = async (sock, m) => {
                 const gsets = getGroupSettings(m.chat, sock);
 
                 if (containsBadWord(m.text, m.chat, sock)) {
+                    // Admin status is normally only computed for commands; get it here (cached)
+                    const st = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
+                    m.isAdmin = st.isSenderAdmin;
+                    m.isBotAdmin = st.isBotAdmin;
+
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
                     return;
                 }
 
-                if (gsets.antilink) {
+                if (gsets.antilink && containsLink(m.text)) {
                     const mode = gsets.antilinkMode || 'admins';
                     const action = gsets.antilinkAction || 'delete';
+
+                    const st = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
+                    m.isAdmin = st.isSenderAdmin;
+                    m.isBotAdmin = st.isBotAdmin;
+
                     let allowed = (mode === 'admins' && m.isAdmin) || (mode === 'owner' && m.isOwner);
 
-                    if (!allowed && containsLink(m.text)) {
+                    if (!allowed) {
                         if (action === 'delete') {
                             if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                             await sock.sendMessage(m.chat, { text: `🔗 Links not allowed, @${m.sender.split('@')[0]}.`, mentions:[m.sender] }, { quoted: m });
@@ -196,6 +285,9 @@ module.exports = async (sock, m) => {
         const cmdName = args.shift().toLowerCase();
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
+
+        // 🔒 Dangerous commands: main owner only
+        if (MAIN_ONLY.has(command.command) && !tenant.isMainOwner(m.sender)) return reply(deny.owner);
 
         const isOwner = m.isOwner;
 
@@ -218,8 +310,8 @@ module.exports = async (sock, m) => {
         }
 
         if (command.admin) {
-            if (!isBotAdmin) return reply(deny.botAdmin); 
-            if (!isSenderAdmin && !isOwner) return reply(deny.admin); 
+            if (!isBotAdmin) return reply(deny.botAdmin);
+            if (!isSenderAdmin && !isOwner) return reply(deny.admin);
         }
 
         const ctx = { args, reply, send, isOwner, isGroup: m.isGroup, isAdmin: isSenderAdmin, isBotAdmin: isBotAdmin, config, prefix };
@@ -229,7 +321,17 @@ module.exports = async (sock, m) => {
         if (command.group === false && m.isGroup) return reply(deny.private);
         if (command.group && !m.isGroup) return reply(deny.group);
 
-        await command.execute(sock, m, ctx);
+        if (HEAVY.has(command.command)) {
+            if (heavyPending >= 15) return reply("⏳ I'm a bit busy right now, please try again in a moment.");
+            heavyPending++;
+            try {
+                await runHeavy(() => command.execute(sock, m, ctx));
+            } finally {
+                heavyPending--;
+            }
+        } else {
+            await command.execute(sock, m, ctx);
+        }
     } catch (err) {
         console.log("🔥 HANDLER ERROR:", err);
         try { await sock.sendMessage(m.chat, { text: `🤖 Error: ${err.message}` }, { quoted: m }); } catch {}
