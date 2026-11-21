@@ -1,5 +1,23 @@
 // © 2026 Alpha. All Rights Reserved.
 
+// ======================================================
+// QUIET NOISY LOGS (must run before anything else)
+// libsignal prints huge "Closing session: SessionEntry {...}" dumps
+// through console.log/info/warn. Dropping them saves memory + CPU.
+// ======================================================
+for (const k of ["log", "info", "warn"]) {
+  const original = console[k];
+
+  console[k] = (...args) => {
+    if (
+      typeof args[0] === "string" &&
+      /^(Closing|Opening|Removing|Migrating).*session/i.test(args[0])
+    ) return;
+
+    original(...args);
+  };
+}
+
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -31,10 +49,13 @@ process.on("exit", code => {
 
 process.on("SIGTERM", () => {
   console.log("⚠️ Received SIGTERM from hosting panel.");
+  // A SIGTERM handler replaces Node's default exit, so exit explicitly
+  setTimeout(() => process.exit(0), 500);
 });
 
 process.on("SIGINT", () => {
   console.log("⚠️ Received SIGINT.");
+  setTimeout(() => process.exit(0), 500);
 });
 
 const originalConsoleError = console.error;
@@ -62,6 +83,19 @@ const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN || "3L4Ccoik7R16ilMsfKycK2OZ
 const NGROK_DOMAIN =
   process.env.NGROK_DOMAIN ||
   "itinerary-splashy-flyer.ngrok-free.dev";
+
+// ======================================================
+// LIMITS
+// ======================================================
+
+// Maximum number of WhatsApp sessions this server will run.
+// Change with the MAX_SESSIONS environment variable.
+const MAX_SESSIONS = Number(process.env.MAX_SESSIONS) || 20;
+
+// Skip receiving statuses for accounts that don't use autostatus.
+// Set FILTER_STATUS=0 in the environment to turn this off
+// (e.g. if another plugin needs to see every status).
+const FILTER_STATUS = process.env.FILTER_STATUS !== "0";
 
 // ======================================================
 // EXPRESS SERVER
@@ -100,13 +134,67 @@ const reconnectTimers = new Map();
 const pairingSockets = new Map();
 
 const store = new Map();
+
+// Settings cache with a short expiry so changes made by commands
+// (which write the settings file directly) are picked up quickly.
 const settingsCache = new Map();
+const SETTINGS_TTL = 5000;
+
+function cacheGet(phone) {
+  const entry = settingsCache.get(phone);
+  return entry && Date.now() - entry.t < SETTINGS_TTL ? entry.v : null;
+}
+
+function cacheSet(phone, value) {
+  settingsCache.set(phone, { t: Date.now(), v: value });
+}
+
+function readSettingsFile(phone) {
+  try {
+    const file = path.join(sessionsDir, phone, "settings.json");
+
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, "utf8"));
+
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.log(`[SETTINGS] Could not read ${phone}:`, err.message);
+  }
+
+  return {};
+}
 
 let baileys;
+let cachedVersion;
+
+async function getWaVersion() {
+  if (!cachedVersion) {
+    cachedVersion = (await baileys.fetchLatestBaileysVersion()).version;
+  }
+
+  return cachedVersion;
+}
 
 global.ghostMode = false;
 global.pollCache = new Map();
 global.currentSock = null;
+
+// How many session slots are in use or reserved
+function slotsInUse() {
+  return (
+    activeSockets.size +
+    startingSockets.size +
+    pairingSockets.size +
+    reconnectTimers.size
+  );
+}
+
+function atCapacity() {
+  return slotsInUse() >= MAX_SESSIONS;
+}
 
 // ======================================================
 // MEMORY CLEANUP
@@ -284,36 +372,15 @@ function attachHandlers(sock, phoneNumber) {
       prefix: "."
     };
 
-    if (settingsCache.has(phoneNumber)) {
-      return settingsCache.get(phoneNumber);
-    }
+    const cached = cacheGet(phoneNumber);
 
-    let saved = {};
+    if (cached) return cached;
 
-    try {
-      const settingsPath = path.join(
-        sessionsDir,
-        phoneNumber,
-        "settings.json"
-      );
-
-      if (fs.existsSync(settingsPath)) {
-        saved = JSON.parse(
-          fs.readFileSync(settingsPath, "utf8")
-        );
-      }
-    } catch (err) {
-      console.log(
-        `[SETTINGS] Could not read ${phoneNumber}:`,
-        err.message
-      );
-    }
+    const saved = readSettingsFile(phoneNumber);
 
     const merged = {
       ...defaults,
-      ...(saved && typeof saved === "object" && !Array.isArray(saved)
-        ? saved
-        : {}),
+      ...saved,
       chreact: {
         ...defaults.chreact,
         ...(saved?.chreact && typeof saved.chreact === "object"
@@ -322,7 +389,7 @@ function attachHandlers(sock, phoneNumber) {
       }
     };
 
-    settingsCache.set(phoneNumber, merged);
+    cacheSet(phoneNumber, merged);
     return merged;
   };
 
@@ -418,6 +485,14 @@ function attachHandlers(sock, phoneNumber) {
 
       const globalSettings = await loadGlobalSettings();
 
+      // Only keep message text in memory when anti-delete / anti-edit needs it
+      const adRaw = globalSettings.antidelete;
+      const antideleteOn =
+        adRaw && typeof adRaw === "object"
+          ? adRaw.enabled === true
+          : !!adRaw;
+      const needStore = antideleteOn || !!globalSettings.antiedit;
+
       for (const mek of chatUpdate.messages) {
         try {
           const remote = mek.key?.remoteJid;
@@ -456,20 +531,15 @@ function attachHandlers(sock, phoneNumber) {
               );
             }
 
+            // Cached read (tenant.read caches the file for a few seconds)
             let autoReactChannels = {};
 
             try {
-              const file = path.join(
-                sessionsDir,
-                phoneNumber,
-                "channel_automation.json"
-              );
-
-              if (fs.existsSync(file)) {
-                autoReactChannels = JSON.parse(
-                  fs.readFileSync(file, "utf8")
-                );
-              }
+              autoReactChannels = tenant.read(
+                sock,
+                "channel_automation.json",
+                {}
+              ) || {};
             } catch {}
 
             if (autoReactChannels[remote]) {
@@ -583,10 +653,9 @@ function attachHandlers(sock, phoneNumber) {
           m.prefix = globalSettings.prefix;
           m.globalSettings = globalSettings;
 
-          if (m.text) {
+          if (m.text && needStore) {
             store.set(`${phoneNumber}:${mek.key.id}`, {
               text: m.text || "",
-              message: mek.message,
               sender: m.sender,
               pushName: m.pushName || null
             });
@@ -629,6 +698,9 @@ function attachHandlers(sock, phoneNumber) {
             style: "fancy",
             react: true
           };
+
+      // Nothing to do if neither feature is on
+      if (!ad.enabled && !globalSettings.antiedit) return;
 
       const ownerNumber = String(
         tenant.MAIN_OWNER || "263784969735"
@@ -934,11 +1006,12 @@ function attachHandlers(sock, phoneNumber) {
     } catch {}
   }, 4000);
 
+  // Presence ping every 2 minutes (was every 20 seconds)
   sock._presenceInterval = setInterval(() => {
     if (sock.user && !sock._ghostMode) {
       sock.sendPresenceUpdate("available").catch(() => {});
     }
-  }, 20000);
+  }, 2 * 60 * 1000);
 }
 
 // ======================================================
@@ -955,6 +1028,16 @@ async function startBot(phoneNumber) {
     return;
   }
 
+  // Session cap: never run more than MAX_SESSIONS at once
+  if (activeSockets.size + startingSockets.size >= MAX_SESSIONS) {
+    console.log(
+      chalk.yellow(
+        `⛔ Session cap (${MAX_SESSIONS}) reached, not starting ${phoneNumber}`
+      )
+    );
+    return;
+  }
+
   startingSockets.add(phoneNumber);
   clearReconnectTimer(phoneNumber);
 
@@ -968,8 +1051,7 @@ async function startBot(phoneNumber) {
       { recursive: true }
     );
 
-    const { version } =
-      await baileys.fetchLatestBaileysVersion();
+    const version = await getWaVersion();
 
     const { state, saveCreds } =
       await useSQLiteAuthState(
@@ -991,12 +1073,18 @@ async function startBot(phoneNumber) {
       generateHighQualityLinkPreview: false,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 15000,
+      keepAliveIntervalMs: 30000,
       syncFullHistory: false,
       getMessage: async () => ({
         conversation: ""
       }),
-      markOnlineOnConnect: false
+      markOnlineOnConnect: false,
+
+      // Don't receive/decrypt statuses for accounts that don't use autostatus
+      shouldIgnoreJid: jid =>
+        FILTER_STATUS &&
+        jid === "status@broadcast" &&
+        !(autoStatusHandler.isEnabled?.(sock) ?? true)
     });
 
     sock._phoneNumber = phoneNumber;
@@ -1157,6 +1245,13 @@ async function pairAccount(phoneNumber, callbacks = {}) {
     );
   }
 
+  // Session cap (covers both the dashboard and the .pair command)
+  if (atCapacity()) {
+    throw new Error(
+      "Pairing is busy right now. Please try again in a few minutes."
+    );
+  }
+
   if (!baileys) {
     throw new Error("WhatsApp connection library is not ready.");
   }
@@ -1168,8 +1263,7 @@ async function pairAccount(phoneNumber, callbacks = {}) {
 
   fs.mkdirSync(sessionPath, { recursive: true });
 
-  const { version } =
-    await baileys.fetchLatestBaileysVersion();
+  const version = await getWaVersion();
 
   // IMPORTANT:
   // Use the same SQLite database as startBot.
@@ -1193,7 +1287,7 @@ async function pairAccount(phoneNumber, callbacks = {}) {
     syncFullHistory: false,
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 15000,
+    keepAliveIntervalMs: 30000,
     markOnlineOnConnect: false
   });
 
@@ -1424,6 +1518,7 @@ app.get("/api/stats", (req, res) => {
     success: true,
     connected: activeSockets.size,
     sessions: activeSockets.size,
+    capacity: MAX_SESSIONS,
     pairing: pairingSockets.size,
     starting: startingSockets.size,
     status: "online",
@@ -1462,6 +1557,7 @@ app.get("/api/health", (req, res) => {
 
     connections: {
       active: activeSockets.size,
+      capacity: MAX_SESSIONS,
       pairing: pairingSockets.size,
       starting: startingSockets.size,
       reconnecting: reconnectTimers.size
@@ -1538,6 +1634,14 @@ app.post(
       return res.status(403).json({
         success: false,
         error: "This account is already registered. Use its saved dashboard access token."
+      });
+    }
+
+    // Check capacity BEFORE issuing a control token / creating folders
+    if (!existingControl && atCapacity()) {
+      return res.status(503).json({
+        success: false,
+        error: "Pairing is busy right now. Please try again in a few minutes."
       });
     }
 
@@ -1654,6 +1758,7 @@ app.post("/api/disconnect", async (req, res) => {
     }
 
     settingsCache.delete(phoneNumber);
+    tenant.forget(phoneNumber);
 
     res.json({
       success: true,
@@ -1689,8 +1794,10 @@ app.get("/api/settings", async (req, res) => {
     });
   }
 
-  if (settingsCache.has(phoneNumber)) {
-    return res.json(settingsCache.get(phoneNumber));
+  const cached = cacheGet(phoneNumber);
+
+  if (cached) {
+    return res.json(cached);
   }
 
   const settingsPath = path.join(
@@ -1717,7 +1824,7 @@ app.get("/api/settings", async (req, res) => {
           prefix: "."
         };
 
-    settingsCache.set(phoneNumber, saved);
+    cacheSet(phoneNumber, saved);
     return res.json(saved);
 
   } catch {
@@ -1781,7 +1888,8 @@ app.post("/api/settings", async (req, res) => {
   fs.mkdirSync(dir, { recursive: true });
 
   try {
-    const previous = settingsCache.get(phoneNumber) || {};
+    // Always merge with what is currently saved on disk
+    const previous = readSettingsFile(phoneNumber);
 
     const merged = {
       ...previous,
@@ -1804,7 +1912,8 @@ app.post("/api/settings", async (req, res) => {
       { mode: 0o600 }
     );
 
-    settingsCache.set(phoneNumber, merged);
+    // Drop the cache so the new values load right away
+    settingsCache.delete(phoneNumber);
 
     res.json({
       success: true
@@ -1875,7 +1984,7 @@ app.post("/api/settings", async (req, res) => {
         );
 
         console.log(
-          `📂 Found ${sessions.length} SQLite session(s):`,
+          `📂 Found ${sessions.length} SQLite session(s) (cap: ${MAX_SESSIONS}):`,
           sessions.join(", ")
         );
 
@@ -1920,13 +2029,13 @@ app.post("/api/settings", async (req, res) => {
           `📊 Memory | RSS: ${rss} MB | ` +
           `Heap: ${heap} MB | ` +
           `External: ${external} MB | ` +
-          `Active: ${activeSockets.size} | ` +
+          `Active: ${activeSockets.size}/${MAX_SESSIONS} | ` +
           `Pairing: ${pairingSockets.size}`
         );
 
-        if (mem.rss > 220 * 1024 * 1024) {
+        if (mem.rss > 260 * 1024 * 1024) {
           console.log(
-            "⚠️ RSS memory is above 220 MB. Check the hosting memory limit."
+            "⚠️ RSS memory is above 260 MB. Check the hosting memory limit."
           );
         }
       }, 60000);
