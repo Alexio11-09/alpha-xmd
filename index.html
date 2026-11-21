@@ -535,16 +535,16 @@ async function refreshAll(){
   $('apiLabel').textContent='API Online';$('apiState').textContent='Online';$('apiState').className='tag';
   $('botState').textContent='Running';$('botState').className='tag';
   $('apiDot').style.background='var(--good)';$('sideApi').textContent='API connected';
-  $('statSessions').textContent=d.sessions??d.connected??0;
+  $('statSessions').textContent=(d.sessions??d.connected??0)+(d.capacity?` / ${d.capacity}`:'');
   $('statUptime').textContent=fmtUptime(d.uptime);
   $('statMemory').textContent=d.memory!=null?d.memory+' MB':'—';
   $('statPairing').textContent=d.pairing??'—';
-  $('nodeVersion').textContent=d.node||'Node.js';
+  $('nodeVersion').textContent=d.nodeVersion||d.node||'Node.js';
   $('lastChecked').textContent=new Date().toLocaleTimeString();
   if(d.rss!=null)$('rssText').textContent=d.rss+' MB';
   if(d.memory!=null)$('heapText').textContent=d.memory+' MB';
   if(d.cpu!=null)$('cpuText').textContent=d.cpu+'%';
-  if(d.node)$('nodeText').textContent=d.node;
+  if(d.nodeVersion||d.node)$('nodeText').textContent=d.nodeVersion||d.node;
   await fetchHealth(false);
  }catch(e){
   $('apiLabel').textContent='API Offline';$('apiState').textContent='Offline';$('apiState').className='tag off';
@@ -558,14 +558,14 @@ async function fetchHealth(show=true){
  try{
   const d=await api('/api/health');
   $('healthTag').textContent=d.status||'Healthy';$('healthTag').className='tag';
-  $('healthSessions').textContent=d.activeSessions??'—';
-  $('healthPairings').textContent=d.pendingPairings??'—';
+  $('healthSessions').textContent=d.connections?`${d.connections.active} / ${d.connections.capacity}`:'—';
+  $('healthPairings').textContent=d.connections?.pairing??'—';
   $('healthUptime').textContent=fmtUptime(d.uptime);
   if(d.memory){
    $('heapText').textContent=d.memory.heapUsed+' MB';
    $('heapTotal').textContent=d.memory.heapTotal+' MB';
    $('rssText').textContent=d.memory.rss+' MB';
-   $('nodeText').textContent=d.node||'—';
+   $('nodeText').textContent=d.runtime?.node||'—';
    let pct=d.memory.heapTotal?Math.min(100,d.memory.heapUsed/d.memory.heapTotal*100):0;
    $('heapBar').style.width=pct+'%';
   }
@@ -615,7 +615,7 @@ async function pairDevice(which='quick'){
   localStorage.setItem('alpha-xmd-last-phone',phone);
   currentCode=d.code;$(code).textContent=d.code;$(box).style.display='block';
   const qr=d.qr||d.qrCode||d.qrcode;
-  const qrImg=which==='full'?$ ('pairQr'):null;
+  const qrImg=which==='full'?$('pairQr'):null;
   if(qrImg&&qr){
    qrImg.src=qr.startsWith('data:')?qr:'data:image/png;base64,'+qr;
    qrImg.hidden=false;
@@ -658,6 +658,7 @@ async function disconnectDevice(){
 }
 
 /* BOT SETTINGS */
+// Only settings the backend actually saves (see the allow-list in /api/settings)
 const settingDefs=[
  ['autoread','Auto read','Automatically mark incoming messages as read.'],
  ['autotyping','Auto typing','Show typing status while preparing a response.'],
@@ -665,9 +666,7 @@ const settingDefs=[
  ['autoreact','Auto react','Enable automatic message reactions.'],
  ['antidelete','Anti-delete','Keep supported deleted-message notifications.'],
  ['antiedit','Anti-edit','Track supported edited-message changes.'],
- ['antilink','Anti-link','Enable configured group link protection.'],
- ['autostatus','Auto status view','Automatically view supported status updates.'],
- ['alwaysonline','Always online','Keep the bot presence online where supported.']
+ ['antilink','Anti-link','Enable configured group link protection.']
 ];
 let loadedSettings={};
 async function loadSettings(){
@@ -755,7 +754,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  applyTheme(localStorage.getItem('alpha-xmd-theme')||'dark');
  initPhone('phoneQuick');initPhone('phoneFull');
  renderActivity();renderNotifications();refreshAll();
- setInterval(refreshAll,10000);
+ setInterval(refreshAll,30000);
 });
 </script>
 </body>
