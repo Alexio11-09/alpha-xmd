@@ -1,10 +1,44 @@
 {
   "name": "alpha-xmd",
-  "description": "alpha-xmd bot deployed on nodeX",
-  "repository": "https://github.com/Alexio11-09/alpha-xmd",
-  "keywords": ["bot", "nodeX", "alpha-xmd", "whatsapp-bot"],
+  "description": "Custom WhatsApp Bot by Alpha",
+  "logo": "https://raw.githubusercontent.com/Alexio11-09/alpha-xmd/main/thumbnail/image.jpg",
+  "keywords": ["whatsapp", "bot", "alpha-xmd", "baileys", "session"],
+  "repository": "https://github.com/Alexio11-09/alpha-xmd.git",
   "scripts": {
     "start": "node index.js"
   },
-  "env": {}
+  "env": {
+    "SESSION_ID": {
+      "description": "REQUIRED: Your WhatsApp session ID.",
+      "value": "",
+      "required": true
+    },
+    "PREFIX": {
+      "description": "Bot command prefix",
+      "value": ".",
+      "required": false
+    },
+    "BOT_MODE": {
+      "description": "Bot operating mode (public or private).",
+      "value": "public",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+    },
+    {
+      "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
+    }
+  ]
 }
