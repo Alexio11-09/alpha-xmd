@@ -56,7 +56,7 @@ const IMG_UA = 'Mozilla/5.0 (compatible; AlphaBot/1.0; +https://github.com/Alexi
 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-async function fetchImage(url, max = 5 * 1024 * 1024) {
+async function fetchImage(url, max = 10 * 1024 * 1024) {
   const r = await ax.get(url, {
     responseType: 'arraybuffer', timeout: 15000, maxContentLength: max, maxBodyLength: max,
     headers: { 'User-Agent': IMG_UA, 'Accept': 'image/*' }
@@ -66,8 +66,8 @@ async function fetchImage(url, max = 5 * 1024 * 1024) {
   return Buffer.from(r.data);
 }
 
-// 🎯 NEW: Scrape Bing Images (No API key required, finds real photos)
-async function bingImages(query, limit = 4) {
+// Scrape Bing Images (No API key required, finds real photos)
+async function bingImages(query, limit = 10) {
   try {
     const res = await ax.get(`https://www.bing.com/images/search?q=${encodeURIComponent(query)}`, {
       headers: { 
@@ -164,7 +164,6 @@ const API = {
 
 const MB = 1024 * 1024;
 const MAX_APK = 60 * MB;
-const MAX_IMG = 10 * MB;
 
 const getJson = async (url, params, headers = {}) => {
   const r = await ax.get(url, { params, timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0', ...headers } });
@@ -207,7 +206,6 @@ module.exports = [
   } catch (e) { console.log('play err:', e.message); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); reply('❌ Failed'); }
 } },
 
-// 🎯 FIXED VIDEO COMMAND (Added 3rd Fallback Provider)
 { command: 'video', aliases: ['vid', 'dl', 'yt', 'ytmp4'], category: 'downloader', execute: async (s, m, { args, reply, config: c }) => {
   let t = args.join(' '); if (!t) return reply('🎥 Usage: .video <name/url>');
   try {
@@ -250,7 +248,7 @@ module.exports = [
       finally { rm(o); }
     }
 
-    // 🎯 Provider 3 (Fallback API)
+    // Provider 3 (Fallback)
     if (!sent) {
       try {
         const d = await getJson('https://api.dreaded.site/api/ytdl', { url: u });
@@ -297,22 +295,34 @@ module.exports = [
   await socialDownload(s, m, reply, c, args[0], 'p', 'Pinterest');
 } },
 
+// 🎯 UPDATED LYRICS COMMAND
 { command: 'lyrics', aliases: ['lirik'], category: 'downloader', execute: async (s, m, { args, reply }) => {
-  if (!args[0]) return reply('❌ Song?'); let q = args.join(' ');
+  if (!args[0]) return reply('❌ Usage: .lyrics <song name>'); 
+  let q = args.join(' ');
+  
   try {
-    let r = await ax.get(`https://api.lolhuman.xyz/api/lirik?apikey=GataDios&query=${encodeURIComponent(q)}`, { timeout: 15e3 });
-    if (r.data?.status === 200 && r.data.result) return reply(`🎵 *${q}*\n\n${r.data.result.substring(0, 2e3)}`);
-  } catch (e) { console.log('[LYRICS] primary service failed:', e.message); }
-
-  const parts = q.split(/\s+-\s+/);
-  if (parts.length >= 2) {
-    try {
+    // Use LRCLIB (Free, no API key, very reliable)
+    let r = await ax.get(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`, { timeout: 15000 });
+    
+    if (r.data && r.data.length > 0) {
+      let hit = r.data[0];
+      let lyrics = hit.plainLyrics || hit.syncedLyrics || 'No lyrics available.';
+      return reply(`🎵 *${hit.trackName}* by *${hit.artistName}*\n\n${lyrics.substring(0, 2000)}`);
+    }
+    
+    // Fallback: Try lyrics.ovh if LRCLIB fails
+    const parts = q.split(/\s+-\s+/);
+    if (parts.length >= 2) {
       const artist = parts[0].trim(), title = parts.slice(1).join(' - ').trim();
-      let r2 = await ax.get(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`, { timeout: 15e3 });
-      if (r2.data?.lyrics) return reply(`🎵 *${artist} - ${title}*\n\n${String(r2.data.lyrics).substring(0, 2e3)}`);
-    } catch (e) { console.log('[LYRICS] fallback failed:', e.message); }
+      let r2 = await ax.get(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`, { timeout: 15000 });
+      if (r2.data?.lyrics) return reply(`🎵 *${artist} - ${title}*\n\n${String(r2.data.lyrics).substring(0, 2000)}`);
+    }
+    
+    reply('❌ Not found. Try: .lyrics artist - song title');
+  } catch (e) { 
+    console.log('[LYRICS] error:', e.message); 
+    reply('❌ Failed to fetch lyrics. Try again in a moment.'); 
   }
-  reply('❌ Not found. Try: .lyrics artist - song title');
 } },
 
 { command: 'yts', aliases: ['ytsearch'], category: 'downloader', execute: async (s, m, { args, reply }) => {
@@ -320,27 +330,68 @@ module.exports = [
   try { let r = await yts(q); if (!r.videos?.length) return reply('❌ No results'); let t = `🔎 *${q}*\n\n`; for (let i = 0; i < Math.min(10, r.videos.length); i++) { let v = r.videos[i]; t += `${i + 1}. *${v.title}*\n   🔗 ${v.url}\n\n`; } reply(t); } catch { reply('❌ Failed'); }
 } },
 
+// 🎯 UPDATED SHAZAM COMMAND (Matches Screenshot Format)
 { command: 'shazam', aliases: ['identify', 'whatsong'], category: 'downloader', execute: async (s, m, { reply }) => {
-  if (!m.quoted) return reply('❌ Reply to audio!'); let qt = m.quoted.message; if (!qt) return reply('❌ Cannot read');
+  if (!m.quoted) return reply('❌ Reply to an audio or voice note!'); 
+  let qt = m.quoted.message; if (!qt) return reply('❌ Cannot read');
   let t = Object.keys(qt).find(k => ['audioMessage', 'voiceMessage', 'videoMessage'].includes(k));
-  if (!t) return reply('❌ Unsupported');
-  reply('🎧...'); let inf, ouf;
+  if (!t) return reply('❌ Unsupported media type');
+  
+  reply('🎧 Listening...'); 
+  let inf, ouf;
+  
   try {
     let st = await downloadContentFromMessage(qt[t], t === 'videoMessage' ? 'video' : 'audio');
     const chunks = []; let size = 0;
-    for await (let ch of st) { size += ch.length; if (size > 20 * 1024 * 1024) return reply('❌ File too large'); chunks.push(ch); }
+    
+    for await (let ch of st) { 
+      size += ch.length; 
+      if (size > 20 * 1024 * 1024) return reply('❌ File too large'); 
+      chunks.push(ch); 
+    }
+    
     inf = tmpFile('si', ''); ouf = tmpFile('so', '.mp3');
     fs.writeFileSync(inf, Buffer.concat(chunks));
+    
     const ok = await runFfmpeg(inf, ouf);
-    if (!ok) { if (size > 8 * 1024 * 1024) return reply('❌ Audio too large and ffmpeg is not available'); fs.copyFileSync(inf, ouf); }
+    if (!ok) { 
+      if (size > 8 * 1024 * 1024) return reply('❌ Audio too large and ffmpeg is not available'); 
+      fs.copyFileSync(inf, ouf); 
+    }
+    
     let ab = fs.readFileSync(ouf).toString('base64');
-    let r = await ax.post('https://api.audd.io/', { api_token: process.env.AUDD_TOKEN || 'test', audio: ab, return: 'apple_music,spotify' }, { headers: { 'Content-Type': 'application/json' }, timeout: 15e3 });
+    let r = await ax.post('https://api.audd.io/', { 
+        api_token: process.env.AUDD_TOKEN || 'test', 
+        audio: ab, 
+        return: 'apple_music,spotify' 
+    }, { headers: { 'Content-Type': 'application/json' }, timeout: 15000 });
+    
     let d = r.data;
+
     if (d.status === 'success' && d.result) {
-      let g = d.result, cu = g.apple_music?.artwork?.url?.replace('{w}', '300').replace('{h}', '300') || g.spotify?.album?.images?.[0]?.url || '', tx = `🎵 *${g.title || '?'}*\n👤 ${g.artist || '?'}\n💿 ${g.album || '?'}`;
-      if (cu) await s.sendMessage(m.chat, { image: { url: cu }, caption: tx }, { quoted: m }); else reply(tx);
-    } else { reply('❌ Not recognized'); }
-  } catch (e) { console.error(e); reply('❌ Failed'); }
+      let g = d.result;
+      let cu = g.apple_music?.artwork?.url?.replace('{w}', '600').replace('{h}', '600') || g.spotify?.album?.images?.[0]?.url || '';
+      
+      let releaseYear = g.release_date ? g.release_date.split('-')[0] : 'Unknown';
+      let tx = `🎵 *${g.title || 'Unknown'}*\n\n` +
+               `💿 *Album:* ${g.album || 'Single'}\n` +
+               `📅 *Released:* ${releaseYear}\n` +
+               `🏢 *Label:* ${g.label || 'Unknown'}\n` +
+               `👤 *Artist:* ${g.artist || 'Unknown'}\n` +
+               `⏱️ *Recognised:* Just now`;
+
+      if (cu) {
+        await s.sendMessage(m.chat, { image: { url: cu }, caption: tx }, { quoted: m });
+      } else {
+        reply(tx);
+      }
+    } else {
+      reply('❌ Not recognized. Make sure the audio is clear and at least 5 seconds long.');
+    }
+  } catch (e) { 
+    console.error(e); 
+    reply('❌ Failed to recognize audio.'); 
+  }
   finally { rm(inf); rm(ouf); }
 } },
 
@@ -388,16 +439,13 @@ module.exports = [
   } catch (e) { console.log('[RINGTONE] failed:', e.message); await react(s, m, '❌'); reply('❌ Ringtone search failed. Try again in a moment.'); }
 } },
 
-// 🎯 FIXED WALLPAPER COMMAND (Uses Bing Images for real HD wallpapers)
 { command: 'wallpaper', aliases: ['wall', 'wp'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   const q = args.join(' ').trim() || 'nature';
   try {
     await react(s, m, '🖼️');
     
-    // 1. Try Bing Images first for exactly what the user asked for
     let urls = await bingImages(q + ' hd wallpaper', 10);
 
-    // 2. Fallback to Wallhaven if Bing fails
     if (!urls.length) {
         try {
             const d = await getJson(`${API.wallhaven}/search`, { q, categories: '111', purity: '100', sorting: 'random', per_page: 10 });
@@ -412,7 +460,7 @@ module.exports = [
     for (const u of urls) {
       if (sent >= 3) break;
       try {
-        const buf = await fetchImage(u, 10 * 1024 * 1024); // 10MB limit for HD wallpapers
+        const buf = await fetchImage(u, 10 * 1024 * 1024);
         await s.sendMessage(m.chat, { image: buf, caption: `🖼️ ${q} wallpaper` }, sent === 0 ? { quoted: m } : {});
         sent++;
         await sleep(1000);
@@ -428,7 +476,6 @@ module.exports = [
   }
 } },
 
-// 🎯 FIXED IMG COMMAND (Uses Bing Images for real photos of artists)
 { command: 'img', aliases: ['image', 'pic'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   if (!args[0]) return reply('❌ Usage: .img <query>');
   const q = args.join(' ');
@@ -436,10 +483,8 @@ module.exports = [
   try {
     await react(s, m, '🔍');
     
-    // 1. Try Bing Images first (Best for real people/artists)
     let urls = await bingImages(q, 10);
 
-    // 2. Fallback to Pexels if Bing fails
     if (!urls.length && process.env.PEXELS_KEY) {
       try {
         const d = await getJson(`${API.pexels}/search`, { query: q, per_page: 10 }, { Authorization: process.env.PEXELS_KEY });
@@ -457,7 +502,7 @@ module.exports = [
         const buf = await fetchImage(u);
         await s.sendMessage(m.chat, { image: buf, caption: `📸 ${q} (${sent + 1})` }, sent === 0 ? { quoted: m } : {});
         sent++;
-        await sleep(1000); // Prevent WhatsApp rate-limit ban
+        await sleep(1000);
       } catch (e) { console.log('[IMG] skipped one:', e.message); }
     }
 
