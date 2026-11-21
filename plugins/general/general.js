@@ -3,11 +3,12 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const pino = require('pino');
-const { Boom } = require('@hapi/boom');
+const { parsePhoneNumber } = require('awesome-phonenumber');
 const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
 function runtime(seconds) {
     seconds = Number(seconds);
@@ -18,41 +19,57 @@ function runtime(seconds) {
     return `${d}d ${h}h ${m}m ${s}s`;
 }
 
+// ======================================================
+// MENU IMAGE: download/read once, then reuse the Buffer
+// ======================================================
+let menuImg = null;
+
+async function getMenuImg() {
+    if (menuImg) return menuImg;
+
+    const src = config.thumbUrl;
+    let buf;
+
+    if (/^https?:\/\//i.test(src)) {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error(`Menu image HTTP ${res.status}`);
+        buf = Buffer.from(await res.arrayBuffer());
+    } else {
+        buf = fs.readFileSync(src);
+    }
+
+    // Only keep it in memory if it is reasonably small
+    if (buf.length < 300 * 1024) menuImg = buf;
+    return buf;
+}
+
+// ======================================================
+// COUNTRY DETECTION
+// ======================================================
 const getCountry = async (m, sock) => {
     try {
-        let targetJid = m.sender;
-        let cleanNumber = targetJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+        // Baileys 7 puts the real phone JID in these fields when the sender is a LID
+        let jid = m.key?.participantAlt || m.key?.remoteJidAlt || m.sender;
+        let num = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 
-        if (targetJid.includes('@lid') || cleanNumber.length < 9) {
-            if (m.isGroup) {
-                try {
-                    const metadata = await sock.groupMetadata(m.chat);
-                    const participant = metadata.participants.find(p => p.id === targetJid || p.lid === targetJid);
-                    if (participant) {
-                        if (participant.phoneNumber) {
-                            cleanNumber = participant.phoneNumber.split('@')[0].replace(/[^0-9]/g, '');
-                        } else if (participant.jid && !participant.jid.includes('@lid')) {
-                            cleanNumber = participant.jid.split('@')[0].replace(/[^0-9]/g, '');
-                        }
-                    }
-                } catch (e) {}
-            }
+        // Rare fallback: only fetch group metadata if we still only have a LID
+        if ((jid.includes('@lid') || num.length < 9) && m.isGroup) {
+            const md = await sock.groupMetadata(m.chat);
+            const p = md.participants.find(x => x.id === m.sender || x.lid === m.sender);
+            const real = p?.phoneNumber || (p?.jid && !p.jid.includes('@lid') ? p.jid : '');
+            if (real) num = real.split('@')[0].replace(/[^0-9]/g, '');
         }
 
-        if (cleanNumber.length < 9) return "Unknown 🌍";
+        if (num.length < 9) return "Unknown 🌍";
 
-        const PhoneNumber = require('awesome-phonenumber');
-        const pn = PhoneNumber('+' + cleanNumber);
-        
-        if (pn.isValid() && pn.getRegionCode()) {
-            const country = pn.getCountry();
-            const flag = pn.getRegionCode().toUpperCase().replace(/./g, char =>
-                String.fromCodePoint(char.charCodeAt(0) + 127397)
-            );
-            return `${country} ${flag}`;
-        }
-        
-        return "Unknown 🌍";
+        const pn = parsePhoneNumber('+' + num);
+        if (!pn.valid || !pn.regionCode) return "Unknown 🌍";
+
+        const flag = pn.regionCode.replace(/./g, c =>
+            String.fromCodePoint(c.charCodeAt(0) + 127397)
+        );
+
+        return `${regionNames.of(pn.regionCode)} ${flag}`;
     } catch (e) {
         return "Unknown 🌍";
     }
@@ -601,10 +618,15 @@ module.exports = [
 ${config.settings.footer}
 `;
 
-                await send({
-                    image: { url: config.thumbUrl },
-                    caption: menu
-                });
+                // Menu image comes from a cached Buffer (falls back to text if it can't be loaded)
+                let image = null;
+                try { image = await getMenuImg(); } catch (e) { console.log("Menu image error:", e.message); }
+
+                if (image) {
+                    await send({ image, caption: menu });
+                } else {
+                    await send({ text: menu });
+                }
 
             } catch (err) {
                 console.log("Menu error:", err);
