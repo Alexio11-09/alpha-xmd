@@ -1,0 +1,10 @@
+{
+  "name": "alpha-xmd",
+  "description": "alpha-xmd bot deployed on nodeX",
+  "repository": "https://github.com/Alexio11-09/alpha-xmd",
+  "keywords": ["bot", "nodeX", "alpha-xmd", "whatsapp-bot"],
+  "scripts": {
+    "start": "node index.js"
+  },
+  "env": {}
+}
