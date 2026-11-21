@@ -150,19 +150,13 @@ const MAIN_ONLY = new Set([
 // across ALL sessions so memory spikes can't stack up.
 // ======================================================
 const HEAVY = new Set([
-    "play", "video", "spotify", "tiktok", "instagram", "facebook", "ytpost",
-    "pindl", "mediafire", "gdrive", "ringtone", "apk", "movie", "dlmovie",
-    "dlseries", "gitclone", "shazam", "img", "wallpaper",
-    "sticker", "toimg", "removebg", "blur", "smeme", "wasted", "take", "steal",
-    "attp", "ttp", "ss", "stickertelegram", "imgscan",
-    "tomp3", "tovideo", "toppt", "topdf", "vv", "vv2",
-    "deep", "smooth", "fat", "blown", "radio", "robot", "chipmunk",
-    "nightcore", "earrape", "bass", "reverse", "slow", "fast", "baby", "demon"
+    // Only commands that were reviewed. Add more names here once a plugin has been checked.
+    "play", "video", "tiktok", "fb", "ig", "pin", "shazam"
 ]);
 
 let heavyQueue = Promise.resolve();
 let heavyPending = 0;
-const HEAVY_TIMEOUT = 180000;
+const HEAVY_TIMEOUT = 90000;
 
 function runHeavy(job) {
     const run = heavyQueue.then(() => Promise.race([
@@ -321,8 +315,11 @@ module.exports = async (sock, m) => {
         if (command.group === false && m.isGroup) return reply(deny.private);
         if (command.group && !m.isGroup) return reply(deny.group);
 
-        if (HEAVY.has(command.command)) {
+        const isHeavy = HEAVY.has(command.command) || (command.aliases || []).some(a => HEAVY.has(a));
+
+        if (isHeavy) {
             if (heavyPending >= 15) return reply("⏳ I'm a bit busy right now, please try again in a moment.");
+            if (heavyPending > 0) reply(`⏳ Queued, ${heavyPending} download(s) ahead of you...`);
             heavyPending++;
             try {
                 await runHeavy(() => command.execute(sock, m, ctx));
