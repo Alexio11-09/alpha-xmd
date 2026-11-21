@@ -151,20 +151,36 @@ const MAIN_ONLY = new Set([
 // ======================================================
 const HEAVY = new Set([
     // Only commands that were reviewed. Add more names here once a plugin has been checked.
-    "play", "video", "tiktok", "fb", "ig", "pin", "shazam"
+    "play", "video", "tiktok", "fb", "ig", "pin", "shazam", "apk"
 ]);
 
-let heavyQueue = Promise.resolve();
-let heavyPending = 0;
-const HEAVY_TIMEOUT = 90000;
+let heavyPending = 0;          // running + waiting
+let heavyActive = 0;           // running right now
+const heavyWaiters = [];
+const HEAVY_LIMIT = 2;         // how many heavy commands may run at the same time
+const HEAVY_TIMEOUT = 120000;  // a stuck job frees its slot after 2 minutes
 
-function runHeavy(job) {
-    const run = heavyQueue.then(() => Promise.race([
-        job(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("Task timed out")), HEAVY_TIMEOUT))
-    ]));
-    heavyQueue = run.catch(() => {});
-    return run;
+async function runHeavy(job) {
+    if (heavyActive >= HEAVY_LIMIT) {
+        // wait for a slot; the finishing job hands its slot straight to us
+        await new Promise(resolve => heavyWaiters.push(resolve));
+    } else {
+        heavyActive++;
+    }
+
+    let timer;
+
+    try {
+        return await Promise.race([
+            job(),
+            new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("Task timed out")), HEAVY_TIMEOUT); })
+        ]);
+    } finally {
+        clearTimeout(timer);
+        const next = heavyWaiters.shift();
+        if (next) next();      // give the slot to the next waiting command
+        else heavyActive--;    // nobody waiting: free the slot
+    }
 }
 
 const deny = {
@@ -205,7 +221,7 @@ module.exports = async (sock, m) => {
         const gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: ".", ...readSessionSettings(botNum) };
 
         // 🎯 GHOST MODE: skip read receipt when ghost is ON so sender stays at one tick
-        if (gs.autoread && !sock._ghostMode) { try { await sock.readMessages([m.key]); } catch {} }
+        if (gs.autoread && !sock._ghostMode && !m.viewOnce) { try { await sock.readMessages([m.key]); } catch {} }
 
         // 🎯 GHOST MODE: skip typing presence when ghost is ON to avoid leaking activity
         if (gs.autotyping && !sock._ghostMode) {
@@ -319,7 +335,7 @@ module.exports = async (sock, m) => {
 
         if (isHeavy) {
             if (heavyPending >= 15) return reply("⏳ I'm a bit busy right now, please try again in a moment.");
-            if (heavyPending > 0) reply(`⏳ Queued, ${heavyPending} download(s) ahead of you...`);
+            if (heavyPending >= HEAVY_LIMIT) reply(`⏳ Queued, ${heavyPending - HEAVY_LIMIT + 1} download(s) ahead of you...`);
             heavyPending++;
             try {
                 await runHeavy(() => command.execute(sock, m, ctx));
