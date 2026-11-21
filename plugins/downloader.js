@@ -9,8 +9,6 @@ const path = require('path');
 
 // ======================================================
 // TEMP FOLDER (auto-cleaned so it can't fill your storage)
-// Files are normally deleted right after use, but a memory restart
-// in the middle of a download used to leave them behind forever.
 // ======================================================
 const TMP_DIR = path.join(process.cwd(), 'tmp');
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -18,10 +16,8 @@ if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
 function cleanTmp(maxAgeMs = 15 * 60 * 1000) {
   try {
     const now = Date.now();
-
     for (const f of fs.readdirSync(TMP_DIR)) {
       const p = path.join(TMP_DIR, f);
-
       try {
         const st = fs.statSync(p);
         if (st.isFile() && now - st.mtimeMs > maxAgeMs) fs.unlinkSync(p);
@@ -56,9 +52,6 @@ const B = c => ({
 
 const rm = f => { try { if (f && fs.existsSync(f)) fs.unlinkSync(f); } catch {} };
 
-// Some hosts (Wikimedia, Flickr...) block or throttle requests that have no proper
-// User-Agent, which is why .img sent one or two pictures and then failed.
-// We download the picture ourselves with a proper User-Agent and send the bytes.
 const IMG_UA = 'Mozilla/5.0 (compatible; AlphaBot/1.0; +https://github.com/Alexio11-09/alpha-xmd)';
 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -73,7 +66,33 @@ async function fetchImage(url, max = 5 * 1024 * 1024) {
   return Buffer.from(r.data);
 }
 
-// Send audio/video by link; if WhatsApp can't fetch the link itself, download it first and send the file
+// 🎯 NEW: Scrape Bing Images (No API key required, finds real photos)
+async function bingImages(query, limit = 4) {
+  try {
+    const res = await ax.get(`https://www.bing.com/images/search?q=${encodeURIComponent(query)}`, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      timeout: 15000
+    });
+    const html = res.data;
+    const regex = /murl&quot;:&quot;(.*?)&quot;/g;
+    const urls = [];
+    let match;
+    while ((match = regex.exec(html)) !== null && urls.length < limit) {
+      const url = match[1];
+      if (!urls.includes(url) && !url.includes('base64') && url.startsWith('http')) {
+        urls.push(url);
+      }
+    }
+    return urls;
+  } catch (e) {
+    console.log('[BING] fetch error:', e.message);
+    return [];
+  }
+}
+
 async function sendMediaUrl(s, m, kind, url, extra, opts) {
   try {
     return await s.sendMessage(m.chat, { [kind]: { url }, ...extra }, opts);
@@ -87,8 +106,6 @@ async function sendMediaUrl(s, m, kind, url, extra, opts) {
   }
 }
 
-// Look at the first bytes of the file to tell images from videos
-// (the old code treated everything as a video because the file name ended in .mp4)
 function sniffType(file) {
   try {
     const fd = fs.openSync(file, 'r');
@@ -96,25 +113,21 @@ function sniffType(file) {
     fs.readSync(fd, b, 0, 12, 0);
     fs.closeSync(fd);
 
-    if (b[0] === 0xFF && b[1] === 0xD8) return 'image';                        // JPEG
-    if (b[0] === 0x89 && b.toString('ascii', 1, 4) === 'PNG') return 'image';  // PNG
-    if (b.toString('ascii', 0, 3) === 'GIF') return 'image';                   // GIF
+    if (b[0] === 0xFF && b[1] === 0xD8) return 'image';
+    if (b[0] === 0x89 && b.toString('ascii', 1, 4) === 'PNG') return 'image';
+    if (b.toString('ascii', 0, 3) === 'GIF') return 'image';
     if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image';
   } catch {}
 
   return 'video';
 }
 
-// Shared by .fb / .ig / .pin: download to disk, send straight from disk, delete
 async function socialDownload(s, m, reply, c, url, prefix, label) {
   const o = tmpFile(prefix);
-
   try {
     const result = await downloadVideo(url, o);
-
     if (result && fs.existsSync(o)) {
       const kind = sniffType(o);
-
       if (kind === 'image') {
         await s.sendMessage(m.chat, { image: { url: o }, caption: `✅ ${label} Image`, contextInfo: B(c) }, { quoted: m });
       } else {
@@ -131,7 +144,6 @@ async function socialDownload(s, m, reply, c, url, prefix, label) {
   }
 }
 
-// Run ffmpeg without freezing the whole bot (execSync froze every session)
 const runFfmpeg = (input, output) => new Promise(resolve => {
   execFile(
     'ffmpeg',
@@ -141,11 +153,6 @@ const runFfmpeg = (input, output) => new Promise(resolve => {
   );
 });
 
-
-// ======================================================
-// EXTRAS HELPERS (.apk .ringtone .wallpaper .img)
-// Free public APIs, no keys needed (.img can use Pexels if PEXELS_KEY is set)
-// ======================================================
 const API = {
   aptoide:   process.env.APTOIDE_API   || 'https://ws75.aptoide.com/api/7',
   itunes:    process.env.ITUNES_API    || 'https://itunes.apple.com',
@@ -156,15 +163,14 @@ const API = {
 };
 
 const MB = 1024 * 1024;
-const MAX_APK = 60 * MB;   // refuse bigger APKs (storage + memory friendly)
-const MAX_IMG = 6 * MB;    // skip huge wallpapers
+const MAX_APK = 60 * MB;
+const MAX_IMG = 10 * MB;
 
 const getJson = async (url, params, headers = {}) => {
   const r = await ax.get(url, { params, timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0', ...headers } });
   return r.data;
 };
 
-// Only one APK download at a time (they are the biggest files)
 let apkChain = Promise.resolve();
 const oneApkAtATime = job => {
   const run = apkChain.then(job);
@@ -184,7 +190,6 @@ module.exports = [
     let v = sr.videos[0];
     await s.sendMessage(m.chat, { react: { text: '⬇️', key: m.key } });
 
-    // The download service is a free third-party one and fails now and then, so try twice
     let audioUrl = null;
     for (let i = 0; i < 2 && !audioUrl; i++) {
       try {
@@ -194,7 +199,7 @@ module.exports = [
       if (!audioUrl && i === 0) await sleep(2000);
     }
 
-    if (!audioUrl) { console.log('[PLAY] no audio URL returned for:', v.title); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); return reply('⚠️ No audio URL returned. The download service may be busy, try again in a minute.'); }
+    if (!audioUrl) { await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); return reply('⚠️ No audio URL returned. The download service may be busy, try again in a minute.'); }
 
     await s.sendMessage(m.chat, { image: { url: v.thumbnail }, caption: `🎵 *${v.title}*\n\n👑 ${c.settings.title}`, contextInfo: B(c) }, { quoted: m });
     await sendMediaUrl(s, m, 'audio', audioUrl, { mimetype: 'audio/mpeg', ptt: !1, fileName: v.title.replace(/[^a-zA-Z0-9]/g, '_') + '.mp3', contextInfo: { externalAdReply: { title: v.title, body: '🎧 Now playing', thumbnailUrl: v.thumbnail, mediaType: 1 } } }, { quoted: m });
@@ -202,6 +207,7 @@ module.exports = [
   } catch (e) { console.log('play err:', e.message); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); reply('❌ Failed'); }
 } },
 
+// 🎯 FIXED VIDEO COMMAND (Added 3rd Fallback Provider)
 { command: 'video', aliases: ['vid', 'dl', 'yt', 'ytmp4'], category: 'downloader', execute: async (s, m, { args, reply, config: c }) => {
   let t = args.join(' '); if (!t) return reply('🎥 Usage: .video <name/url>');
   try {
@@ -214,7 +220,7 @@ module.exports = [
     const pick = v => v?.download?.downloadUrl || v?.url || v?.downloadUrl || null;
     let sent = false;
 
-    // Provider 1: the same service .play uses
+    // Provider 1
     let videoUrl = null;
     try { videoUrl = pick(await ytdl.downloadVideo(u)); } catch (e) { console.log('[VIDEO] provider 1 error:', e.message); }
     if (!videoUrl) { try { videoUrl = pick(await ytdl.downloadVideo(u, 360)); } catch (e) {} }
@@ -224,11 +230,9 @@ module.exports = [
         await sendMediaUrl(s, m, 'video', videoUrl, { mimetype: 'video/mp4', fileName: 'video_' + Date.now() + '.mp4', caption, contextInfo: B(c) }, { quoted: m });
         sent = true;
       } catch (e) { console.log('[VIDEO] provider 1 send failed:', e.message); }
-    } else {
-      console.log('[VIDEO] provider 1 returned no URL for:', u);
     }
 
-    // Provider 2 (independent service): download to disk, then send from disk
+    // Provider 2
     if (!sent) {
       const o = tmpFile('yv');
       try {
@@ -246,6 +250,18 @@ module.exports = [
       finally { rm(o); }
     }
 
+    // 🎯 Provider 3 (Fallback API)
+    if (!sent) {
+      try {
+        const d = await getJson('https://api.dreaded.site/api/ytdl', { url: u });
+        const dlUrl = d?.result?.mp4 || d?.result?.video || d?.result?.url;
+        if (dlUrl) {
+           await sendMediaUrl(s, m, 'video', dlUrl, { mimetype: 'video/mp4', fileName: 'video_' + Date.now() + '.mp4', caption, contextInfo: B(c) }, { quoted: m });
+           sent = true;
+        }
+      } catch (e) { console.log('[VIDEO] provider 3 failed:', e.message); }
+    }
+
     if (!sent) { await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); return reply('⚠️ Could not download that video right now. Try again in a minute, or try a different video.'); }
     await s.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
   } catch (e) { console.log('video err:', e.message); await s.sendMessage(m.chat, { react: { text: '❌', key: m.key } }); reply('❌ Failed'); }
@@ -258,7 +274,6 @@ module.exports = [
     let r = await ax.get(`https://tikwm.com/api/?url=${encodeURIComponent(args[0])}`, { timeout: 2e4 }), d = r.data?.data;
     if (!d?.play) return reply('❌ Failed.');
     await dl(d.play, o);
-    // Send straight from disk instead of loading the whole video into RAM
     await s.sendMessage(m.chat, { video: { url: o }, caption: `🎬 *TikTok*\n👤 @${d.author?.nickname || '?'}\n⚡ *${c.settings.title}*`, contextInfo: B(c) }, { quoted: m });
   } catch (e) { reply('❌ ' + e.message); }
   finally { rm(o); }
@@ -284,25 +299,19 @@ module.exports = [
 
 { command: 'lyrics', aliases: ['lirik'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   if (!args[0]) return reply('❌ Song?'); let q = args.join(' ');
-
-  // 1) original service
   try {
     let r = await ax.get(`https://api.lolhuman.xyz/api/lirik?apikey=GataDios&query=${encodeURIComponent(q)}`, { timeout: 15e3 });
     if (r.data?.status === 200 && r.data.result) return reply(`🎵 *${q}*\n\n${r.data.result.substring(0, 2e3)}`);
-    console.log('[LYRICS] primary service returned no lyrics, status:', r.data?.status);
   } catch (e) { console.log('[LYRICS] primary service failed:', e.message); }
 
-  // 2) fallback: works when you type  .lyrics artist - song title
   const parts = q.split(/\s+-\s+/);
   if (parts.length >= 2) {
     try {
       const artist = parts[0].trim(), title = parts.slice(1).join(' - ').trim();
       let r2 = await ax.get(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`, { timeout: 15e3 });
       if (r2.data?.lyrics) return reply(`🎵 *${artist} - ${title}*\n\n${String(r2.data.lyrics).substring(0, 2e3)}`);
-      console.log('[LYRICS] fallback returned no lyrics');
     } catch (e) { console.log('[LYRICS] fallback failed:', e.message); }
   }
-
   reply('❌ Not found. Try: .lyrics artist - song title');
 } },
 
@@ -318,144 +327,95 @@ module.exports = [
   reply('🎧...'); let inf, ouf;
   try {
     let st = await downloadContentFromMessage(qt[t], t === 'videoMessage' ? 'video' : 'audio');
-
-    // collect chunks, join once, refuse very large files
     const chunks = []; let size = 0;
-    for await (let ch of st) {
-      size += ch.length;
-      if (size > 20 * 1024 * 1024) return reply('❌ File too large');
-      chunks.push(ch);
-    }
-
-    inf = tmpFile('si', '');
-    ouf = tmpFile('so', '.mp3');
+    for await (let ch of st) { size += ch.length; if (size > 20 * 1024 * 1024) return reply('❌ File too large'); chunks.push(ch); }
+    inf = tmpFile('si', ''); ouf = tmpFile('so', '.mp3');
     fs.writeFileSync(inf, Buffer.concat(chunks));
-
-    // trim to 20s mono-friendly mp3; if ffmpeg is missing, fall back to the original file
     const ok = await runFfmpeg(inf, ouf);
-    if (!ok) {
-      if (size > 8 * 1024 * 1024) return reply('❌ Audio too large and ffmpeg is not available');
-      fs.copyFileSync(inf, ouf);
-    }
-
+    if (!ok) { if (size > 8 * 1024 * 1024) return reply('❌ Audio too large and ffmpeg is not available'); fs.copyFileSync(inf, ouf); }
     let ab = fs.readFileSync(ouf).toString('base64');
     let r = await ax.post('https://api.audd.io/', { api_token: process.env.AUDD_TOKEN || 'test', audio: ab, return: 'apple_music,spotify' }, { headers: { 'Content-Type': 'application/json' }, timeout: 15e3 });
     let d = r.data;
-
     if (d.status === 'success' && d.result) {
       let g = d.result, cu = g.apple_music?.artwork?.url?.replace('{w}', '300').replace('{h}', '300') || g.spotify?.album?.images?.[0]?.url || '', tx = `🎵 *${g.title || '?'}*\n👤 ${g.artist || '?'}\n💿 ${g.album || '?'}`;
       if (cu) await s.sendMessage(m.chat, { image: { url: cu }, caption: tx }, { quoted: m }); else reply(tx);
-    } else {
-      if (!process.env.AUDD_TOKEN) console.log('[SHAZAM] No AUDD_TOKEN set - the "test" token is limited. Get a token from audd.io and add AUDD_TOKEN to the environment.');
-      reply('❌ Not recognized');
-    }
+    } else { reply('❌ Not recognized'); }
   } catch (e) { console.error(e); reply('❌ Failed'); }
   finally { rm(inf); rm(ouf); }
 } },
 
-// ======================================================
-// .apk <app name>
-// ======================================================
 { command: 'apk', aliases: ['app', 'aptoide'], category: 'downloader', execute: async (s, m, { args, reply, config: c }) => {
   if (!args[0]) return reply('📱 Usage: .apk <app name>\nExample: .apk whatsapp');
   const q = args.join(' ');
-
   try {
     await react(s, m, '🔎');
-
     const d = await getJson(`${API.aptoide}/apps/search`, { query: q, limit: 1 });
     const app = d?.datalist?.list?.[0];
     if (!app) { await react(s, m, '❌'); return reply('❌ App not found.'); }
-
     const url = app.file?.path || app.file?.path_alt;
     const size = Number(app.size || app.file?.filesize || 0);
     const name = String(app.name || q);
     const version = app.file?.vername || '';
-
     if (!url) { await react(s, m, '❌'); return reply('❌ No download link for that app.'); }
-
-    if (size > MAX_APK) {
-      await react(s, m, '❌');
-      return reply(`⚠️ *${name}* is ${fmtSize(size)}, which is too large for this bot (limit ${fmtSize(MAX_APK)}).`);
-    }
-
+    if (size > MAX_APK) { await react(s, m, '❌'); return reply(`⚠️ *${name}* is ${fmtSize(size)}, which is too large for this bot (limit ${fmtSize(MAX_APK)}).`); }
     await react(s, m, '⬇️');
-
     await oneApkAtATime(() => s.sendMessage(m.chat, {
       document: { url },
       mimetype: 'application/vnd.android.package-archive',
       fileName: name.replace(/[^a-zA-Z0-9._-]+/g, '_') + '.apk',
       caption: `📱 *${name}*\n${version ? '🏷️ Version: ' + version + '\n' : ''}${size ? '📦 Size: ' + fmtSize(size) + '\n' : ''}👑 ${c?.settings?.title || 'Alpha Bot'}`
     }, { quoted: m }));
-
     await react(s, m, '✅');
-  } catch (e) {
-    console.log('[APK] failed:', e.message);
-    await react(s, m, '❌');
-    reply('❌ APK download failed. Try again in a moment.');
-  }
+  } catch (e) { console.log('[APK] failed:', e.message); await react(s, m, '❌'); reply('❌ APK download failed. Try again in a moment.'); }
 } },
 
-// ======================================================
-// .ringtone <song or sound name>   (30-second clip)
-// ======================================================
 { command: 'ringtone', aliases: ['ringtones', 'rt'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   if (!args[0]) return reply('🔔 Usage: .ringtone <song name>\nExample: .ringtone calm down rema');
   const q = args.join(' ');
-
   try {
     await react(s, m, '🔎');
-
     const d = await getJson(`${API.itunes}/search`, { term: q, media: 'music', entity: 'song', limit: 5 });
     const hit = (d?.results || []).find(x => x.previewUrl);
     if (!hit) { await react(s, m, '❌'); return reply('❌ No ringtone found. Try the song name plus the artist.'); }
-
     await s.sendMessage(m.chat, {
       audio: { url: hit.previewUrl },
       mimetype: 'audio/mp4',
       ptt: false,
       fileName: `${hit.trackName || q}`.replace(/[^a-zA-Z0-9._-]+/g, '_') + '.m4a'
     }, { quoted: m });
-
     await reply(`🔔 *${hit.trackName || q}*\n👤 ${hit.artistName || '?'}\n⏱️ 30-second clip. Save it and set it as your ringtone.`);
     await react(s, m, '✅');
-  } catch (e) {
-    console.log('[RINGTONE] failed:', e.message);
-    await react(s, m, '❌');
-    reply('❌ Ringtone search failed. Try again in a moment.');
-  }
+  } catch (e) { console.log('[RINGTONE] failed:', e.message); await react(s, m, '❌'); reply('❌ Ringtone search failed. Try again in a moment.'); }
 } },
 
-// ======================================================
-// .wallpaper <topic>   (safe-for-work only)
-// ======================================================
+// 🎯 FIXED WALLPAPER COMMAND (Uses Bing Images for real HD wallpapers)
 { command: 'wallpaper', aliases: ['wall', 'wp'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   const q = args.join(' ').trim() || 'nature';
-
   try {
     await react(s, m, '🖼️');
+    
+    // 1. Try Bing Images first for exactly what the user asked for
+    let urls = await bingImages(q + ' hd wallpaper', 10);
 
-    const base = { q, categories: '111', purity: '100', sorting: 'random', per_page: 24 };
-
-    // phone-shaped wallpapers first, then anything
-    let d = await getJson(`${API.wallhaven}/search`, { ...base, ratios: 'portrait' });
-    let list = (d?.data || []).filter(x => x.path && Number(x.file_size || 0) <= MAX_IMG);
-
-    if (!list.length) {
-      d = await getJson(`${API.wallhaven}/search`, base);
-      list = (d?.data || []).filter(x => x.path && Number(x.file_size || 0) <= MAX_IMG);
+    // 2. Fallback to Wallhaven if Bing fails
+    if (!urls.length) {
+        try {
+            const d = await getJson(`${API.wallhaven}/search`, { q, categories: '111', purity: '100', sorting: 'random', per_page: 10 });
+            urls.push(...(d?.data || []).map(x => x.path).filter(Boolean));
+        } catch(e) {}
     }
 
-    if (!list.length) { await react(s, m, '❌'); return reply('❌ No wallpapers found for that. Try another word.'); }
+    urls = shuffle([...new Set(urls)]);
+    if (!urls.length) { await react(s, m, '❌'); return reply('❌ No wallpapers found for that. Try another word.'); }
 
-    // a picture that fails to load is skipped, the next one is tried
     let sent = 0;
-    for (const w of shuffle(list).slice(0, 8)) {
+    for (const u of urls) {
       if (sent >= 3) break;
       try {
-        const buf = await fetchImage(w.path, MAX_IMG);
-        await s.sendMessage(m.chat, { image: buf, caption: `🖼️ ${q}${w.resolution ? '\n📐 ' + w.resolution : ''}` }, sent === 0 ? { quoted: m } : {});
+        const buf = await fetchImage(u, 10 * 1024 * 1024); // 10MB limit for HD wallpapers
+        await s.sendMessage(m.chat, { image: buf, caption: `🖼️ ${q} wallpaper` }, sent === 0 ? { quoted: m } : {});
         sent++;
+        await sleep(1000);
       } catch (e) { console.log('[WALLPAPER] skipped one:', e.message); }
     }
 
@@ -468,65 +428,36 @@ module.exports = [
   }
 } },
 
-// ======================================================
-// .img <query>
-// Sources: Pexels (if PEXELS_KEY is set), Openverse and Wikimedia Commons.
-// Results are mixed randomly so repeated searches don't give the same pictures,
-// and a picture that can't be loaded is skipped instead of stopping the command.
-// ======================================================
+// 🎯 FIXED IMG COMMAND (Uses Bing Images for real photos of artists)
 { command: 'img', aliases: ['image', 'pic'], category: 'downloader', execute: async (s, m, { args, reply }) => {
   if (!args[0]) return reply('❌ Usage: .img <query>');
   const q = args.join(' ');
 
   try {
     await react(s, m, '🔍');
-    let urls = [];
+    
+    // 1. Try Bing Images first (Best for real people/artists)
+    let urls = await bingImages(q, 10);
 
-    if (process.env.PEXELS_KEY) {
+    // 2. Fallback to Pexels if Bing fails
+    if (!urls.length && process.env.PEXELS_KEY) {
       try {
-        const d = await getJson(`${API.pexels}/search`, { query: q, per_page: 15, page: 1 + Math.floor(Math.random() * 3) }, { Authorization: process.env.PEXELS_KEY });
+        const d = await getJson(`${API.pexels}/search`, { query: q, per_page: 10 }, { Authorization: process.env.PEXELS_KEY });
         urls.push(...(d?.photos || []).map(p => p.src?.large || p.src?.medium).filter(Boolean));
       } catch (e) { console.log('[IMG] pexels failed:', e.message); }
-    }
-
-    if (urls.length < 4) {
-      try {
-        const d = await getJson(API.openverse + '/images/', { q, page_size: 20, mature: false });
-        urls.push(...(d?.results || []).map(r => r.url || r.thumbnail).filter(Boolean));
-      } catch (e) { console.log('[IMG] openverse failed:', e.message); }
-    }
-
-    if (urls.length < 4) {
-      try {
-        const wiki = async offset => {
-          const d = await getJson(API.wikimedia, {
-            action: 'query', format: 'json', origin: '*',
-            generator: 'search', gsrsearch: `${q} filetype:bitmap`, gsrnamespace: 6, gsrlimit: 20, gsroffset: offset,
-            prop: 'imageinfo', iiprop: 'url|mime', iiurlwidth: 1000
-          });
-          return Object.values(d?.query?.pages || {})
-            .map(p => p.imageinfo?.[0])
-            .filter(i => i && /^image\/(jpeg|png)$/.test(i.mime || ''))
-            .map(i => i.thumburl || i.url)
-            .filter(Boolean);
-        };
-        let w = await wiki(Math.floor(Math.random() * 30));
-        if (!w.length) w = await wiki(0);
-        urls.push(...w);
-      } catch (e) { console.log('[IMG] wikimedia failed:', e.message); }
     }
 
     urls = shuffle([...new Set(urls)]);
     if (!urls.length) { await react(s, m, '❌'); return reply('❌ No images found for that. Try another word.'); }
 
-    let sent = 0, tries = 0;
+    let sent = 0;
     for (const u of urls) {
-      if (sent >= 4 || tries >= 14) break;
-      tries++;
+      if (sent >= 4) break;
       try {
         const buf = await fetchImage(u);
         await s.sendMessage(m.chat, { image: buf, caption: `📸 ${q} (${sent + 1})` }, sent === 0 ? { quoted: m } : {});
         sent++;
+        await sleep(1000); // Prevent WhatsApp rate-limit ban
       } catch (e) { console.log('[IMG] skipped one:', e.message); }
     }
 
