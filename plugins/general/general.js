@@ -193,7 +193,7 @@ function buildSections() {
 }
 
 module.exports = [
-    {
+        {
         command: "menu",
         aliases: ["help", "commands"],
         category: "general",
@@ -201,7 +201,7 @@ module.exports = [
             try {
                 const requestedCat = args[0]?.toUpperCase();
 
-                // If user typed ".menu GENERAL" or clicked a category
+                // If user wants a specific category (e.g., .menu GENERAL)
                 if (requestedCat) {
                     const foundSec = SECTIONS.find(s => s.title.toUpperCase().includes(requestedCat) || s.cat.includes(requestedCat.toLowerCase()));
                     if (foundSec) {
@@ -214,33 +214,49 @@ module.exports = [
                     }
                 }
 
-                // Try sending WhatsApp Native Interactive List
-                try {
-                    const rows = SECTIONS.map(s => ({
-                        title: s.title,
-                        rowId: `${prefix}menu ${s.title.replace(/^[^\w\s]+\s*/, '').trim()}`,
-                        description: `View ${s.title} commands (${s.cmds.length})`
-                    }));
+                // Gather stats for the full menu
+                const now = new Date();
+                const time = now.toLocaleTimeString();
+                const date = now.toLocaleDateString();
+                const pushname = m.pushName || "User";
+                const uptime = runtime(process.uptime());
+                const country = await getCountry(m, sock);
 
-                    const buttonMessage = {
-                        text: `Hello *${m.pushName || "User"}*,\nSelect a command category below to explore Alpha-XMD.`,
-                        footer: `Prefix: ${prefix} | Alpha-XMD Bot`,
-                        title: `⚡ ${config.settings.title} ⚡`,
-                        buttonText: "📑 Open Categories",
-                        sections: [
-                            {
-                                title: "Command Modules",
-                                rows: rows
-                            }
-                        ]
-                    };
+                // The complete, beautiful categorized text menu
+                const menu = `
+╭───〔 ${config.settings.title} 〕───⬣
 
-                    await sock.sendMessage(m.chat, buttonMessage, { quoted: m });
-                    return;
+👤 *User:* ${pushname}
+🌍 *Country:* ${country}
+🕒 *Time:* ${time}
+📅 *Date:* ${date}
+⚡ *Uptime:* ${uptime}
 
-                } catch (interactiveErr) {
-                    console.log("Interactive list error, falling back to text:", interactiveErr.message);
+╰────────────⬣
+
+${buildSections()}
+
+💡 *Tip:* Type *${prefix}menu <category>* (e.g. *${prefix}menu owner*) to view a specific section!
+
+${config.settings.footer}
+`;
+
+                let image = null;
+                try { image = await getMenuImg(); } catch (e) {}
+
+                // Send with image if available, otherwise text
+                if (image) {
+                    await send({ image, caption: menu });
+                } else {
+                    await send({ text: menu });
                 }
+
+            } catch (err) {
+                console.log("Menu error:", err);
+                await sock.sendMessage(m.chat, { text: "❌ Menu failed to load" }, { quoted: m });
+            }
+        }
+    },
 
                 // Fallback Classic Text Menu
                 const now = new Date();
