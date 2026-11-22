@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (NATIVE INTERACTIVE LIST MENU + FULL FALLBACK)
+// © 2026 Alpha - GENERAL COMMANDS (NATIVE INTERACTIVE CATEGORY LIST + FALLBACK)
 
 const fs = require('fs');
 const os = require('os');
@@ -87,7 +87,7 @@ const SECTIONS = [
   { title: '🎵 AUDIO EFFECTS', cat: ['audio'], cmds: ['deep', 'smooth', 'fat', 'blown', 'radio', 'robot', 'chipmunk', 'nightcore', 'earrape', 'bass', 'reverse', 'slow', 'fast', 'baby', 'demon'] },
   { title: '😂 EMOJI ANIMATIONS', cat: ['emoji'], cmds: ['happy', 'heart', 'angry', 'sad', 'shy', 'moon', 'confused', 'hot', 'nikal'] },
   { title: '🎮 GAMES & FUN', cat: ['game', 'fun'], cmds: ['tictactoe', 'hangman', 'guess', 'quiz', 'trivia', 'answer', 'truth', 'dare', '8ball', 'compliment', 'insult', 'flirt', 'shayari', 'simp', 'stupid', 'goodnight', 'meme', 'squidgame', 'konami', 'lovetest', 'aura', 'dice', 'roll', 'joke', 'quote', 'fact', 'flip', 'rps', 'ship', 'hug', 'emojimix', 'wcg'] },
-  { title: '🎌 ANIME & REACTIONS', cat: ['anime', 'reaction'], cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'hentai 🔞', 'hentaigif 🔞', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
+  { title: '🎌 ANIME & REACTIONS', cat: ['anime', 'reaction'], cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
   { title: '🎬 MOVIES / SERIES', cat: ['movie', 'series'], cmds: ['selectmovie', 'dlmovie', 'dlseries', 'selectseries', 'seriesinfo'] },
   { title: '⚽ FOOTBALL', cat: ['football', 'soccer', 'sport'], cmds: ['livescore', 'competitions', 'matches', 'standings', 'team', 'head2head', 'matchlist', 'teamperson', 'teammatches', 'areas'] },
   { title: '👁️ STALK', cat: ['stalk'], cmds: ['npmstalk', 'wastalk', 'igstalk', 'tiktokstalk', 'twitterstalk', 'ytstalk', 'tgstalk', 'minecraftstalk', 'xboxstalk', 'steamstalk', 'githubstalk'] },
@@ -201,6 +201,7 @@ module.exports = [
             try {
                 const requestedCat = args[0]?.toUpperCase();
 
+                // Render single category when selected from interactive list or typed directly
                 if (requestedCat) {
                     const foundSec = SECTIONS.find(s =>
                         s.title.toUpperCase().includes(requestedCat) ||
@@ -226,11 +227,11 @@ module.exports = [
                 // Try sending WhatsApp Native Interactive List
                 try {
                     const baileys = await import("@whiskeysockets/baileys");
-                    
+
                     const rows = SECTIONS.map(s => ({
                         header: s.title,
-                        title: `${s.title} (${s.cmds.length})`,
-                        description: `Tap to view ${s.title.toLowerCase()} commands`,
+                        title: `${s.title}`,
+                        description: `View ${s.cmds.length} commands in this module`,
                         id: `${prefix}menu ${s.title.replace(/^[^\w\s]+\s*/, '').trim()}`
                     }));
 
@@ -243,10 +244,10 @@ module.exports = [
                                         hasMediaAttachment: false
                                     },
                                     body: {
-                                        text: `Hello *${m.pushName || "User"}*,\nSelect a category from the interactive list below to explore available commands.`
+                                        text: `Hello *${m.pushName || "User"}*,\nTap the button below to open the category list and explore all command modules.`
                                     },
                                     footer: {
-                                        text: `Prefix: ${prefix} | Lightweight Mode`
+                                        text: `Prefix: ${prefix} | Powered by Alpha-XMD`
                                     },
                                     nativeFlowMessage: {
                                         buttons: [
@@ -256,7 +257,7 @@ module.exports = [
                                                     title: "📑 Open Categories",
                                                     sections: [
                                                         {
-                                                            title: "Available Command Modules",
+                                                            title: "All Command Modules",
                                                             rows
                                                         }
                                                     ]
@@ -302,7 +303,7 @@ module.exports = [
                     console.log("Interactive list error, falling back to text:", interactiveErr.message);
                 }
 
-                // Fallback Text Menu if interaction fails
+                // Fallback Text Menu
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
