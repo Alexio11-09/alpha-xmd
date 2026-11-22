@@ -192,16 +192,6 @@ function buildSections() {
   return out.join('\n\n');
 }
 
-// Map categories for interactive list rows
-function getInteractiveCategories() {
-  const map = {};
-  for (const s of SECTIONS) {
-    const cleanTitle = s.title.replace(/^[^\w\s]+\s*/, ''); // remove emojis for keys
-    map[cleanTitle.toUpperCase()] = s.cmds;
-  }
-  return map;
-}
-
 module.exports = [
     {
         command: "menu",
@@ -226,76 +216,33 @@ module.exports = [
 
                 // Try sending WhatsApp Native Interactive List
                 try {
-                    const baileys = await import("@whiskeysockets/baileys");
                     const rows = SECTIONS.map(s => ({
-                        header: s.title,
-                        title: `${s.title} (${s.cmds.length})`,
-                        description: `Tap to view commands in ${s.title}`,
-                        id: `${prefix}menu ${s.title.replace(/^[^\w\s]+\s*/, '').trim()}`
+                        title: s.title,
+                        rowId: `${prefix}menu ${s.title.replace(/^[^\w\s]+\s*/, '').trim()}`,
+                        description: `View ${s.title} commands (${s.cmds.length})`
                     }));
 
-                    const msgContent = {
-                        viewOnceMessage: {
-                            message: {
-                                interactiveMessage: {
-                                    header: {
-                                        title: `⚡ ${config.settings.title} ⚡`,
-                                        hasMediaAttachment: false
-                                    },
-                                    body: {
-                                        text: `Hello *${m.pushName || "User"}*,\nSelect a category from the interactive list below or view the full text menu.`
-                                    },
-                                    footer: {
-                                        text: `Prefix: ${prefix} | Powered by Alpha-XMD`
-                                    },
-                                    nativeFlowMessage: {
-                                        buttons: [
-                                            {
-                                                name: "single_select",
-                                                buttonParamsJson: JSON.stringify({
-                                                    title: "📑 Open Categories",
-                                                    sections: [{ title: "Command Categories", rows }]
-                                                })
-                                            }
-                                        ]
-                                    }
-                                }
+                    const buttonMessage = {
+                        text: `Hello *${m.pushName || "User"}*,\nSelect a command category below to explore Alpha-XMD.`,
+                        footer: `Prefix: ${prefix} | Alpha-XMD Bot`,
+                        title: `⚡ ${config.settings.title} ⚡`,
+                        buttonText: "📑 Open Categories",
+                        sections: [
+                            {
+                                title: "Command Modules",
+                                rows: rows
                             }
-                        }
+                        ]
                     };
 
-                    const generated = baileys.generateWAMessageFromContent(m.chat, msgContent, {
-                        userJid: sock.user.id,
-                        quoted: m
-                    });
-
-                    const additionalNodes = [
-                        {
-                            tag: "biz",
-                            attrs: {},
-                            content: [
-                                {
-                                    tag: "interactive",
-                                    attrs: { type: "native_flow", v: "1" },
-                                    content: [{ tag: "native_flow", attrs: { name: "single_select" } }]
-                                }
-                            ]
-                        }
-                    ];
-
-                    if (!m.isGroup) additionalNodes.push({ tag: "bot", attrs: { biz_bot: "1" } });
-
-                    await sock.relayMessage(m.chat, generated.message, {
-                        messageId: generated.key.id,
-                        additionalNodes
-                    });
+                    await sock.sendMessage(m.chat, buttonMessage, { quoted: m });
                     return;
+
                 } catch (interactiveErr) {
-                    // Fallback to classic text menu if interactive message fails
-                    console.log("Interactive menu fallback triggered:", interactiveErr.message);
+                    console.log("Interactive list error, falling back to text:", interactiveErr.message);
                 }
 
-                // Classic Text Menu Fallback
+                // Fallback Classic Text Menu
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
