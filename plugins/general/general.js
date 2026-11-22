@@ -83,53 +83,53 @@ const getCountry = async (m, sock) => {
 //  - A name only appears once (the first section that lists it wins).
 // ======================================================
 const SECTIONS = [
-  { title: '📊 GENERAL', cmds: ['menu', 'ping', 'alive', 'info', 'owner', 'repo', 'pair'] },
+  { title: '📊 GENERAL', cat: ['general', 'main'], cmds: ['menu', 'ping', 'alive', 'info', 'owner', 'repo', 'pair'] },
 
-  { title: '👑 OWNER', cmds: ['update', 'restart', 'shutdown', 'eval', 'bc', 'join', 'leave', 'block', 'unblock', 'blocklist', 'pm', 'addowner', 'delowner', 'owners', 'getchannel', 'anticall', 'poststatus', 'cleartmp', 'clearsession', 'sudo', 'clear', 'tostatus', 'toviewonce', 'autobio', 'channel', 'disk', 'deljunk'] },
+  { title: '👑 OWNER', cat: ['owner'], cmds: ['update', 'restart', 'shutdown', 'eval', 'bc', 'join', 'leave', 'block', 'unblock', 'blocklist', 'pm', 'addowner', 'delowner', 'owners', 'getchannel', 'anticall', 'poststatus', 'cleartmp', 'clearsession', 'sudo', 'clear', 'tostatus', 'toviewonce', 'autobio', 'channel', 'disk', 'deljunk'] },
 
-  { title: '👥 GROUP', cmds: ['tagall', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute', 'hidetag', 'groupinfo', 'grouplink', 'getlink', 'revokelink', 'welcome on/off', 'goodbye on/off', 'antilink', 'antidemote', 'antisticker', 'antitag', 'poll', 'listadmin', 'tagadmin', 'vcf', 'promoteall', 'demoteall', 'kickinactive', 'approveall', 'approve', 'disapproveall', 'invite', 'gcstatus', 'getname', 'getdeskgc', 'getppgc', 'setppgc', 'listactive', 'listinactive', 'totalmembers', 'addcode', 'delcode', 'listcode', 'removes', 'mediatag', 'ban', 'unban', 'banlist'] },
+  { title: '👥 GROUP', cat: ['group'], cmds: ['tagall', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute', 'hidetag', 'groupinfo', 'grouplink', 'getlink', 'revokelink', 'welcome on/off', 'goodbye on/off', 'antilink', 'antidemote', 'antisticker', 'antitag', 'antiforeign', 'antibot', 'antigroupmention', 'antistatusgroupmention', 'poll', 'listadmin', 'tagadmin', 'vcf', 'promoteall', 'demoteall', 'kickinactive', 'approveall', 'approve', 'disapproveall', 'invite', 'gcstatus', 'getname', 'getdeskgc', 'getppgc', 'setppgc', 'listactive', 'listinactive', 'totalmembers', 'addcode', 'delcode', 'listcode', 'removes', 'mediatag', 'ban', 'unban', 'banlist'] },
 
-  { title: '⚙️ SETTINGS', cmds: ['mode', 'autoread', 'autotyping', 'autorecording', 'autoreact', 'autostatus', 'antiedit', 'antidelete', 'autoreply', 'autosticker', 'autovoice', 'dmblocker', 'antispam', 'chatbot', 'autosavestatus', 'lastseen', 'ppprivacy', 'readreceipts'] },
+  { title: '⚙️ SETTINGS', cat: ['setting'], cmds: ['mode', 'autoread', 'autotyping', 'autorecording', 'autoreact', 'autostatus', 'antiblock', 'ghost', 'antiedit', 'antidelete', 'autoreply', 'autosticker', 'autovoice', 'dmblocker', 'antispam', 'chatbot', 'autosavestatus', 'lastseen', 'ppprivacy', 'readreceipts'] },
 
-  { title: '📥 DOWNLOADER', cmds: ['play', 'video', 'tiktok', 'instagram', 'facebook', 'pindl', 'spotify', 'mediafire', 'gitclone', 'apk', 'ringtone', 'wallpaper', 'img', 'shazam', 'yts', 'ytpost', 'gdrive', 'movie'] },
+  { title: '📥 DOWNLOADER', cat: ['download'], cmds: ['play', 'video', 'tiktok', 'instagram', 'facebook', 'pindl', 'spotify', 'mediafire', 'gitclone', 'apk', 'ringtone', 'wallpaper', 'img', 'shazam', 'yts', 'ytpost', 'gdrive', 'movie'] },
 
-  { title: '🔧 TOOLS', cmds: ['calc', 'qr', 'tts', 'time', 'sticker', 'toimg', 'getpp', 'getpp2', 'setpp', 'getid', 'translate', 'weather', 'lyrics', 'removebg', 'tomp3', 'vv', 'vv2', 'url', 'take', 'steal', 'blur', 'attp', 'ttp', 'ss', 'stickertelegram', 'imgscan', 'tovideo', 'toptt', 'topdf', 'smeme', 'wasted', 'font'] },
+  { title: '🔧 TOOLS', cat: ['tool'], cmds: ['calc', 'qr', 'tts', 'time', 'sticker', 'toimg', 'getpp', 'getpp2', 'setpp', 'getid', 'translate', 'weather', 'lyrics', 'removebg', 'tomp3', 'vv', 'vv2', 'url', 'take', 'steal', 'blur', 'attp', 'ttp', 'ss', 'stickertelegram', 'imgscan', 'tovideo', 'toptt', 'topdf', 'smeme', 'wasted', 'font', 'webzip', 'botip', 'debugid'] },
 
-  { title: '🛠️ UTILITIES', cmds: ['save', 'delete', 'hack', 'tinyurl', 'fliptext', 'genpass', 'device', 'browse', 'fancy', 'carbon', 'obfuscate', 'tozip', 'readmore', 'ngldm'] },
+  { title: '🛠️ UTILITIES', cat: ['utilit'], cmds: ['save', 'delete', 'hack', 'tinyurl', 'fliptext', 'genpass', 'device', 'browse', 'fancy', 'carbon', 'obfuscate', 'tozip', 'readmore', 'ngldm'] },
 
-  { title: '🤖 AI & IMAGE GEN', cmds: ['gpt', 'gemini', 'blackbox', 'deepseek', 'copilot', 'claude', 'perplexity', 'venice', 'dalle', 'flux', 'imagine', 'animagine', 'dreamshaper', 'pony', 'pixar', 'cartoon', 'seedream', 'toghibili'] },
+  { title: '🤖 AI & IMAGE GEN', cat: ['ai', 'imagegen'], cmds: ['gpt', 'gemini', 'blackbox', 'deepseek', 'copilot', 'claude', 'perplexity', 'venice', 'dalle', 'flux', 'imagine', 'animagine', 'dreamshaper', 'pony', 'pixar', 'cartoon', 'seedream', 'toghibili'] },
 
-  { title: '🔍 SEARCH', cmds: ['gsmarena', 'google', 'bing', 'livewallpapers', 'imdb', 'define', 'wiki'] },
+  { title: '🔍 SEARCH', cat: ['search'], cmds: ['gsmarena', 'google', 'bing', 'livewallpapers', 'imdb', 'define', 'wiki'] },
 
-  { title: '🌐 INFORMATION', cmds: ['news', 'countryinfo', 'check', 'bible', 'quran', 'inspect', 'webcrawl'] },
+  { title: '🌐 INFORMATION', cat: ['info'], cmds: ['news', 'countryinfo', 'check', 'bible', 'quran', 'inspect', 'webcrawl'] },
 
-  { title: '🎨 PHOTO EFFECTS', cmds: ['zombie', 'figure', 'underground', 'oldage', 'turky', 'train', 'streetwear', 'tatoo', 'satan', 'sdm', 'spirit', 'toroblox', 'mirror', 'partner', 'bf', 'gf', 'polaroid', 'punk', 'piramid', 'peci', 'island', 'mangu', 'liquor', 'mecca', 'mayan', 'maid', 'glasses', 'cambodia', 'japan', 'hijab', 'hitam', 'vintage'] },
+  { title: '🎨 PHOTO EFFECTS', cat: ['photo', 'effect', 'imageedit'], cmds: ['zombie', 'figure', 'underground', 'oldage', 'turky', 'train', 'streetwear', 'tatoo', 'satan', 'sdm', 'spirit', 'toroblox', 'mirror', 'partner', 'bf', 'gf', 'polaroid', 'punk', 'piramid', 'peci', 'island', 'mangu', 'liquor', 'mecca', 'mayan', 'maid', 'glasses', 'cambodia', 'japan', 'hijab', 'hitam', 'tupai', 'vintage'] },
 
-  { title: '🎨 LOGO & TEXT MAKERS', cmds: ['hacker', 'neon', 'fire', 'gold', 'logo', 'glitch', 'avenger', 'pubg', 'naruto', 'matrix', 'graffiti', '1000d', 'rainbow', 'metallic', 'ice', 'snow', 'purple', 'thunder', 'water', 'underwater', '4d', 'luxury', 'silver', 'foggyglass', 'wetglass', 'candy', 'christmas', '3dchristmas', 'sparklechristmas', 'deepsea', 'scifi', 'waterpipe', 'spooky', 'pencil', 'circuit', 'discovery', 'fiction', 'transformer', 'berry', 'magma', '3dstone', 'neonlight', 'harrypotter', 'brokenglass', 'papercut', 'watercolor', 'multicolor', 'neondevil', 'graffitibike', 'cloud', 'honey', 'fruitjuice', 'biscuit', 'wood', 'chocolate', 'strawberry', 'blood', 'dropwater', 'toxic', 'lava', 'rock', 'bloodglass', 'halloween', 'darkgold', 'joker', 'wicker', 'firework', 'skeleton', 'sand', 'glue', '1917', 'leaves'] },
+  { title: '🎨 LOGO & TEXT MAKERS', cat: ['logo', 'textmaker', 'maker'], cmds: ['hacker', 'neon', 'fire', 'gold', 'logo', 'glitch', 'avenger', 'pubg', 'naruto', 'matrix', 'graffiti', '1000d', '3d', 'rainbow', 'metallic', 'ice', 'snow', 'purple', 'thunder', 'water', 'underwater', '4d', 'luxury', 'silver', 'foggyglass', 'wetglass', 'candy', 'christmas', '3dchristmas', 'sparklechristmas', 'deepsea', 'scifi', 'waterpipe', 'spooky', 'pencil', 'circuit', 'discovery', 'fiction', 'transformer', 'berry', 'magma', '3dstone', 'neonlight', 'harrypotter', 'brokenglass', 'papercut', 'watercolor', 'multicolor', 'neondevil', 'graffitibike', 'cloud', 'honey', 'fruitjuice', 'biscuit', 'wood', 'chocolate', 'strawberry', 'blood', 'dropwater', 'toxic', 'lava', 'rock', 'bloodglass', 'halloween', 'darkgold', 'joker', 'wicker', 'firework', 'skeleton', 'sand', 'glue', '1917', 'leaves'] },
 
-  { title: '🎵 AUDIO EFFECTS', cmds: ['deep', 'smooth', 'fat', 'blown', 'radio', 'robot', 'chipmunk', 'nightcore', 'earrape', 'bass', 'reverse', 'slow', 'fast', 'baby', 'demon'] },
+  { title: '🎵 AUDIO EFFECTS', cat: ['audio'], cmds: ['deep', 'smooth', 'fat', 'blown', 'radio', 'robot', 'chipmunk', 'nightcore', 'earrape', 'bass', 'reverse', 'slow', 'fast', 'baby', 'demon'] },
 
-  { title: '😂 EMOJI ANIMATIONS', cmds: ['happy', 'heart', 'angry', 'sad', 'shy', 'moon', 'confused', 'hot', 'nikal'] },
+  { title: '😂 EMOJI ANIMATIONS', cat: ['emoji'], cmds: ['happy', 'heart', 'angry', 'sad', 'shy', 'moon', 'confused', 'hot', 'nikal'] },
 
-  { title: '🎮 GAMES & FUN', cmds: ['tictactoe', 'hangman', 'guess', 'quiz', 'trivia', 'answer', 'truth', 'dare', '8ball', 'compliment', 'insult', 'flirt', 'shayari', 'simp', 'stupid', 'goodnight', 'meme', 'squidgame', 'konami', 'lovetest', 'aura', 'dice', 'roll', 'joke', 'quote', 'fact', 'flip', 'rps', 'ship', 'hug', 'emojimix', 'wcg'] },
+  { title: '🎮 GAMES & FUN', cat: ['game', 'fun'], cmds: ['tictactoe', 'hangman', 'guess', 'quiz', 'trivia', 'answer', 'truth', 'dare', '8ball', 'compliment', 'insult', 'flirt', 'shayari', 'simp', 'stupid', 'goodnight', 'meme', 'squidgame', 'konami', 'lovetest', 'aura', 'dice', 'roll', 'joke', 'quote', 'fact', 'flip', 'rps', 'ship', 'hug', 'emojimix', 'wcg'] },
 
-  { title: '🎌 ANIME & REACTIONS', cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'hentai 🔞', 'hentaigif 🔞', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
+  { title: '🎌 ANIME & REACTIONS', cat: ['anime', 'reaction'], cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'hentai 🔞', 'hentaigif 🔞', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
 
-  { title: '🎬 MOVIES / SERIES', cmds: ['selectmovie', 'dlmovie', 'dlseries', 'selectseries', 'seriesinfo'] },
+  { title: '🎬 MOVIES / SERIES', cat: ['movie', 'series'], cmds: ['selectmovie', 'dlmovie', 'dlseries', 'selectseries', 'seriesinfo'] },
 
-  { title: '⚽ FOOTBALL', cmds: ['livescore', 'competitions', 'matches', 'standings', 'team', 'head2head', 'matchlist', 'teamperson', 'teammatches', 'areas'] },
+  { title: '⚽ FOOTBALL', cat: ['football', 'soccer', 'sport'], cmds: ['livescore', 'competitions', 'matches', 'standings', 'team', 'head2head', 'matchlist', 'teamperson', 'teammatches', 'areas'] },
 
-  { title: '👁️ STALK', cmds: ['npmstalk', 'wastalk', 'igstalk', 'tiktokstalk', 'twitterstalk', 'ytstalk', 'tgstalk', 'minecraftstalk', 'xboxstalk', 'steamstalk', 'githubstalk'] },
+  { title: '👁️ STALK', cat: ['stalk'], cmds: ['npmstalk', 'wastalk', 'igstalk', 'tiktokstalk', 'twitterstalk', 'ytstalk', 'tgstalk', 'minecraftstalk', 'xboxstalk', 'steamstalk', 'githubstalk'] },
 
-  { title: '🐙 GITHUB', cmds: ['ghlogin', 'ghtoken', 'ghcreate', 'ghdelete', 'ghpush', 'ghpushall', 'ghcommit', 'ghfork', 'ghlist', 'ghbranches', 'ghdeletefile', 'ghcreatebranch', 'ghlogout'] },
+  { title: '🐙 GITHUB', cat: ['github'], cmds: ['ghlogin', 'ghtoken', 'ghcreate', 'ghdelete', 'ghpush', 'ghpushall', 'ghcommit', 'ghfork', 'ghlist', 'ghbranches', 'ghdeletefile', 'ghcreatebranch', 'ghlogout'] },
 
-  { title: '📺 CHANNEL', cmds: ['createchannel', 'followchannel', 'unfollowchannel', 'updatechannelname', 'updatechannelpic', 'updatechanneldesc', 'mutechannel', 'unmutechannel', 'deletechannel'] },
+  { title: '📺 CHANNEL', cat: ['channel'], cmds: ['createchannel', 'followchannel', 'unfollowchannel', 'updatechannelname', 'updatechannelpic', 'updatechanneldesc', 'mutechannel', 'unmutechannel', 'deletechannel'] },
 
-  { title: '💰 FINANCE', cmds: ['currencylist', 'rates', 'exchange', 'forex'] },
+  { title: '💰 FINANCE', cat: ['finance', 'money', 'currency', 'crypto'], cmds: ['currencylist', 'rates', 'exchange', 'forex'] },
 
-  { title: '📧 TEMP MAIL / NUMBER', cmds: ['tempmail', 'tempinbox', 'tempnumber', 'checksms', 'listcountries'] },
+  { title: '📧 TEMP MAIL / NUMBER', cat: ['temp', 'mail'], cmds: ['tempmail', 'tempinbox', 'tempnumber', 'checksms', 'listcountries'] },
 
-  { title: '🖥️ CPANEL', cmds: ['addserver', 'delserver', 'listservers', 'sendpanel', '1gb…9gb', 'unli', 'admin', 'addprem', 'delprem', 'premiumlist', 'bothosting'] }
+  { title: '🖥️ CPANEL', cat: ['cpanel', 'panel', 'hosting'], cmds: ['addserver', 'delserver', 'listservers', 'sendpanel', '1gb…9gb', 'unli', 'admin', 'addprem', 'delprem', 'premiumlist', 'bothosting'] }
 ];
 
 // The loaded commands (message.js exports them). Returns null if they are not available.
@@ -152,8 +152,24 @@ function getRegistry() {
 // "welcome on/off" -> "welcome", "1gb…9gb" -> "1gb", "hentai 🔞" -> "hentai"
 const baseName = entry => entry.split(/[\s…]/)[0].toLowerCase();
 
+// "1gb…9gb" -> ["1gb","2gb",...,"9gb"]  (any other entry -> null)
+function expandRange(entry) {
+  const r = /^(\d+)([a-z]+)…(\d+)([a-z]+)$/i.exec(entry);
+  if (!r || r[2].toLowerCase() !== r[4].toLowerCase()) return null;
+  const from = +r[1], to = +r[3];
+  if (to < from || to - from > 50) return null;
+  return Array.from({ length: to - from + 1 }, (_, i) => `${from + i}${r[2].toLowerCase()}`);
+}
+
 const box = (title, items) =>
   `╭───〔 ${title} 〕───⬣\n${items.map(i => `│ • .${i}`).join('\n')}\n╰────────────⬣`;
+
+// pick a section for a command that is not listed above, from the command's own "category"
+function sectionByCategory(category) {
+  const c = String(category || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (!c) return null;
+  return SECTIONS.find(sec => (sec.cat || []).some(k => c.startsWith(k))) || null;
+}
 
 function buildSections() {
   const reg = getRegistry();
@@ -161,12 +177,47 @@ function buildSections() {
   const listed = new Set();    // every name mentioned in SECTIONS
   const out = [];
 
-  for (const sec of SECTIONS) for (const e of sec.cmds) listed.add(baseName(e));
+  for (const sec of SECTIONS) {
+    for (const e of sec.cmds) {
+      for (const n of (expandRange(e) || [baseName(e)])) listed.add(n);
+    }
+  }
+
+  // commands that exist but are not in any list: put them in the section matching their category
+  const auto = new Map();      // section title -> [names]
+  const extra = [];            // no matching section -> MORE COMMANDS
+
+  if (reg) {
+    for (const c of reg.list) {
+      if (c.hidden) continue;
+      const all = [String(c.command).toLowerCase(), ...(c.aliases || []).map(a => String(a).toLowerCase())];
+      if (all.some(n => listed.has(n))) continue;
+
+      const sec = sectionByCategory(c.category);
+      if (sec) {
+        if (!auto.has(sec.title)) auto.set(sec.title, []);
+        auto.get(sec.title).push(c.command);
+      } else if (!extra.includes(c.command)) {
+        extra.push(c.command);
+      }
+    }
+  }
 
   for (const sec of SECTIONS) {
     const items = [];
 
     for (const entry of sec.cmds) {
+      const range = expandRange(entry);
+
+      if (range) {
+        // show only the numbers that really exist, e.g. "2gb…9gb"
+        const have = range.filter(n => !shown.has(n) && (!reg || reg.names.has(n)));
+        if (!have.length) continue;
+        have.forEach(n => shown.add(n));
+        items.push(have.length > 1 ? `${have[0]}…${have[have.length - 1]}` : have[0]);
+        continue;
+      }
+
       const base = baseName(entry);
       if (shown.has(base)) continue;
       if (reg && !reg.names.has(base)) continue;   // command is not loaded -> hide it
@@ -174,22 +225,14 @@ function buildSections() {
       items.push(entry);
     }
 
+    for (const name of auto.get(sec.title) || []) {
+      if (!shown.has(name.toLowerCase())) { shown.add(name.toLowerCase()); items.push(name); }
+    }
+
     if (items.length) out.push(box(sec.title, items));
   }
 
-  // commands that exist but are not in any list above
-  if (reg) {
-    const extra = [];
-
-    for (const c of reg.list) {
-      if (c.hidden) continue;
-      const all = [String(c.command).toLowerCase(), ...(c.aliases || []).map(a => String(a).toLowerCase())];
-      if (all.some(n => listed.has(n))) continue;
-      if (!extra.includes(c.command)) extra.push(c.command);
-    }
-
-    if (extra.length) out.push(box('🆕 MORE COMMANDS', extra));
-  }
+  if (extra.length) out.push(box('🆕 MORE COMMANDS', extra));
 
   return out.join('\n\n');
 }
