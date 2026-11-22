@@ -75,6 +75,125 @@ const getCountry = async (m, sock) => {
     }
 };
 
+// ======================================================
+// MENU SECTIONS
+// Move a command to another category by moving its name between these lists.
+//  - Commands that do not exist (plugin missing or not loaded) are hidden automatically.
+//  - Commands that DO exist but are not listed here show up under "MORE COMMANDS".
+//  - A name only appears once (the first section that lists it wins).
+// ======================================================
+const SECTIONS = [
+  { title: '📊 GENERAL', cmds: ['menu', 'ping', 'alive', 'info', 'owner', 'repo', 'pair'] },
+
+  { title: '👑 OWNER', cmds: ['update', 'restart', 'shutdown', 'eval', 'bc', 'join', 'leave', 'block', 'unblock', 'blocklist', 'pm', 'addowner', 'delowner', 'owners', 'getchannel', 'anticall', 'poststatus', 'cleartmp', 'clearsession', 'sudo', 'clear', 'tostatus', 'toviewonce', 'autobio', 'channel', 'disk', 'deljunk'] },
+
+  { title: '👥 GROUP', cmds: ['tagall', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute', 'hidetag', 'groupinfo', 'grouplink', 'getlink', 'revokelink', 'welcome on/off', 'goodbye on/off', 'antilink', 'antidemote', 'antisticker', 'antitag', 'poll', 'listadmin', 'tagadmin', 'vcf', 'promoteall', 'demoteall', 'kickinactive', 'approveall', 'approve', 'disapproveall', 'invite', 'gcstatus', 'getname', 'getdeskgc', 'getppgc', 'setppgc', 'listactive', 'listinactive', 'totalmembers', 'addcode', 'delcode', 'listcode', 'removes', 'mediatag', 'ban', 'unban', 'banlist'] },
+
+  { title: '⚙️ SETTINGS', cmds: ['mode', 'autoread', 'autotyping', 'autorecording', 'autoreact', 'autostatus', 'antiedit', 'antidelete', 'autoreply', 'autosticker', 'autovoice', 'dmblocker', 'antispam', 'chatbot', 'autosavestatus', 'lastseen', 'ppprivacy', 'readreceipts'] },
+
+  { title: '📥 DOWNLOADER', cmds: ['play', 'video', 'tiktok', 'instagram', 'facebook', 'pindl', 'spotify', 'mediafire', 'gitclone', 'apk', 'ringtone', 'wallpaper', 'img', 'shazam', 'yts', 'ytpost', 'gdrive', 'movie'] },
+
+  { title: '🔧 TOOLS', cmds: ['calc', 'qr', 'tts', 'time', 'sticker', 'toimg', 'getpp', 'getpp2', 'setpp', 'getid', 'translate', 'weather', 'lyrics', 'removebg', 'tomp3', 'vv', 'vv2', 'url', 'take', 'steal', 'blur', 'attp', 'ttp', 'ss', 'stickertelegram', 'imgscan', 'tovideo', 'toptt', 'topdf', 'smeme', 'wasted', 'font'] },
+
+  { title: '🛠️ UTILITIES', cmds: ['save', 'delete', 'hack', 'tinyurl', 'fliptext', 'genpass', 'device', 'browse', 'fancy', 'carbon', 'obfuscate', 'tozip', 'readmore', 'ngldm'] },
+
+  { title: '🤖 AI & IMAGE GEN', cmds: ['gpt', 'gemini', 'blackbox', 'deepseek', 'copilot', 'claude', 'perplexity', 'venice', 'dalle', 'flux', 'imagine', 'animagine', 'dreamshaper', 'pony', 'pixar', 'cartoon', 'seedream', 'toghibili'] },
+
+  { title: '🔍 SEARCH', cmds: ['gsmarena', 'google', 'bing', 'livewallpapers', 'imdb', 'define', 'wiki'] },
+
+  { title: '🌐 INFORMATION', cmds: ['news', 'countryinfo', 'check', 'bible', 'quran', 'inspect', 'webcrawl'] },
+
+  { title: '🎨 PHOTO EFFECTS', cmds: ['zombie', 'figure', 'underground', 'oldage', 'turky', 'train', 'streetwear', 'tatoo', 'satan', 'sdm', 'spirit', 'toroblox', 'mirror', 'partner', 'bf', 'gf', 'polaroid', 'punk', 'piramid', 'peci', 'island', 'mangu', 'liquor', 'mecca', 'mayan', 'maid', 'glasses', 'cambodia', 'japan', 'hijab', 'hitam', 'vintage'] },
+
+  { title: '🎨 LOGO & TEXT MAKERS', cmds: ['hacker', 'neon', 'fire', 'gold', 'logo', 'glitch', 'avenger', 'pubg', 'naruto', 'matrix', 'graffiti', '1000d', 'rainbow', 'metallic', 'ice', 'snow', 'purple', 'thunder', 'water', 'underwater', '4d', 'luxury', 'silver', 'foggyglass', 'wetglass', 'candy', 'christmas', '3dchristmas', 'sparklechristmas', 'deepsea', 'scifi', 'waterpipe', 'spooky', 'pencil', 'circuit', 'discovery', 'fiction', 'transformer', 'berry', 'magma', '3dstone', 'neonlight', 'harrypotter', 'brokenglass', 'papercut', 'watercolor', 'multicolor', 'neondevil', 'graffitibike', 'cloud', 'honey', 'fruitjuice', 'biscuit', 'wood', 'chocolate', 'strawberry', 'blood', 'dropwater', 'toxic', 'lava', 'rock', 'bloodglass', 'halloween', 'darkgold', 'joker', 'wicker', 'firework', 'skeleton', 'sand', 'glue', '1917', 'leaves'] },
+
+  { title: '🎵 AUDIO EFFECTS', cmds: ['deep', 'smooth', 'fat', 'blown', 'radio', 'robot', 'chipmunk', 'nightcore', 'earrape', 'bass', 'reverse', 'slow', 'fast', 'baby', 'demon'] },
+
+  { title: '😂 EMOJI ANIMATIONS', cmds: ['happy', 'heart', 'angry', 'sad', 'shy', 'moon', 'confused', 'hot', 'nikal'] },
+
+  { title: '🎮 GAMES & FUN', cmds: ['tictactoe', 'hangman', 'guess', 'quiz', 'trivia', 'answer', 'truth', 'dare', '8ball', 'compliment', 'insult', 'flirt', 'shayari', 'simp', 'stupid', 'goodnight', 'meme', 'squidgame', 'konami', 'lovetest', 'aura', 'dice', 'roll', 'joke', 'quote', 'fact', 'flip', 'rps', 'ship', 'hug', 'emojimix', 'wcg'] },
+
+  { title: '🎌 ANIME & REACTIONS', cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'hentai 🔞', 'hentaigif 🔞', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
+
+  { title: '🎬 MOVIES / SERIES', cmds: ['selectmovie', 'dlmovie', 'dlseries', 'selectseries', 'seriesinfo'] },
+
+  { title: '⚽ FOOTBALL', cmds: ['livescore', 'competitions', 'matches', 'standings', 'team', 'head2head', 'matchlist', 'teamperson', 'teammatches', 'areas'] },
+
+  { title: '👁️ STALK', cmds: ['npmstalk', 'wastalk', 'igstalk', 'tiktokstalk', 'twitterstalk', 'ytstalk', 'tgstalk', 'minecraftstalk', 'xboxstalk', 'steamstalk', 'githubstalk'] },
+
+  { title: '🐙 GITHUB', cmds: ['ghlogin', 'ghtoken', 'ghcreate', 'ghdelete', 'ghpush', 'ghpushall', 'ghcommit', 'ghfork', 'ghlist', 'ghbranches', 'ghdeletefile', 'ghcreatebranch', 'ghlogout'] },
+
+  { title: '📺 CHANNEL', cmds: ['createchannel', 'followchannel', 'unfollowchannel', 'updatechannelname', 'updatechannelpic', 'updatechanneldesc', 'mutechannel', 'unmutechannel', 'deletechannel'] },
+
+  { title: '💰 FINANCE', cmds: ['currencylist', 'rates', 'exchange', 'forex'] },
+
+  { title: '📧 TEMP MAIL / NUMBER', cmds: ['tempmail', 'tempinbox', 'tempnumber', 'checksms', 'listcountries'] },
+
+  { title: '🖥️ CPANEL', cmds: ['addserver', 'delserver', 'listservers', 'sendpanel', '1gb…9gb', 'unli', 'admin', 'addprem', 'delprem', 'premiumlist', 'bothosting'] }
+];
+
+// The loaded commands (message.js exports them). Returns null if they are not available.
+function getRegistry() {
+  try {
+    const list = require('../../message').commands;
+    if (!Array.isArray(list) || !list.length) return null;
+
+    const names = new Set();
+    for (const c of list) {
+      names.add(String(c.command).toLowerCase());
+      for (const a of c.aliases || []) names.add(String(a).toLowerCase());
+    }
+    return { list, names };
+  } catch {
+    return null;
+  }
+}
+
+// "welcome on/off" -> "welcome", "1gb…9gb" -> "1gb", "hentai 🔞" -> "hentai"
+const baseName = entry => entry.split(/[\s…]/)[0].toLowerCase();
+
+const box = (title, items) =>
+  `╭───〔 ${title} 〕───⬣\n${items.map(i => `│ • .${i}`).join('\n')}\n╰────────────⬣`;
+
+function buildSections() {
+  const reg = getRegistry();
+  const shown = new Set();     // names already printed (a command appears only once)
+  const listed = new Set();    // every name mentioned in SECTIONS
+  const out = [];
+
+  for (const sec of SECTIONS) for (const e of sec.cmds) listed.add(baseName(e));
+
+  for (const sec of SECTIONS) {
+    const items = [];
+
+    for (const entry of sec.cmds) {
+      const base = baseName(entry);
+      if (shown.has(base)) continue;
+      if (reg && !reg.names.has(base)) continue;   // command is not loaded -> hide it
+      shown.add(base);
+      items.push(entry);
+    }
+
+    if (items.length) out.push(box(sec.title, items));
+  }
+
+  // commands that exist but are not in any list above
+  if (reg) {
+    const extra = [];
+
+    for (const c of reg.list) {
+      if (c.hidden) continue;
+      const all = [String(c.command).toLowerCase(), ...(c.aliases || []).map(a => String(a).toLowerCase())];
+      if (all.some(n => listed.has(n))) continue;
+      if (!extra.includes(c.command)) extra.push(c.command);
+    }
+
+    if (extra.length) out.push(box('🆕 MORE COMMANDS', extra));
+  }
+
+  return out.join('\n\n');
+}
+
 module.exports = [
     {
         command: "menu",
@@ -110,510 +229,7 @@ module.exports = [
 
 ╰────────────⬣
 
-╭───〔 📊 GENERAL 〕───⬣
-│ • .menu
-│ • .ping
-│ • .alive
-│ • .info
-│ • .owner
-│ • .repo
-│ • .pair
-╰────────────⬣
-
-╭───〔 👑 OWNER 〕───⬣
-│ • .update
-│ • .restart
-│ • .shutdown
-│ • .eval
-│ • .bc
-│ • .join
-│ • .leave
-│ • .block
-│ • .unblock
-│ • .blocklist
-│ • .pm
-│ • .addowner
-│ • .delowner
-│ • .owners
-│ • .getchannel
-│ • .anticall
-│ • .poststatus
-│ • .cleartmp
-│ • .clearsession
-│ • .sudo
-│ • .clear
-│ • .tostatus
-│ • .toviewonce
-│ • .save
-│ • .delete
-│ • .hack
-│ • .autobio
-│ • .channel
-│ • .disk
-│ • .deljunk
-╰────────────⬣
-
-╭───〔 👥 GROUP 〕───⬣
-│ • .tagall
-│ • .kick
-│ • .add
-│ • .promote
-│ • .demote
-│ • .mute
-│ • .unmute
-│ • .hidetag
-│ • .groupinfo
-│ • .grouplink
-│ • .revokelink
-│ • .welcome on/off
-│ • .goodbye on/off
-│ • .antilink
-│ • .antidemote
-│ • .antisticker
-│ • .antitag
-│ • .poll
-│ • .listadmin
-│ • .tagadmin
-│ • .vcf
-│ • .promoteall
-│ • .demoteall
-│ • .kickinactive
-│ • .approveall
-│ • .approve
-│ • .disapproveall
-│ • .invite
-│ • .gcstatus
-│ • .getname
-│ • .getdeskgc
-│ • .getppgc
-│ • .setppgc
-│ • .listactive
-│ • .listinactive
-│ • .totalmembers
-│ • .addcode
-│ • .delcode
-│ • .listcode
-│ • .removes
-│ • .mediatag
-│ • .ban
-│ • .unban
-│ • .banlist
-╰────────────⬣
-
-╭───〔 ⚙️ SETTINGS 〕───⬣
-│ • .mode
-│ • .autoread
-│ • .autotyping
-│ • .autorecording
-│ • .autoreact
-│ • .antiedit
-│ • .antidelete
-│ • .autoreply
-│ • .autosticker
-│ • .autovoice
-│ • .dmblocker
-│ • .antispam
-│ • .chatbot
-│ • .autosavestatus
-│ • .lastseen
-│ • .ppprivacy
-│ • .readreceipts
-╰────────────⬣
-
-╭───〔 📥 DOWNLOADER 〕───⬣
-│ • .play
-│ • .video
-│ • .spotify
-│ • .tiktok
-│ • .instagram
-│ • .facebook
-│ • .ytpost
-│ • .pindl
-│ • .mediafire
-│ • .gdrive
-│ • .ringtone
-│ • .yts
-│ • .lyrics
-│ • .apk
-│ • .movie
-│ • .wallpaper
-│ • .gitclone
-│ • .img
-│ • .shazam
-╰────────────⬣
-
-╭───〔 ⚙️ TOOLS & UTILITIES 〕───⬣
-│ • .calc
-│ • .qr
-│ • .tts
-│ • .time
-│ • .sticker
-│ • .toimg
-│ • .getpp
-│ • .getpp2
-│ • .setpp
-│ • .getid
-│ • .getlink
-│ • .translate
-│ • .weather
-│ • .lyrics
-│ • .removebg
-│ • .tomp3
-│ • .vv
-│ • .vv2
-│ • .url
-│ • .img
-│ • .take
-│ • .steal
-│ • .blur
-│ • .attp
-│ • .ttp
-│ • .ss
-│ • .stickertelegram
-│ • .imgscan
-│ • .tovideo
-│ • .toppt
-│ • .topdf
-│ • .smeme
-│ • .wasted
-│ • .font
-╰────────────⬣
-
-╭───〔 🤖 AI & IMAGE GEN 〕───⬣
-│ • .gpt
-│ • .gemini
-│ • .blackbox
-│ • .deepseek
-│ • .copilot
-│ • .claude
-│ • .perplexity
-│ • .venice
-│ • .chatbot
-│ • .dalle
-│ • .flux
-│ • .imagine
-│ • .animagine
-│ • .dreamshaper
-│ • .pony
-│ • .pixar
-│ • .cartoon
-│ • .seedream
-│ • .toghibili
-╰────────────⬣
-
-╭───〔 🔍 SEARCH 〕───⬣
-│ • .gsmarena
-│ • .google
-│ • .bing
-│ • .livewallpapers
-│ • .imdb
-│ • .define
-│ • .wiki
-╰────────────⬣
-
-╭───〔 🌐 INFORMATION 〕───⬣
-│ • .news
-│ • .countryinfo
-│ • .check
-│ • .bible
-│ • .quran
-│ • .inspect
-│ • .webcrawl
-╰────────────⬣
-
-╭───〔 🎨 PHOTO EFFECTS 〕───⬣
-│ • .zombie
-│ • .figure
-│ • .underground
-│ • .oldage
-│ • .turky
-│ • .train
-│ • .streetwear
-│ • .tatoo
-│ • .satan
-│ • .sdm
-│ • .spirit
-│ • .toroblox
-│ • .mirror
-│ • .partner
-│ • .bf
-│ • .gf
-│ • .polaroid
-│ • .punk
-│ • .piramid
-│ • .peci
-│ • .island
-│ • .mangu
-│ • .liquor
-│ • .mecca
-│ • .mayan
-│ • .maid
-│ • .glasses
-│ • .cambodia
-│ • .japan
-│ • .hijab
-│ • .hitam
-│ • .vintage
-╰────────────⬣
-
-╭───〔 🎨 LOGO & TEXT MAKERS 〕───⬣
-│ • .hacker
-│ • .neon
-│ • .fire
-│ • .gold
-│ • .logo
-│ • .glitch
-│ • .avenger
-│ • .pubg
-│ • .naruto
-│ • .matrix
-│ • .graffiti
-│ • .1000d
-│ • .rainbow
-│ • .metallic
-│ • .ice
-│ • .snow
-│ • .purple
-│ • .thunder
-│ • .water
-│ • .underwater
-│ • .4d
-│ • .luxury
-│ • .silver
-│ • .foggyglass
-│ • .wetglass
-│ • .candy
-│ • .christmas
-│ • .3dchristmas
-│ • .sparklechristmas
-│ • .deepsea
-│ • .scifi
-│ • .waterpipe
-│ • .spooky
-│ • .pencil
-│ • .circuit
-│ • .discovery
-│ • .fiction
-│ • .transformer
-│ • .berry
-│ • .magma
-│ • .3dstone
-│ • .neonlight
-│ • .harrypotter
-│ • .brokenglass
-│ • .papercut
-│ • .watercolor
-│ • .multicolor
-│ • .neondevil
-│ • .graffitibike
-│ • .cloud
-│ • .honey
-│ • .fruitjuice
-│ • .biscuit
-│ • .wood
-│ • .chocolate
-│ • .strawberry
-│ • .blood
-│ • .dropwater
-│ • .toxic
-│ • .lava
-│ • .rock
-│ • .bloodglass
-│ • .halloween
-│ • .darkgold
-│ • .joker
-│ • .wicker
-│ • .firework
-│ • .skeleton
-│ • .sand
-│ • .glue
-│ • .1917
-│ • .leaves
-╰────────────⬣
-
-╭───〔 🎵 AUDIO EFFECTS 〕───⬣
-│ • .deep
-│ • .smooth
-│ • .fat
-│ • .blown
-│ • .radio
-│ • .robot
-│ • .chipmunk
-│ • .nightcore
-│ • .earrape
-│ • .bass
-│ • .reverse
-│ • .slow
-│ • .fast
-│ • .baby
-│ • .demon
-╰────────────⬣
-
-╭───〔 😂 EMOJI ANIMATIONS 〕───⬣
-│ • .happy
-│ • .heart
-│ • .angry
-│ • .sad
-│ • .shy
-│ • .moon
-│ • .confused
-│ • .hot
-│ • .nikal
-╰────────────⬣
-
-╭───〔 🎮 GAMES & FUN 〕───⬣
-│ • .tictactoe
-│ • .hangman
-│ • .guess
-│ • .quiz
-│ • .trivia
-│ • .answer
-│ • .truth
-│ • .dare
-│ • .8ball
-│ • .compliment
-│ • .insult
-│ • .flirt
-│ • .shayari
-│ • .simp
-│ • .stupid
-│ • .goodnight
-│ • .meme
-│ • .squidgame
-│ • .konami
-│ • .lovetest
-│ • .aura
-│ • .dice
-│ • .roll
-│ • .joke
-│ • .quote
-│ • .fact
-│ • .flip
-│ • .rps
-│ • .ship
-│ • .hug
-│ • .emojimix
-│ • .wcg
-╰────────────⬣
-
-╭───〔 🎌 ANIME & REACTIONS 〕───⬣
-│ • .waifu
-│ • .neko
-│ • .shinobu
-│ • .megumin
-│ • .aizen
-│ • .animequote
-│ • .anime
-│ • .manga
-│ • .topanime
-│ • .topmanga
-│ • .character
-│ • .randomanime
-│ • .seasonal
-│ • .hentai 🔞
-│ • .hentaigif 🔞
-│ • .nom
-│ • .poke
-│ • .cry
-│ • .kiss
-│ • .pat
-│ • .wink
-│ • .facepalm
-│ • .slap
-│ • .bite
-╰────────────⬣
-
-╭───〔 🎬 MOVIES / SERIES 〕───⬣
-│ • .selectmovie
-│ • .dlmovie
-│ • .dlseries
-│ • .selectseries
-│ • .seriesinfo
-╰────────────⬣
-
-╭───〔 ⚽ FOOTBALL 〕───⬣
-│ • .livescore
-│ • .competitions
-│ • .matches
-│ • .standings
-│ • .team
-│ • .head2head
-│ • .matchlist
-│ • .teamperson
-│ • .teammatches
-│ • .areas
-╰────────────⬣
-
-╭───〔 👁️ STALK 〕───⬣
-│ • .npmstalk
-│ • .wastalk
-│ • .igstalk
-│ • .tiktokstalk
-│ • .twitterstalk
-│ • .ytstalk
-│ • .tgstalk
-│ • .minecraftstalk
-│ • .xboxstalk
-│ • .steamstalk
-│ • .githubstalk
-╰────────────⬣
-
-╭───〔 🐙 GITHUB 〕───⬣
-│ • .ghlogin
-│ • .ghtoken
-│ • .ghcreate
-│ • .ghdelete
-│ • .ghpush
-│ • .ghpushall
-│ • .ghcommit
-│ • .ghfork
-│ • .ghlist
-│ • .ghbranches
-│ • .ghdeletefile
-│ • .ghcreatebranch
-│ • .ghlogout
-╰────────────⬣
-
-╭───〔 📺 CHANNEL 〕───⬣
-│ • .createchannel
-│ • .followchannel
-│ • .unfollowchannel
-│ • .updatechannelname
-│ • .updatechannelpic
-│ • .updatechanneldesc
-│ • .mutechannel
-│ • .unmutechannel
-│ • .deletechannel
-╰────────────⬣
-
-╭───〔 💰 FINANCE 〕───⬣
-│ • .currencylist
-│ • .rates
-│ • .exchange
-│ • .forex
-╰────────────⬣
-
-╭───〔 📧 TEMP MAIL / NUMBER 〕───⬣
-│ • .tempmail
-│ • .tempinbox
-│ • .tempnumber
-│ • .checksms
-│ • .listcountries
-╰────────────⬣
-
-╭───〔 🖥️ CPANEL 〕───⬣
-│ • .addserver
-│ • .delserver
-│ • .listservers
-│ • .sendpanel
-│ • .1gb…9gb
-│ • .unli
-│ • .admin
-│ • .addprem
-│ • .delprem
-│ • .premiumlist
-│ • .bothosting
-╰────────────⬣
+${buildSections()}
 
 ${config.settings.footer}
 `;
