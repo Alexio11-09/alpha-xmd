@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (BULLETPROOF FULL SYNCHRONIZED MENU)
+// © 2026 Alpha - GENERAL COMMANDS (NATIVE INTERACTIVE LIST MENU + FULL FALLBACK)
 
 const fs = require('fs');
 const os = require('os');
@@ -201,7 +201,6 @@ module.exports = [
             try {
                 const requestedCat = args[0]?.toUpperCase();
 
-                // Filter to a single category if requested (e.g. .menu group)
                 if (requestedCat) {
                     const foundSec = SECTIONS.find(s =>
                         s.title.toUpperCase().includes(requestedCat) ||
@@ -224,7 +223,86 @@ module.exports = [
                     }
                 }
 
-                // Gather stats for the full menu
+                // Try sending WhatsApp Native Interactive List
+                try {
+                    const baileys = await import("@whiskeysockets/baileys");
+                    
+                    const rows = SECTIONS.map(s => ({
+                        header: s.title,
+                        title: `${s.title} (${s.cmds.length})`,
+                        description: `Tap to view ${s.title.toLowerCase()} commands`,
+                        id: `${prefix}menu ${s.title.replace(/^[^\w\s]+\s*/, '').trim()}`
+                    }));
+
+                    const msgContent = {
+                        viewOnceMessage: {
+                            message: {
+                                interactiveMessage: {
+                                    header: {
+                                        title: `⚡ ${config.settings.title} ⚡`,
+                                        hasMediaAttachment: false
+                                    },
+                                    body: {
+                                        text: `Hello *${m.pushName || "User"}*,\nSelect a category from the interactive list below to explore available commands.`
+                                    },
+                                    footer: {
+                                        text: `Prefix: ${prefix} | Lightweight Mode`
+                                    },
+                                    nativeFlowMessage: {
+                                        buttons: [
+                                            {
+                                                name: "single_select",
+                                                buttonParamsJson: JSON.stringify({
+                                                    title: "📑 Open Categories",
+                                                    sections: [
+                                                        {
+                                                            title: "Available Command Modules",
+                                                            rows
+                                                        }
+                                                    ]
+                                                })
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    };
+
+                    const generated = baileys.generateWAMessageFromContent(m.chat, msgContent, {
+                        userJid: sock.user.id,
+                        quoted: m
+                    });
+
+                    const additionalNodes = [
+                        {
+                            tag: "biz",
+                            attrs: {},
+                            content: [
+                                {
+                                    tag: "interactive",
+                                    attrs: { type: "native_flow", v: "1" },
+                                    content: [{ tag: "native_flow", attrs: { name: "single_select" } }]
+                                }
+                            ]
+                        }
+                    ];
+
+                    if (!m.isGroup) {
+                        additionalNodes.push({ tag: "bot", attrs: { biz_bot: "1" } });
+                    }
+
+                    await sock.relayMessage(m.chat, generated.message, {
+                        messageId: generated.key.id,
+                        additionalNodes
+                    });
+                    return;
+
+                } catch (interactiveErr) {
+                    console.log("Interactive list error, falling back to text:", interactiveErr.message);
+                }
+
+                // Fallback Text Menu if interaction fails
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -244,8 +322,6 @@ module.exports = [
 ╰────────────⬣
 
 ${buildSections()}
-
-💡 *Tip:* Type *${prefix}menu <category>* (e.g. *${prefix}menu owner*) to view a single section!
 
 ${config.settings.footer}
 `;
