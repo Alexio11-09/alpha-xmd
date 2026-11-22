@@ -132,6 +132,10 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
+// Plugins can add an onMessage(sock, m, helpers) function to a command to look at every group message
+// (used by .antistatusgroupmention). It runs before the "is this a command?" check.
+const hooks = commands.filter(c => typeof c.onMessage === 'function');
+
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
 // ======================================================
@@ -246,6 +250,14 @@ module.exports = async (sock, m) => {
         if (gs.autoreact && !rawTxt.startsWith(prefix)) {
             const emojis = ["🔥", "😂", "😍", "😎", "🤖", "⚡", "💯", "👀", "🥶", "😈"];
             try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
+        }
+
+        // Plugin hooks (group messages only; they return quickly when the message is not relevant)
+        if (m.isGroup && hooks.length && !m.fromMe) {
+            for (const h of hooks) {
+                try { await h.onMessage(sock, m, { checkAdmin }); }
+                catch (e) { console.log(`[HOOK ${h.command}]`, e.message); }
+            }
         }
 
         if (!m.text) return;
