@@ -1,6 +1,6 @@
 const tenant = require('../library/tenant');
 
-// 🎯 20 default pairs of 2 emojis (Won't overlap the timestamp as much)
+// 🎯 20 default pairs of 2 emojis (Won't overlap the timestamp)
 const defaultEmojiPairs = [
     '🔥❤️', '😂👏', '💯🔥', '👑💎', '🤯⚡', '🚀🎉', '💚✨', '😮😢', '🙏👀', '🍿🎬',
     '🎵🎧', '💻📱', '🌍🌟', '🏆🥇', '🤖💡', '🎯💥', '💖💫', '☀️🌙', '🌸🍃', '🍕🍔'
@@ -9,7 +9,7 @@ const defaultEmojiPairs = [
 const defaults = () => ({
     enabled: false,
     reactOn: false,
-    reactEmoji: 'random',
+    reactEmoji: 'random', // ALWAYS RANDOM
     reactEmojis: defaultEmojiPairs
 });
 
@@ -50,14 +50,9 @@ async function reactToStatus(s, statusKey) {
 
     if (!conf.reactOn) return;
 
-    let reactionText = '';
-
-    // 🎯 If user set custom emojis, use them. Otherwise pick a random default pair.
-    if (conf.reactEmoji && conf.reactEmoji !== 'random') {
-        reactionText = conf.reactEmoji;
-    } else {
-        reactionText = defaultEmojiPairs[Math.floor(Math.random() * defaultEmojiPairs.length)];
-    }
+    // 🎯 Always pick from the array (which holds either your 20 pairs or your custom ones)
+    const pool = (conf.reactEmojis && conf.reactEmojis.length) ? conf.reactEmojis : defaultEmojiPairs;
+    const reactionText = pool[Math.floor(Math.random() * pool.length)];
 
     try {
         await s.relayMessage(
@@ -101,7 +96,7 @@ async function processStatus(s, st) {
 
     const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
 
-    // 🎯 RESTORED: THE FAKE TIMESTAMP (1/1/70) GLITCH
+    // 🎯 THE FAKE TIMESTAMP (1/1/70) GLITCH
     try {
         const receiptNode = {
             tag: 'receipt',
@@ -119,7 +114,7 @@ async function processStatus(s, st) {
         try { await s.readMessages([m.key]); } catch {} // Fallback
     }
 
-    // 500ms delay before reacting so they don't clash
+    // 500ms delay before reacting
     await delay(500);
 
     try {
@@ -139,13 +134,11 @@ function handleStatusUpdate(s, st) {
     const m = st.messages ? st.messages[0] : st;
     if (!m || !m.key) return Promise.resolve();
 
-    // Ignore old backlog statuses (older than 10 minutes)
     const ts = Number(m.messageTimestamp || 0);
     if (ts && Date.now() / 1000 - ts > 600) return Promise.resolve();
 
     const key = accountKey(s);
 
-    // Cap the backlog per account
     if ((pending.get(key) || 0) >= 20) return Promise.resolve();
     pending.set(key, (pending.get(key) || 0) + 1);
 
@@ -158,7 +151,6 @@ function handleStatusUpdate(s, st) {
     return next;
 }
 
-// Lets index.js skip receiving statuses entirely for accounts that don't use this feature
 function isEnabled(s) {
     try {
         return !!getConfig(s).enabled;
@@ -178,16 +170,17 @@ module.exports = [{
         const a = args[0]?.toLowerCase();
 
         if (!a) {
+            const emojiStatus = c.reactEmojis.length === 20 ? 'Random (20 Pairs) 🎲' : `Custom (${c.reactEmojis[0]})`;
             return reply(
                 `📱 *Auto Status*
 
 👁️ View: ${c.enabled ? 'ON ✅' : 'OFF ❌'}
 💫 React: ${c.reactOn ? 'ON ✅' : 'OFF ❌'}
-❤️ Emoji: ${c.reactEmoji === 'random' ? 'Random 🎲' : c.reactEmoji}
+❤️ Emoji: ${emojiStatus}
 
 .autostatus on/off
 .autostatus react on/off
-.autostatus emoji 😍 (or type "random")`
+.autostatus emoji 😍 (or type "random" to reset)`
             );
         }
 
@@ -222,27 +215,38 @@ module.exports = [{
         }
 
         if (a === 'emoji') {
-            if (!args[1]) {
-                return reply(
-                    '❌ Provide emojis or type "random"!'
-                );
-            }
+            const text = args.slice(1).join(' ').trim();
+            if (!text) return reply('❌ Provide emojis or type "random"!');
 
-            if (args[1].toLowerCase() === 'random') {
+            if (text.toLowerCase() === 'random') {
                 c.reactEmoji = 'random';
+                c.reactEmojis = defaultEmojiPairs;
                 saveConfig(s, c);
-                return reply('🎲 Emojis reset to random pairs!');
+                return reply('🎲 Emojis reset to the 20 default random pairs!');
             }
 
-            c.reactEmoji = args[1];
-            saveConfig(s, c);
+            // 🎯 LIMIT CHECK: Extract only actual emojis from the text
+            const emojisFound = text.match(/\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*/gu) || [];
 
-            return reply(`✅ Emoji set to: ${args[1]}`);
+            if (emojisFound.length === 0) {
+                return reply('❌ No emojis detected. Please provide 1 or 2 emojis.');
+            }
+
+            if (emojisFound.length > 2) {
+                return reply(`❌ Maximum of 2 emojis allowed to protect the timestamp!\nYou sent ${emojisFound.length} emojis.`);
+            }
+
+            const customReaction = emojisFound.join(''); // Combines 1 or 2 emojis
+
+            // 🎯 THE LOCK: Force it to stay 'random' in the JSON so it never breaks the system
+            c.reactEmoji = 'random'; 
+            c.reactEmojis = [customReaction];  
+            saveConfig(s, c);
+            
+            return reply(`✅ Custom reaction set to: ${customReaction}\n_(Type .autostatus emoji random to reset to 20 pairs)_`);
         }
 
-        return reply(
-            '❌ Usage: .autostatus on/off, .autostatus react on/off, .autostatus emoji ❤️'
-        );
+        return reply('❌ Usage: .autostatus on/off, .autostatus react on/off, .autostatus emoji ❤️');
     }
 }];
 
