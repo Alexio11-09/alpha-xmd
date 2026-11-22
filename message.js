@@ -136,6 +136,10 @@ loadCommands(path.join(__dirname, "plugins"));
 // (used by .antistatusgroupmention). It runs before the "is this a command?" check.
 const hooks = commands.filter(c => typeof c.onMessage === 'function');
 
+// Plugins can add an onListReply(sock, m, helpers) function to a command to handle
+// taps on a native list menu (works in DMs and groups; return true once handled).
+const listReplyHooks = commands.filter(c => typeof c.onListReply === 'function');
+
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
 // ======================================================
@@ -217,6 +221,13 @@ module.exports = async (sock, m) => {
                 try { return await sock.sendMessage(m.chat, data, { quoted: m }); } catch(e2) { console.log("Send error:", e2.message); }
             }
         };
+
+        // 📋 Native list-menu tap (works in DMs and groups, skipped for banned users)
+        if (m.mtype === 'listResponseMessage' && !isUserBanned(m.sender, sock)) {
+            for (const hook of listReplyHooks) {
+                try { if (await hook.onListReply(sock, m, { reply, send })) return; } catch (e) { console.log('[LIST REPLY]', e.message); }
+            }
+        }
 
         const botNum = sock.user.id.split('@')[0].split(':')[0];
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
