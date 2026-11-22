@@ -1,16 +1,19 @@
 const tenant = require('../library/tenant');
 
-const defaultEmojis = ['🔥', '❤️', '😂', '👏', '💯'];
+// 🎯 20 default pairs of 2 emojis (Won't overlap the timestamp as much)
+const defaultEmojiPairs = [
+    '🔥❤️', '😂👏', '💯🔥', '👑💎', '🤯⚡', '🚀🎉', '💚✨', '😮😢', '🙏👀', '🍿🎬',
+    '🎵🎧', '💻📱', '🌍🌟', '🏆🥇', '🤖💡', '🎯💥', '💖💫', '☀️🌙', '🌸🍃', '🍕🍔'
+];
 
 const defaults = () => ({
     enabled: false,
     reactOn: false,
     reactEmoji: 'random',
-    reactEmojis: defaultEmojis
+    reactEmojis: defaultEmojiPairs
 });
 
 const cacheByAccount = new Map();
-
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function accountKey(sock) {
@@ -27,19 +30,17 @@ function getConfig(sock) {
     let c = tenant.read(sock, 'autoStatus.json', defaults());
 
     if (!Array.isArray(c.reactEmojis) || !c.reactEmojis.length) {
-        c.reactEmojis = defaultEmojis;
+        c.reactEmojis = defaultEmojiPairs;
     }
 
     const merged = { ...defaults(), ...c };
 
-    // Only cache for a real, identified account
     if (key !== 'unknown') cacheByAccount.set(key, merged);
     return merged;
 }
 
 function saveConfig(sock, data) {
     const key = accountKey(sock);
-
     tenant.write(sock, 'autoStatus.json', data);
     cacheByAccount.set(key, data);
 }
@@ -49,14 +50,14 @@ async function reactToStatus(s, statusKey) {
 
     if (!conf.reactOn) return;
 
-    const pool = conf.reactEmojis?.length
-        ? conf.reactEmojis
-        : defaultEmojis;
+    let reactionText = '';
 
-    const combinedEmojis =
-        conf.reactEmoji && conf.reactEmoji !== 'random'
-            ? conf.reactEmoji
-            : pool.slice(0, 5).join('');
+    // 🎯 If user set custom emojis, use them. Otherwise pick a random default pair.
+    if (conf.reactEmoji && conf.reactEmoji !== 'random') {
+        reactionText = conf.reactEmoji;
+    } else {
+        reactionText = defaultEmojiPairs[Math.floor(Math.random() * defaultEmojiPairs.length)];
+    }
 
     try {
         await s.relayMessage(
@@ -66,11 +67,10 @@ async function reactToStatus(s, statusKey) {
                     key: {
                         remoteJid: 'status@broadcast',
                         id: statusKey.id,
-                        participant:
-                            statusKey.participant || statusKey.remoteJid,
+                        participant: statusKey.participant || statusKey.remoteJid,
                         fromMe: false
                     },
-                    text: combinedEmojis
+                    text: reactionText
                 }
             },
             {
@@ -87,7 +87,7 @@ async function reactToStatus(s, statusKey) {
 }
 
 // ---------------------------------------------------------------
-// Process one status (view + optional reaction)
+// Process one status (fake view timestamp + optional reaction)
 // ---------------------------------------------------------------
 async function processStatus(s, st) {
     const conf = getConfig(s);
@@ -99,18 +99,27 @@ async function processStatus(s, st) {
     if (!m || !m.key) return;
     if (m.key.remoteJid !== 'status@broadcast') return;
 
-    // View the status.
-    // NOTE: Baileys' readMessages() uses an internal receipt function, so the
-    // old "fake timestamp" patch of s.sendReceipt never took effect and a normal
-    // read receipt was always sent. The dead patch (and its noisy log line)
-    // has been removed; behaviour is unchanged.
+    const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
+
+    // 🎯 RESTORED: THE FAKE TIMESTAMP (1/1/70) GLITCH
     try {
-        await s.readMessages([m.key]);
+        const receiptNode = {
+            tag: 'receipt',
+            attrs: {
+                id: m.key.id,
+                to: p,
+                type: 'read',
+                t: '0',                 // Forces the 1970 glitch
+                xmlns: 'jabber:client'  // Required for raw XML nodes to work
+            }
+        };
+        await s.sendNode(receiptNode);
     } catch (e) {
-        console.log('[AUTOSTATUS] View failed:', e.message);
+        console.log('[AUTOSTATUS] Fake timestamp failed:', e.message);
+        try { await s.readMessages([m.key]); } catch {} // Fallback
     }
 
-    // Keep the existing reaction delay.
+    // 500ms delay before reacting so they don't clash
     await delay(500);
 
     try {
@@ -121,8 +130,7 @@ async function processStatus(s, st) {
 }
 
 // ---------------------------------------------------------------
-// Queue per account so a burst of statuses (e.g. after a reconnect)
-// is handled one at a time instead of all at once.
+// Queue per account so a burst of statuses is handled one at a time
 // ---------------------------------------------------------------
 const queues = new Map();
 const pending = new Map();
@@ -179,8 +187,7 @@ module.exports = [{
 
 .autostatus on/off
 .autostatus react on/off
-.autostatus emoji 😍
-.autostatus emoji random`
+.autostatus emoji 😍 (or type "random")`
             );
         }
 
@@ -217,8 +224,14 @@ module.exports = [{
         if (a === 'emoji') {
             if (!args[1]) {
                 return reply(
-                    '❌ Provide an emoji or type "random"!'
+                    '❌ Provide emojis or type "random"!'
                 );
+            }
+
+            if (args[1].toLowerCase() === 'random') {
+                c.reactEmoji = 'random';
+                saveConfig(s, c);
+                return reply('🎲 Emojis reset to random pairs!');
             }
 
             c.reactEmoji = args[1];
