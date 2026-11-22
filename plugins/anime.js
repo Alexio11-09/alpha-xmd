@@ -1,17 +1,17 @@
-// © 2026 Alpha - ANIME & REACTION COMMANDS (COMPLETE)
+// © 2026 Alpha - ANIME & REACTION COMMANDS (ERROR-PROOFED)
 
 const axios = require('axios');
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // ---------- HELPER: fetch image from sfw waifu.pics ----------
 const waifuSfw = async (category) => {
-    const res = await axios.get(`https://api.waifu.pics/sfw/${category}`);
+    const res = await axios.get(`https://api.waifu.pics/sfw/${category}`, { timeout: 10000 });
     return res.data.url;
 };
 
 // ---------- HELPER: fetch from nekos.life ----------
 const nekosLife = async (endpoint) => {
-    const res = await axios.get(`https://nekos.life/api/v2/img/${endpoint}`);
+    const res = await axios.get(`https://nekos.life/api/v2/img/${endpoint}`, { timeout: 10000 });
     return res.data.url;
 };
 
@@ -23,7 +23,6 @@ const sendImg = async (sock, m, url, caption) => {
 // ---------- GENERIC REACTION COMMAND FACTORY ----------
 const reactCmd = (command, waifuCat, caption) => ({
     command,
-    aliases: [command],
     category: "anime",
     execute: async (sock, m, { reply }) => {
         try {
@@ -34,7 +33,7 @@ const reactCmd = (command, waifuCat, caption) => ({
                 const url = await nekosLife(command);
                 await sendImg(sock, m, url, caption);
             } catch {
-                reply(`❌ Couldn't fetch ${command} image.`);
+                reply(`❌ Couldn't fetch ${command} image right now. API might be down.`);
             }
         }
     }
@@ -44,36 +43,48 @@ module.exports = [
 
     // 1. WAIFU
     { command: "waifu", aliases: ["waifuimg"], category: "anime",
-      execute: async (s, m) => { try { const url = await waifuSfw('waifu'); await sendImg(s, m, url, "🌸 Your Waifu!"); } catch(e) { m.reply("❌ Failed"); } }
+      execute: async (s, m, { reply }) => { 
+          try { const url = await waifuSfw('waifu'); await sendImg(s, m, url, "🌸 Your Waifu!"); } 
+          catch(e) { reply("❌ Failed to fetch waifu."); } 
+      }
     },
 
     // 2. NEKO
     { command: "neko", aliases: ["nekoimg","catgirl"], category: "anime",
-      execute: async (s, m) => { try { const url = await waifuSfw('neko'); await sendImg(s, m, url, "🐱 Neko Girl!"); } catch(e) { m.reply("❌ Failed"); } }
+      execute: async (s, m, { reply }) => { 
+          try { const url = await waifuSfw('neko'); await sendImg(s, m, url, "🐱 Neko Girl!"); } 
+          catch(e) { reply("❌ Failed to fetch neko."); } 
+      }
     },
 
     // 3. SHINOBU
     { command: "shinobu", aliases: ["shinobuimg"], category: "anime",
-      execute: async (s, m) => { try { const url = await waifuSfw('shinobu'); await sendImg(s, m, url, "🦋 Shinobu Kocho!"); } catch(e) { m.reply("❌ Failed"); } }
+      execute: async (s, m, { reply }) => { 
+          try { const url = await waifuSfw('shinobu'); await sendImg(s, m, url, "🦋 Shinobu Kocho!"); } 
+          catch(e) { reply("❌ Failed to fetch Shinobu."); } 
+      }
     },
 
     // 4. MEGUMIN
     { command: "megumin", aliases: ["meguminimg","explosion"], category: "anime",
-      execute: async (s, m) => { try { const url = await waifuSfw('megumin'); await sendImg(s, m, url, "💥 EXPLOSION! Megumin!"); } catch(e) { m.reply("❌ Failed"); } }
+      execute: async (s, m, { reply }) => { 
+          try { const url = await waifuSfw('megumin'); await sendImg(s, m, url, "💥 EXPLOSION! Megumin!"); } 
+          catch(e) { reply("❌ Failed to fetch Megumin."); } 
+      }
     },
 
     // 5. AIZEN
     { command: "aizen", aliases: ["aizenimg","sosuke"], category: "anime",
-      execute: async (s, m) => {
+      execute: async (s, m, { reply }) => {
           try {
               const url = await waifuSfw('aizen');
               await sendImg(s, m, url, "👓 Sosuke Aizen");
           } catch {
               try {
-                  const res = await axios.get('https://nekos.best/api/v2/aizen');
+                  const res = await axios.get('https://nekos.best/api/v2/aizen', { timeout: 10000 });
                   await sendImg(s, m, res.data.results[0].url, "👓 Sosuke Aizen");
               } catch {
-                  m.reply("❌ Failed");
+                  reply("❌ Failed to fetch Aizen.");
               }
           }
       }
@@ -83,9 +94,11 @@ module.exports = [
     { command: "animequote", aliases: ["aquote","animeq"], category: "anime",
       execute: async (s, m, { reply }) => {
           try {
-              const res = await axios.get('https://animechan.xyz/api/random');
+              const res = await axios.get('https://animechan.vercel.app/api/random', { timeout: 10000 });
               reply(`💬 *"${res.data.quote}"*\n— *${res.data.character}* (${res.data.anime})`);
-          } catch { reply("❌ Failed"); }
+          } catch { 
+              reply("❌ Anime Quote API is currently offline or rate-limited."); 
+          }
       }
     },
 
@@ -94,12 +107,13 @@ module.exports = [
       execute: async (s, m, { args, reply }) => {
           if (!args[0]) return reply("❌ Provide a name.\n📌 .anime Naruto");
           try {
-              const res = await axios.get(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(args.join(" "))}&limit=1`);
+              const res = await axios.get(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(args.join(" "))}&limit=1`, { timeout: 10000 });
               const a = res.data.data[0];
-              if (!a) return reply("❌ Not found");
+              if (!a) return reply("❌ Anime not found.");
+              
               let txt = `🎬 *${a.title}* (${a.type})\n⭐ ${a.score||'?'}/10\n📺 ${a.episodes||'?'} eps\n🎭 ${a.status}\n📅 ${a.aired?.string||'?'}\n\n${a.synopsis?.substring(0,200)}...\n🔗 ${a.url}`;
               await s.sendMessage(m.chat, { image: { url: a.images.jpg.image_url }, caption: txt }, { quoted: m });
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Search failed. (API might be rate-limited, try again in a sec)."); }
       }
     },
 
@@ -108,12 +122,13 @@ module.exports = [
       execute: async (s, m, { args, reply }) => {
           if (!args[0]) return reply("❌ Provide a name.\n📌 .manga One Piece");
           try {
-              const res = await axios.get(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(args.join(" "))}&limit=1`);
+              const res = await axios.get(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(args.join(" "))}&limit=1`, { timeout: 10000 });
               const a = res.data.data[0];
-              if (!a) return reply("❌ Not found");
+              if (!a) return reply("❌ Manga not found.");
+              
               let txt = `📚 *${a.title}* (${a.type})\n⭐ ${a.score||'?'}/10\n📖 ${a.chapters||'?'} ch\n📅 ${a.published?.string||'?'}\n✍️ ${a.authors?.map(x=>x.name).join(', ')||'?'}\n\n${a.synopsis?.substring(0,200)}...\n🔗 ${a.url}`;
               await s.sendMessage(m.chat, { image: { url: a.images.jpg.image_url }, caption: txt }, { quoted: m });
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Search failed. (API might be rate-limited, try again in a sec)."); }
       }
     },
 
@@ -121,9 +136,9 @@ module.exports = [
     { command: "topanime", aliases: ["animetop","bestanime"], category: "anime",
       execute: async (s, m, { reply }) => {
           try {
-              const res = await axios.get('https://api.jikan.moe/v4/top/anime?limit=10');
+              const res = await axios.get('https://api.jikan.moe/v4/top/anime?limit=10', { timeout: 10000 });
               reply(res.data.data.map((a,i)=>`${i+1}. *${a.title}* ⭐ ${a.score}`).join('\n'));
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Failed to fetch top anime."); }
       }
     },
 
@@ -131,9 +146,9 @@ module.exports = [
     { command: "topmanga", aliases: ["mangatop","bestmanga"], category: "anime",
       execute: async (s, m, { reply }) => {
           try {
-              const res = await axios.get('https://api.jikan.moe/v4/top/manga?limit=10');
+              const res = await axios.get('https://api.jikan.moe/v4/top/manga?limit=10', { timeout: 10000 });
               reply(res.data.data.map((a,i)=>`${i+1}. *${a.title}* ⭐ ${a.score}`).join('\n'));
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Failed to fetch top manga."); }
       }
     },
 
@@ -142,12 +157,13 @@ module.exports = [
       execute: async (s, m, { args, reply }) => {
           if (!args[0]) return reply("❌ Provide a character name.\n📌 .character Naruto");
           try {
-              const res = await axios.get(`https://api.jikan.moe/v4/characters?q=${encodeURIComponent(args.join(" "))}&limit=1`);
+              const res = await axios.get(`https://api.jikan.moe/v4/characters?q=${encodeURIComponent(args.join(" "))}&limit=1`, { timeout: 10000 });
               const ch = res.data.data[0];
-              if (!ch) return reply("❌ Not found");
+              if (!ch) return reply("❌ Character not found.");
+              
               let txt = `👤 *${ch.name}*\n📺 ${ch.anime?.map(a=>a.anime.title).slice(0,2).join(', ')||'?'}\n❤️ ${ch.favorites} faves\n\n${ch.about?.substring(0,200)||''}\n🔗 ${ch.url}`;
               await s.sendMessage(m.chat, { image: { url: ch.images.jpg.image_url }, caption: txt }, { quoted: m });
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Search failed. (API might be rate-limited)."); }
       }
     },
 
@@ -155,11 +171,11 @@ module.exports = [
     { command: "randomanime", aliases: ["ranime","surpriseanime"], category: "anime",
       execute: async (s, m, { reply }) => {
           try {
-              const res = await axios.get('https://api.jikan.moe/v4/random/anime');
+              const res = await axios.get('https://api.jikan.moe/v4/random/anime', { timeout: 10000 });
               const a = res.data.data;
               let txt = `🎲 *${a.title}*\n⭐ ${a.score||'?'}/10\n📺 ${a.episodes||'?'} eps\n📖 ${a.synopsis?.substring(0,150)}...\n🔗 ${a.url}`;
               await s.sendMessage(m.chat, { image: { url: a.images.jpg.image_url }, caption: txt }, { quoted: m });
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Failed to fetch random anime."); }
       }
     },
 
@@ -167,13 +183,13 @@ module.exports = [
     { command: "seasonal", aliases: ["currentanime","newanime"], category: "anime",
       execute: async (s, m, { reply }) => {
           try {
-              const res = await axios.get('https://api.jikan.moe/v4/seasons/now');
+              const res = await axios.get('https://api.jikan.moe/v4/seasons/now', { timeout: 10000 });
               reply(res.data.data.slice(0,10).map((a,i)=>`${i+1}. *${a.title}* ⭐ ${a.score||'?'}`).join('\n'));
-          } catch { reply("❌ Failed"); }
+          } catch { reply("❌ Failed to fetch seasonal anime."); }
       }
     },
 
-    // 14. HENTAI (NSFW – group only, now with double API)
+    // 14. HENTAI (NSFW – group only)
     {
         command: "hentai",
         aliases: ["h", "nsfw"],
@@ -181,16 +197,14 @@ module.exports = [
         group: true,
         execute: async (sock, m, { reply }) => {
             try {
-                // Try waifu.pics NSFW first
-                const url = await axios.get('https://api.waifu.pics/nsfw/waifu').then(r => r.data.url);
+                const url = await axios.get('https://api.waifu.pics/nsfw/waifu', { timeout: 10000 }).then(r => r.data.url);
                 await sock.sendMessage(m.chat, { image: { url }, caption: "🔞 *NSFW CONTENT* ⚠️" }, { quoted: m });
             } catch {
                 try {
-                    // Fallback nekos.life
-                    const url = await axios.get('https://nekos.life/api/v2/img/hentai').then(r => r.data.url);
+                    const url = await axios.get('https://nekos.life/api/v2/img/hentai', { timeout: 10000 }).then(r => r.data.url);
                     await sock.sendMessage(m.chat, { image: { url }, caption: "🔞 *NSFW CONTENT* ⚠️" }, { quoted: m });
                 } catch {
-                    reply("❌ Failed to fetch adult content. Maybe the APIs are down.");
+                    reply("❌ Failed to fetch adult content. API might be down.");
                 }
             }
         }
@@ -204,13 +218,12 @@ module.exports = [
         group: true,
         execute: async (sock, m, { reply }) => {
             try {
-                const url = await axios.get('https://nekos.life/api/v2/img/Random_hentai_gif').then(r => r.data.url);
+                const url = await axios.get('https://nekos.life/api/v2/img/Random_hentai_gif', { timeout: 10000 }).then(r => r.data.url);
                 await sock.sendMessage(m.chat, { video: { url }, caption: "🔞 *NSFW GIF* ⚠️", gifPlayback: true }, { quoted: m });
             } catch {
                 try {
-                    // Fallback waifu.pics nsfw/waifu (static, but at least something)
-                    const url = await axios.get('https://api.waifu.pics/nsfw/waifu').then(r => r.data.url);
-                    await sock.sendMessage(m.chat, { image: { url }, caption: "🔞 *NSFW (static)* ⚠️" }, { quoted: m });
+                    const url = await axios.get('https://api.waifu.pics/nsfw/waifu', { timeout: 10000 }).then(r => r.data.url);
+                    await sock.sendMessage(m.chat, { image: { url }, caption: "🔞 *NSFW (static fallback)* ⚠️" }, { quoted: m });
                 } catch {
                     reply("❌ Failed to fetch adult content.");
                 }
@@ -227,6 +240,6 @@ module.exports = [
     reactCmd("facepalm", "facepalm", "🤦‍♀️ *Facepalm*"),
     reactCmd("hug", "hug", "🤗 *Hug!*"),
     reactCmd("poke", "poke", "👉 *Poke!*"),
-    reactCmd("slap", "slap", "👋 *Slap!*"),     // extra if you want
-    reactCmd("bite", "bite", "😬 *Bite!*")       // extra
+    reactCmd("slap", "slap", "👋 *Slap!*"),
+    reactCmd("bite", "bite", "😬 *Bite!*")
 ];
