@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (NATIVE INTERACTIVE CATEGORY LIST + FALLBACK)
+// © 2026 Alpha - GENERAL COMMANDS (FULL SYNCHRONIZED MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -7,6 +7,7 @@ const { parsePhoneNumber } = require('awesome-phonenumber');
 const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
 function runtime(seconds) {
@@ -37,6 +38,7 @@ async function getMenuImg() {
         buf = fs.readFileSync(src);
     }
 
+    // Only keep it in memory if it is reasonably small
     if (buf.length < 300 * 1024) menuImg = buf;
     return buf;
 }
@@ -46,9 +48,11 @@ async function getMenuImg() {
 // ======================================================
 const getCountry = async (m, sock) => {
     try {
+        // Baileys 7 puts the real phone JID in these fields when the sender is a LID
         let jid = m.key?.participantAlt || m.key?.remoteJidAlt || m.sender;
         let num = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 
+        // Rare fallback: only fetch group metadata if we still only have a LID
         if ((jid.includes('@lid') || num.length < 9) && m.isGroup) {
             const md = await sock.groupMetadata(m.chat);
             const p = md.participants.find(x => x.id === m.sender || x.lid === m.sender);
@@ -71,37 +75,69 @@ const getCountry = async (m, sock) => {
     }
 };
 
+// ======================================================
+// MENU SECTIONS
+// Move a command to another category by moving its name between these lists.
+//  - Commands that do not exist (plugin missing or not loaded) are hidden automatically.
+//  - Commands that DO exist but are not listed here show up under "MORE COMMANDS".
+//  - A name only appears once (the first section that lists it wins).
+// ======================================================
 const SECTIONS = [
   { title: '📊 GENERAL', cat: ['general', 'main'], cmds: ['menu', 'ping', 'alive', 'info', 'owner', 'repo', 'pair'] },
+
   { title: '👑 OWNER', cat: ['owner'], cmds: ['update', 'restart', 'shutdown', 'eval', 'bc', 'join', 'leave', 'block', 'unblock', 'blocklist', 'pm', 'addowner', 'delowner', 'owners', 'getchannel', 'anticall', 'poststatus', 'cleartmp', 'clearsession', 'sudo', 'clear', 'tostatus', 'toviewonce', 'autobio', 'channel', 'disk', 'deljunk'] },
+
   { title: '👥 GROUP', cat: ['group'], cmds: ['tagall', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute', 'hidetag', 'groupinfo', 'grouplink', 'getlink', 'revokelink', 'welcome on/off', 'goodbye on/off', 'antilink', 'antidemote', 'antisticker', 'antitag', 'antiforeign', 'antibot', 'antigroupmention', 'antistatusgroupmention', 'poll', 'listadmin', 'tagadmin', 'vcf', 'promoteall', 'demoteall', 'kickinactive', 'approveall', 'approve', 'disapproveall', 'invite', 'gcstatus', 'getname', 'getdeskgc', 'getppgc', 'setppgc', 'listactive', 'listinactive', 'totalmembers', 'addcode', 'delcode', 'listcode', 'removes', 'mediatag', 'ban', 'unban', 'banlist'] },
+
   { title: '⚙️ SETTINGS', cat: ['setting'], cmds: ['mode', 'autoread', 'autotyping', 'autorecording', 'autoreact', 'autostatus', 'antiblock', 'ghost', 'antiedit', 'antidelete', 'autoreply', 'autosticker', 'autovoice', 'dmblocker', 'antispam', 'chatbot', 'autosavestatus', 'lastseen', 'ppprivacy', 'readreceipts'] },
+
   { title: '📥 DOWNLOADER', cat: ['download'], cmds: ['play', 'video', 'tiktok', 'instagram', 'facebook', 'pindl', 'spotify', 'mediafire', 'gitclone', 'apk', 'ringtone', 'wallpaper', 'img', 'shazam', 'yts', 'ytpost', 'gdrive', 'movie'] },
+
   { title: '🔧 TOOLS', cat: ['tool'], cmds: ['calc', 'qr', 'tts', 'time', 'sticker', 'toimg', 'getpp', 'getpp2', 'setpp', 'getid', 'translate', 'weather', 'lyrics', 'removebg', 'tomp3', 'vv', 'vv2', 'url', 'take', 'steal', 'blur', 'attp', 'ttp', 'ss', 'stickertelegram', 'imgscan', 'tovideo', 'toptt', 'topdf', 'smeme', 'wasted', 'font', 'webzip', 'botip', 'debugid'] },
+
   { title: '🛠️ UTILITIES', cat: ['utilit'], cmds: ['save', 'delete', 'hack', 'tinyurl', 'fliptext', 'genpass', 'device', 'browse', 'fancy', 'carbon', 'obfuscate', 'tozip', 'readmore', 'ngldm'] },
+
   { title: '🤖 AI & IMAGE GEN', cat: ['ai', 'imagegen'], cmds: ['gpt', 'gemini', 'blackbox', 'deepseek', 'copilot', 'claude', 'perplexity', 'venice', 'dalle', 'flux', 'imagine', 'animagine', 'dreamshaper', 'pony', 'pixar', 'cartoon', 'seedream', 'toghibili'] },
+
   { title: '🔍 SEARCH', cat: ['search'], cmds: ['gsmarena', 'google', 'bing', 'livewallpapers', 'imdb', 'define', 'wiki'] },
+
   { title: '🌐 INFORMATION', cat: ['info'], cmds: ['news', 'countryinfo', 'check', 'bible', 'quran', 'inspect', 'webcrawl'] },
+
   { title: '🎨 PHOTO EFFECTS', cat: ['photo', 'effect', 'imageedit'], cmds: ['zombie', 'figure', 'underground', 'oldage', 'turky', 'train', 'streetwear', 'tatoo', 'satan', 'sdm', 'spirit', 'toroblox', 'mirror', 'partner', 'bf', 'gf', 'polaroid', 'punk', 'piramid', 'peci', 'island', 'mangu', 'liquor', 'mecca', 'mayan', 'maid', 'glasses', 'cambodia', 'japan', 'hijab', 'hitam', 'tupai', 'vintage'] },
+
   { title: '🎨 LOGO & TEXT MAKERS', cat: ['logo', 'textmaker', 'maker'], cmds: ['hacker', 'neon', 'fire', 'gold', 'logo', 'glitch', 'avenger', 'pubg', 'naruto', 'matrix', 'graffiti', '1000d', '3d', 'rainbow', 'metallic', 'ice', 'snow', 'purple', 'thunder', 'water', 'underwater', '4d', 'luxury', 'silver', 'foggyglass', 'wetglass', 'candy', 'christmas', '3dchristmas', 'sparklechristmas', 'deepsea', 'scifi', 'waterpipe', 'spooky', 'pencil', 'circuit', 'discovery', 'fiction', 'transformer', 'berry', 'magma', '3dstone', 'neonlight', 'harrypotter', 'brokenglass', 'papercut', 'watercolor', 'multicolor', 'neondevil', 'graffitibike', 'cloud', 'honey', 'fruitjuice', 'biscuit', 'wood', 'chocolate', 'strawberry', 'blood', 'dropwater', 'toxic', 'lava', 'rock', 'bloodglass', 'halloween', 'darkgold', 'joker', 'wicker', 'firework', 'skeleton', 'sand', 'glue', '1917', 'leaves'] },
+
   { title: '🎵 AUDIO EFFECTS', cat: ['audio'], cmds: ['deep', 'smooth', 'fat', 'blown', 'radio', 'robot', 'chipmunk', 'nightcore', 'earrape', 'bass', 'reverse', 'slow', 'fast', 'baby', 'demon'] },
+
   { title: '😂 EMOJI ANIMATIONS', cat: ['emoji'], cmds: ['happy', 'heart', 'angry', 'sad', 'shy', 'moon', 'confused', 'hot', 'nikal'] },
+
   { title: '🎮 GAMES & FUN', cat: ['game', 'fun'], cmds: ['tictactoe', 'hangman', 'guess', 'quiz', 'trivia', 'answer', 'truth', 'dare', '8ball', 'compliment', 'insult', 'flirt', 'shayari', 'simp', 'stupid', 'goodnight', 'meme', 'squidgame', 'konami', 'lovetest', 'aura', 'dice', 'roll', 'joke', 'quote', 'fact', 'flip', 'rps', 'ship', 'hug', 'emojimix', 'wcg'] },
-  { title: '🎌 ANIME & REACTIONS', cat: ['anime', 'reaction'], cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
+
+  { title: '🎌 ANIME & REACTIONS', cat: ['anime', 'reaction'], cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'hentai 🔞', 'hentaigif 🔞', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
+
   { title: '🎬 MOVIES / SERIES', cat: ['movie', 'series'], cmds: ['selectmovie', 'dlmovie', 'dlseries', 'selectseries', 'seriesinfo'] },
+
   { title: '⚽ FOOTBALL', cat: ['football', 'soccer', 'sport'], cmds: ['livescore', 'competitions', 'matches', 'standings', 'team', 'head2head', 'matchlist', 'teamperson', 'teammatches', 'areas'] },
+
   { title: '👁️ STALK', cat: ['stalk'], cmds: ['npmstalk', 'wastalk', 'igstalk', 'tiktokstalk', 'twitterstalk', 'ytstalk', 'tgstalk', 'minecraftstalk', 'xboxstalk', 'steamstalk', 'githubstalk'] },
+
   { title: '🐙 GITHUB', cat: ['github'], cmds: ['ghlogin', 'ghtoken', 'ghcreate', 'ghdelete', 'ghpush', 'ghpushall', 'ghcommit', 'ghfork', 'ghlist', 'ghbranches', 'ghdeletefile', 'ghcreatebranch', 'ghlogout'] },
+
   { title: '📺 CHANNEL', cat: ['channel'], cmds: ['createchannel', 'followchannel', 'unfollowchannel', 'updatechannelname', 'updatechannelpic', 'updatechanneldesc', 'mutechannel', 'unmutechannel', 'deletechannel'] },
+
   { title: '💰 FINANCE', cat: ['finance', 'money', 'currency', 'crypto'], cmds: ['currencylist', 'rates', 'exchange', 'forex'] },
+
   { title: '📧 TEMP MAIL / NUMBER', cat: ['temp', 'mail'], cmds: ['tempmail', 'tempinbox', 'tempnumber', 'checksms', 'listcountries'] },
+
   { title: '🖥️ CPANEL', cat: ['cpanel', 'panel', 'hosting'], cmds: ['addserver', 'delserver', 'listservers', 'sendpanel', '1gb…9gb', 'unli', 'admin', 'addprem', 'delprem', 'premiumlist', 'bothosting'] }
 ];
 
+// The loaded commands (message.js exports them). Returns null if they are not available.
 function getRegistry() {
   try {
     const list = require('../../message').commands;
     if (!Array.isArray(list) || !list.length) return null;
+
     const names = new Set();
     for (const c of list) {
       names.add(String(c.command).toLowerCase());
@@ -113,8 +149,10 @@ function getRegistry() {
   }
 }
 
+// "welcome on/off" -> "welcome", "1gb…9gb" -> "1gb", "hentai 🔞" -> "hentai"
 const baseName = entry => entry.split(/[\s…]/)[0].toLowerCase();
 
+// "1gb…9gb" -> ["1gb","2gb",...,"9gb"]  (any other entry -> null)
 function expandRange(entry) {
   const r = /^(\d+)([a-z]+)…(\d+)([a-z]+)$/i.exec(entry);
   if (!r || r[2].toLowerCase() !== r[4].toLowerCase()) return null;
@@ -126,6 +164,7 @@ function expandRange(entry) {
 const box = (title, items) =>
   `╭───〔 ${title} 〕───⬣\n${items.map(i => `│ • .${i}`).join('\n')}\n╰────────────⬣`;
 
+// pick a section for a command that is not listed above, from the command's own "category"
 function sectionByCategory(category) {
   const c = String(category || '').toLowerCase().replace(/[^a-z]/g, '');
   if (!c) return null;
@@ -134,8 +173,8 @@ function sectionByCategory(category) {
 
 function buildSections() {
   const reg = getRegistry();
-  const shown = new Set();
-  const listed = new Set();
+  const shown = new Set();     // names already printed (a command appears only once)
+  const listed = new Set();    // every name mentioned in SECTIONS
   const out = [];
 
   for (const sec of SECTIONS) {
@@ -144,8 +183,9 @@ function buildSections() {
     }
   }
 
-  const auto = new Map();
-  const extra = [];
+  // commands that exist but are not in any list: put them in the section matching their category
+  const auto = new Map();      // section title -> [names]
+  const extra = [];            // no matching section -> MORE COMMANDS
 
   if (reg) {
     for (const c of reg.list) {
@@ -165,18 +205,22 @@ function buildSections() {
 
   for (const sec of SECTIONS) {
     const items = [];
+
     for (const entry of sec.cmds) {
       const range = expandRange(entry);
+
       if (range) {
+        // show only the numbers that really exist, e.g. "2gb…9gb"
         const have = range.filter(n => !shown.has(n) && (!reg || reg.names.has(n)));
         if (!have.length) continue;
         have.forEach(n => shown.add(n));
         items.push(have.length > 1 ? `${have[0]}…${have[have.length - 1]}` : have[0]);
         continue;
       }
+
       const base = baseName(entry);
       if (shown.has(base)) continue;
-      if (reg && !reg.names.has(base)) continue;
+      if (reg && !reg.names.has(base)) continue;   // command is not loaded -> hide it
       shown.add(base);
       items.push(entry);
     }
@@ -189,6 +233,7 @@ function buildSections() {
   }
 
   if (extra.length) out.push(box('🆕 MORE COMMANDS', extra));
+
   return out.join('\n\n');
 }
 
@@ -197,113 +242,18 @@ module.exports = [
         command: "menu",
         aliases: ["help", "commands"],
         category: "general",
-        execute: async (sock, m, { args, prefix = ".", send, reply }) => {
+        execute: async (sock, m, { send }) => {
             try {
-                const requestedCat = args[0]?.toUpperCase();
+                const loadMsg = await sock.sendMessage(m.chat, {
+                    text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
+                }, { quoted: m });
 
-                // Render single category when selected from interactive list or typed directly
-                if (requestedCat) {
-                    const foundSec = SECTIONS.find(s =>
-                        s.title.toUpperCase().includes(requestedCat) ||
-                        s.cat.includes(requestedCat.toLowerCase())
-                    );
-                    if (foundSec) {
-                        const reg = getRegistry();
-                        const validCmds = foundSec.cmds.filter(entry => {
-                            if (expandRange(entry)) return true;
-                            const base = baseName(entry);
-                            return !reg || reg.names.has(base);
-                        });
+                await new Promise(resolve => setTimeout(resolve, 700));
+                await sock.sendMessage(m.chat, {
+                    text: "⚡ Loaded 100% ████████████",
+                    edit: loadMsg.key
+                });
 
-                        let sectionText = `╭───〔 ${foundSec.title} 〕───⬣\n`;
-                        for (const c of validCmds) {
-                            sectionText += `│ • ${prefix}${c}\n`;
-                        }
-                        sectionText += `╰────────────⬣`;
-                        return reply(sectionText);
-                    }
-                }
-
-                // Try sending WhatsApp Native Interactive List
-                try {
-                    const baileys = await import("@whiskeysockets/baileys");
-
-                    const rows = SECTIONS.map(s => ({
-                        header: s.title,
-                        title: `${s.title}`,
-                        description: `View ${s.cmds.length} commands in this module`,
-                        id: `${prefix}menu ${s.title.replace(/^[^\w\s]+\s*/, '').trim()}`
-                    }));
-
-                    const msgContent = {
-                        viewOnceMessage: {
-                            message: {
-                                interactiveMessage: {
-                                    header: {
-                                        title: `⚡ ${config.settings.title} ⚡`,
-                                        hasMediaAttachment: false
-                                    },
-                                    body: {
-                                        text: `Hello *${m.pushName || "User"}*,\nTap the button below to open the category list and explore all command modules.`
-                                    },
-                                    footer: {
-                                        text: `Prefix: ${prefix} | Powered by Alpha-XMD`
-                                    },
-                                    nativeFlowMessage: {
-                                        buttons: [
-                                            {
-                                                name: "single_select",
-                                                buttonParamsJson: JSON.stringify({
-                                                    title: "📑 Open Categories",
-                                                    sections: [
-                                                        {
-                                                            title: "All Command Modules",
-                                                            rows
-                                                        }
-                                                    ]
-                                                })
-                                            }
-                                        ]
-                                    }
-                                }
-                            }
-                        }
-                    };
-
-                    const generated = baileys.generateWAMessageFromContent(m.chat, msgContent, {
-                        userJid: sock.user.id,
-                        quoted: m
-                    });
-
-                    const additionalNodes = [
-                        {
-                            tag: "biz",
-                            attrs: {},
-                            content: [
-                                {
-                                    tag: "interactive",
-                                    attrs: { type: "native_flow", v: "1" },
-                                    content: [{ tag: "native_flow", attrs: { name: "single_select" } }]
-                                }
-                            ]
-                        }
-                    ];
-
-                    if (!m.isGroup) {
-                        additionalNodes.push({ tag: "bot", attrs: { biz_bot: "1" } });
-                    }
-
-                    await sock.relayMessage(m.chat, generated.message, {
-                        messageId: generated.key.id,
-                        additionalNodes
-                    });
-                    return;
-
-                } catch (interactiveErr) {
-                    console.log("Interactive list error, falling back to text:", interactiveErr.message);
-                }
-
-                // Fallback Text Menu
                 const now = new Date();
                 const time = now.toLocaleTimeString();
                 const date = now.toLocaleDateString();
@@ -327,8 +277,9 @@ ${buildSections()}
 ${config.settings.footer}
 `;
 
+                // Menu image comes from a cached Buffer (falls back to text if it can't be loaded)
                 let image = null;
-                try { image = await getMenuImg(); } catch (e) {}
+                try { image = await getMenuImg(); } catch (e) { console.log("Menu image error:", e.message); }
 
                 if (image) {
                     await send({ image, caption: menu });
@@ -376,6 +327,7 @@ ${config.settings.footer}
                 `🤖 Beep boop… I'm online! Uptime: ${uptime} | Memory: ${memory}MB`,
                 `🏃‍♂️ Running like a champ. Uptime: ${uptime} | Ping: ${ping}ms`
             ];
+
             reply(R(quotes));
         }
     },
@@ -399,6 +351,7 @@ ${config.settings.footer}
                 `🤖 *Bot Status*\n\n🟢 Status: Online\n⏱️ Running: ${uptime}\n📡 Ping: Fast\n🧠 RAM: ${memory}MB\n👤 Owner: @${owner}`,
                 `📋 *Technical Info*\n\n⚡ Uptime: ${uptime}\n💾 Memory: ${memory}MB\n🖥️ OS: ${platform}\n🔢 Node: ${nodeVersion}\n👑 @${owner}`
             ];
+
             reply(R(infos), { mentions: [ownerJid] });
         }
     },
@@ -418,6 +371,7 @@ ${config.settings.footer}
                 `🫅 *Contact*\n👤 ${ownerName}\n📱 @${ownerNumber}\n\nDMs open.`,
                 `👤 *Bot Creator*\n${ownerName}\n📞 @${ownerNumber}\n\nReach out anytime.`
             ];
+
             reply(R(messages), { mentions: [ownerJid] });
         }
     },
@@ -437,6 +391,7 @@ ${config.settings.footer}
                 `🧬 *Open Source Bot*\n\n💻 *Repo:* ${repoLink}\n👑 *Dev:* ${ownerName}\n📱 *WhatsApp:* ${ownerContact}\n\n🤖 Build your own version.`,
                 `⚡ *Alpha XMD Repository*\n\n🔗 ${repoLink}\n👤 *Maintainer:* ${ownerName}\n📞 ${ownerContact}\n\n📥 Clone, modify, deploy.`
             ];
+
             reply(texts[Math.floor(Math.random() * texts.length)]);
         }
     },
