@@ -352,3 +352,4 @@ module.exports = async (sock, m) => {
 };
 
 module.exports.games = games;
+module.exports.commands = commands;   // lets the menu list the commands that are really loaded
