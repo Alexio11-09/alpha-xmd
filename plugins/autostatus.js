@@ -82,7 +82,7 @@ async function reactToStatus(s, statusKey) {
 }
 
 // ---------------------------------------------------------------
-// Process one status (fake view timestamp + optional reaction)
+// Process one status (local read + fake timestamp + reaction)
 // ---------------------------------------------------------------
 async function processStatus(s, st) {
     const conf = getConfig(s);
@@ -96,7 +96,20 @@ async function processStatus(s, st) {
 
     const p = m.key.participantAlt || m.key.participant || m.key.remoteJid;
 
-    // 🎯 THE FAKE TIMESTAMP (1/1/70) GLITCH
+    // 🎯 STEP 1: Mark as read locally on the bot's device (clears green circle)
+    try {
+        await s.chatModify(
+            { 
+                markRead: true, 
+                lastMessages: [{ key: m.key, messageTimestamp: m.messageTimestamp }] 
+            }, 
+            'status@broadcast'
+        );
+    } catch (e) {
+        console.log('[AUTOSTATUS] Local mark-read failed:', e.message);
+    }
+
+    // 🎯 STEP 2: Send the FAKE TIMESTAMP (1/1/70) to the server
     try {
         const receiptNode = {
             tag: 'receipt',
@@ -105,7 +118,7 @@ async function processStatus(s, st) {
                 to: p,
                 type: 'read',
                 t: '0',                 // Forces the 1970 glitch
-                xmlns: 'jabber:client'  // Required for raw XML nodes to work
+                xmlns: 'jabber:client'  // Required for raw XML nodes
             }
         };
         await s.sendNode(receiptNode);
@@ -238,7 +251,7 @@ module.exports = [{
 
             const customReaction = emojisFound.join(''); // Combines 1 or 2 emojis
 
-            // 🎯 THE LOCK: Force it to stay 'random' in the JSON so it never breaks the system
+            // 🎯 THE LOCK: Force it to stay 'random' in the JSON
             c.reactEmoji = 'random'; 
             c.reactEmojis = [customReaction];  
             saveConfig(s, c);
