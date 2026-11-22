@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (FULL SYNCHRONIZED MENU + INTERACTIVE LIST)
+// © 2026 Alpha - GENERAL COMMANDS (BULLETPROOF FULL SYNCHRONIZED MENU)
 
 const fs = require('fs');
 const os = require('os');
@@ -193,7 +193,7 @@ function buildSections() {
 }
 
 module.exports = [
-        {
+    {
         command: "menu",
         aliases: ["help", "commands"],
         category: "general",
@@ -201,13 +201,23 @@ module.exports = [
             try {
                 const requestedCat = args[0]?.toUpperCase();
 
-                // If user wants a specific category (e.g., .menu GENERAL)
+                // Filter to a single category if requested (e.g. .menu group)
                 if (requestedCat) {
-                    const foundSec = SECTIONS.find(s => s.title.toUpperCase().includes(requestedCat) || s.cat.includes(requestedCat.toLowerCase()));
+                    const foundSec = SECTIONS.find(s =>
+                        s.title.toUpperCase().includes(requestedCat) ||
+                        s.cat.includes(requestedCat.toLowerCase())
+                    );
                     if (foundSec) {
+                        const reg = getRegistry();
+                        const validCmds = foundSec.cmds.filter(entry => {
+                            if (expandRange(entry)) return true;
+                            const base = baseName(entry);
+                            return !reg || reg.names.has(base);
+                        });
+
                         let sectionText = `╭───〔 ${foundSec.title} 〕───⬣\n`;
-                        for (const c of foundSec.cmds) {
-                            sectionText += `│ • .${c}\n`;
+                        for (const c of validCmds) {
+                            sectionText += `│ • ${prefix}${c}\n`;
                         }
                         sectionText += `╰────────────⬣`;
                         return reply(sectionText);
@@ -222,7 +232,6 @@ module.exports = [
                 const uptime = runtime(process.uptime());
                 const country = await getCountry(m, sock);
 
-                // The complete, beautiful categorized text menu
                 const menu = `
 ╭───〔 ${config.settings.title} 〕───⬣
 
@@ -236,48 +245,7 @@ module.exports = [
 
 ${buildSections()}
 
-💡 *Tip:* Type *${prefix}menu <category>* (e.g. *${prefix}menu owner*) to view a specific section!
-
-${config.settings.footer}
-`;
-
-                let image = null;
-                try { image = await getMenuImg(); } catch (e) {}
-
-                // Send with image if available, otherwise text
-                if (image) {
-                    await send({ image, caption: menu });
-                } else {
-                    await send({ text: menu });
-                }
-
-            } catch (err) {
-                console.log("Menu error:", err);
-                await sock.sendMessage(m.chat, { text: "❌ Menu failed to load" }, { quoted: m });
-            }
-        }
-    },
-
-                // Fallback Classic Text Menu
-                const now = new Date();
-                const time = now.toLocaleTimeString();
-                const date = now.toLocaleDateString();
-                const pushname = m.pushName || "User";
-                const uptime = runtime(process.uptime());
-                const country = await getCountry(m, sock);
-
-                const menu = `
-╭───〔 ${config.settings.title} 〕───⬣
-
-👤 *User:* ${pushname}
-🌍 *Country:* ${country}
-🕒 *Time:* ${time}
-📅 *Date:* ${date}
-⚡ *Uptime:* ${uptime}
-
-╰────────────⬣
-
-${buildSections()}
+💡 *Tip:* Type *${prefix}menu <category>* (e.g. *${prefix}menu owner*) to view a single section!
 
 ${config.settings.footer}
 `;
