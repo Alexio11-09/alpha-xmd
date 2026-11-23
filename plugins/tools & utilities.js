@@ -1,6 +1,6 @@
 const fs = require('fs'), path = require('path'), axios = require('axios'), os = require('os'), crypto = require('crypto');
 const QR = require('qrcode');
-const { downloadContentFromMessage: dl } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage: dl, normalizeMessageContent } = require('@whiskeysockets/baileys');
 const moment = require('moment-timezone');
 const ffmpeg = require('fluent-ffmpeg');
 const { writeExif } = require('../library/exif');
@@ -12,53 +12,37 @@ const FormData = require('form-data');
 const cl = f => { try { fs.unlinkSync(f) } catch {} };
 const rd = async st => { const a = []; for await (const c of st) a.push(c); return Buffer.concat(a) };
 
-// 🎯 NEW: Robust View Once Unwrapper
-function getViewOnceMedia(m) {
-  if (!m.quoted || !m.quoted.message) return null;
-  
-  let quotedMsg = m.quoted.message;
-  let type = m.quoted.mtype;
-  let media = quotedMsg[type];
+// 🎯 FIXED: Uses Baileys normalizer to bypass WhatsApp's URL stripping
+async function vvFetch(s, q) {
+  if (!q || !q.message) throw new Error("No quoted message found.");
 
-  if (!media) return null;
+  const normalized = normalizeMessageContent(q.message);
+  if (!normalized) throw new Error("Could not normalize message content.");
 
-  // Unwrap View Once wrappers
-  if (type === 'viewOnceMessageV2' || type === 'viewOnceMessage' || type === 'viewOnceMessageV2Extension') {
-    media = media.message;
-    type = Object.keys(media)[0];
-    media = media[type];
+  const type = Object.keys(normalized)[0];
+  const media = normalized[type];
+
+  if (!media) throw new Error("No media found in the normalized message.");
+
+  // Try the native Baileys downloader (handles viewOnce + re-uploads)
+  try {
+    const buf = await s.downloadMediaMessage({ message: normalized }, type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio');
+    if (buf && buf.length > 0) return buf;
+  } catch (e) {
+    console.log('[VV NATIVE DOWNLOAD FAILED]', e.message);
   }
 
-  if (!type || (!type.includes('image') && !type.includes('video') && !type.includes('audio') && !type.includes('voice'))) {
-    return null;
-  }
-
-  return { type, media };
-}
-
-// 🎯 NEW: Bulletproof fetcher that uses Baileys' native downloader first
-async function vvFetch(s, q, mediaObj, type) {
-  // 1. Try native Baileys downloader (handles view once, re-uploads, etc.)
-  if (q && q.download) {
-    try {
-      const buf = await q.download();
-      if (buf && buf.length > 0) return buf;
-    } catch (e) {
-      console.log('[VV NATIVE DOWNLOAD FAILED]', e.message);
-    }
-  }
-
-  // 2. Fallback to manual download
+  // Fallback: Manual download
   const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
   try {
-    return await rd(await dl(mediaObj, mtype)); 
+    return await rd(await dl(media, mtype)); 
   } catch (e) {
     console.log('[VV MANUAL DOWNLOAD FAILED]', e.message);
     throw e;
   }
 }
 
-const vvError = e => /40[34]|410|gone|not found|expired/i.test(String(e.message))
+const vvError = e => /40[34]|410|gone|not found|expired|No valid media URL/i.test(String(e.message))
   ? "❌ WhatsApp no longer has that media (expired or already opened)."
   : "❌ Failed: " + String(e.message).slice(0, 120);
 
@@ -354,38 +338,40 @@ module.exports = [
     finally { cl(v); cl(a); }
   } },
   
-  // 🎯 FIXED VV COMMAND
   { command: "vv", category: "tools", execute: async (s, m, { reply }) => {
-    const vvData = getViewOnceMedia(m);
-    if (!vvData) return reply("❌ Reply to a View Once image, video, or audio.");
-    const { type, media } = vvData;
-
+    if (!m.quoted) return reply("❌ Reply to a View Once image, video, or audio.");
     try {
-      const b = await vvFetch(s, m.quoted, media, type);
+      const b = await vvFetch(s, m.quoted);
+      const normalized = normalizeMessageContent(m.quoted.message);
+      const type = Object.keys(normalized)[0];
+      
       if (type.includes('image')) await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
       else if (type.includes('video')) await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
       else { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply("✅ Voice saved"); }
-    } catch (e) { reply(vvError(e)); }
+    } catch (e) { 
+      reply(vvError(e)); 
+    }
   } },
 
-  // 🎯 FIXED VV2 COMMAND
   { command: "vv2", category: "tools", execute: async (s, m, { reply }) => {
-    const vvData = getViewOnceMedia(m);
-    if (!vvData) return;
-    const { type, media } = vvData;
-
+    if (!m.quoted) return;
     try {
-      const b = await vvFetch(s, m.quoted, media, type);
+      const b = await vvFetch(s, m.quoted);
+      const normalized = normalizeMessageContent(m.quoted.message);
+      const type = Object.keys(normalized)[0];
       const dest = await resolveDest(s, m);
+      
       if (type.includes('image')) await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
       else if (type.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
       else await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
+      
       await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
     } catch (e) {
       console.log("vv2 error:", e.message);
-      reply("❌ Failed to send privately.");
+      reply("❌ Failed to send privately. " + e.message);
     }
   } },
+
   { command: "url", category: "tools", execute: async (s, m, { reply }) => {
     const q = m.quoted;
     if (!q?.message) return reply("❌ Reply media");
