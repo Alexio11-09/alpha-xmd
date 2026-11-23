@@ -75,21 +75,16 @@ async function resolveTarget(s, m, args) {
   return t;
 }
 
+// 🎯 FIXED: Bulletproof resolveDest to prevent LID errors
 async function resolveDest(s, m) {
-  let dest = m.key.participantAlt || (!m.isGroup && m.key.remoteJidAlt) || m.key.participant || m.participant || m.sender;
+  let dest = m.key.participantAlt || m.key.remoteJidAlt || m.sender;
   dest = dest.toString().split(':')[0];
   if (!dest.includes('@')) dest += '@s.whatsapp.net';
 
-  if (dest.endsWith('@lid') && m.isGroup) {
-    try {
-      const mt = await s.groupMetadata(m.chat);
-      const p = mt.participants.find(x => x.id === dest || x.lid === dest || (x.jid && x.jid.split('@')[0] === dest.split('@')[0]));
-      if (p) {
-        if (p.phoneNumber) dest = p.phoneNumber.includes('@') ? p.phoneNumber : p.phoneNumber + '@s.whatsapp.net';
-        else if (p.jid && !p.jid.endsWith('@lid')) dest = p.jid;
-        else if (p.id && !p.id.endsWith('@lid')) dest = p.id;
-      }
-    } catch (e) {}
+  if (dest.endsWith('@lid')) {
+    // Use resolveTarget with empty args to force LID resolution
+    const resolved = await resolveTarget(s, m, []);
+    if (resolved) dest = resolved;
   }
   return dest;
 }
@@ -263,7 +258,9 @@ module.exports = [
       reply("✅ Group Profile Picture updated successfully!");
     } catch (e) { reply("❌ Failed to update Group PP: " + e.message); }
   } },
-  { command: "getpp2", category: "tools", execute: async (s, m, { args }) => {
+  
+  // 🎯 FIXED: Added error catching and reply
+  { command: "getpp2", category: "tools", execute: async (s, m, { args, reply }) => {
     const t = await resolveTarget(s, m, args);
     if (!t) return;
     try {
@@ -271,7 +268,10 @@ module.exports = [
       const dest = await resolveDest(s, m);
       await s.sendMessage(dest, { image: { url: u }, caption: `📸 @${t.split('@')[0]}`, mentions: [t] }, { quoted: m });
       await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
-    } catch (e) {}
+    } catch (e) {
+      console.log("getpp2 error:", e.message);
+      reply("❌ Failed to send privately. Make sure I can DM you!");
+    }
   } },
   { command: "getid", category: "tools", execute: (s, m, { reply }) => {
     const t = m.mentionedJid?.[0] || m.quoted?.sender || m.sender;
@@ -332,7 +332,9 @@ module.exports = [
       else { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply("✅ Voice saved"); }
     } catch (e) { reply(vvError(e)); }
   } },
-  { command: "vv2", category: "tools", execute: async (s, m) => {
+
+  // 🎯 FIXED: Added error catching and reply
+  { command: "vv2", category: "tools", execute: async (s, m, { reply }) => {
     const q = m.quoted;
     if (!q) return;
     const t = q.mtype, c = q.message?.[t];
@@ -344,7 +346,10 @@ module.exports = [
       else if (t.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
       else await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
       await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
-    } catch (e) {}
+    } catch (e) {
+      console.log("vv2 error:", e.message);
+      reply("❌ Failed to send privately.");
+    }
   } },
   { command: "url", category: "tools", execute: async (s, m, { reply }) => {
     const q = m.quoted;
