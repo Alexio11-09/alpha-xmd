@@ -11,12 +11,38 @@ const FormData = require('form-data');
 // ======================================================
 const cl = f => { try { fs.unlinkSync(f) } catch {} };
 const rd = async st => { const a = []; for await (const c of st) a.push(c); return Buffer.concat(a) };
-const kindOf = t => t.includes('image') ? 'image' : t.includes('video') ? 'video' : 'audio';
 
-async function vvFetch(q, t, c) {
-  try { return await rd(await dl(c, kindOf(t))); }
-  catch (e1) {
-    try { return await q.download(); } catch (e2) { throw e1; }
+// 🎯 NEW: Robust View Once Unwrapper
+function getViewOnceMedia(m) {
+  if (!m.quoted || !m.quoted.message) return null;
+  
+  let quotedMsg = m.quoted.message;
+  let type = m.quoted.mtype;
+  let media = quotedMsg[type];
+
+  if (!media) return null;
+
+  // Unwrap View Once wrappers
+  if (type === 'viewOnceMessageV2' || type === 'viewOnceMessage' || type === 'viewOnceMessageV2Extension') {
+    media = media.message;
+    type = Object.keys(media)[0];
+    media = media[type];
+  }
+
+  if (!type.includes('image') && !type.includes('video') && !type.includes('audio') && !type.includes('voice')) {
+    return null;
+  }
+
+  return { type, media };
+}
+
+async function vvFetch(mediaObj, type) {
+  const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
+  try { 
+    return await rd(await dl(mediaObj, mtype)); 
+  } catch (e1) {
+    console.log('[VV DOWNLOAD ERROR]', e1.message);
+    throw e1;
   }
 }
 
@@ -75,14 +101,12 @@ async function resolveTarget(s, m, args) {
   return t;
 }
 
-// 🎯 FIXED: Bulletproof resolveDest to prevent LID errors
 async function resolveDest(s, m) {
   let dest = m.key.participantAlt || m.key.remoteJidAlt || m.sender;
   dest = dest.toString().split(':')[0];
   if (!dest.includes('@')) dest += '@s.whatsapp.net';
 
   if (dest.endsWith('@lid')) {
-    // Use resolveTarget with empty args to force LID resolution
     const resolved = await resolveTarget(s, m, []);
     if (resolved) dest = resolved;
   }
@@ -258,8 +282,6 @@ module.exports = [
       reply("✅ Group Profile Picture updated successfully!");
     } catch (e) { reply("❌ Failed to update Group PP: " + e.message); }
   } },
-  
-  // 🎯 FIXED: Added error catching and reply
   { command: "getpp2", category: "tools", execute: async (s, m, { args, reply }) => {
     const t = await resolveTarget(s, m, args);
     if (!t) return;
@@ -319,31 +341,32 @@ module.exports = [
     } catch (e) { reply("❌ Failed"); }
     finally { cl(v); cl(a); }
   } },
+  
+  // 🎯 FIXED VV COMMAND
   { command: "vv", category: "tools", execute: async (s, m, { reply }) => {
-    const q = m.quoted;
-    if (!q) return reply("❌ Reply view-once");
-    const t = q.mtype, c = q.message?.[t];
-    if (!c) return reply("❌ I can't read that message");
-    if (!(c.viewOnce || q.viewOnce)) return reply("❌ Not view-once");
+    const vvData = getViewOnceMedia(m);
+    if (!vvData) return reply("❌ Reply to a View Once image, video, or audio.");
+    const { type, media } = vvData;
+
     try {
-      const b = await vvFetch(q, t, c);
-      if (t.includes('image')) await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
-      else if (t.includes('video')) await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
+      const b = await vvFetch(media, type);
+      if (type.includes('image')) await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
+      else if (type.includes('video')) await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
       else { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply("✅ Voice saved"); }
     } catch (e) { reply(vvError(e)); }
   } },
 
-  // 🎯 FIXED: Added error catching and reply
+  // 🎯 FIXED VV2 COMMAND
   { command: "vv2", category: "tools", execute: async (s, m, { reply }) => {
-    const q = m.quoted;
-    if (!q) return;
-    const t = q.mtype, c = q.message?.[t];
-    if (!c || !(c.viewOnce || q.viewOnce)) return;
+    const vvData = getViewOnceMedia(m);
+    if (!vvData) return;
+    const { type, media } = vvData;
+
     try {
-      const b = await vvFetch(q, t, c);
+      const b = await vvFetch(media, type);
       const dest = await resolveDest(s, m);
-      if (t.includes('image')) await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
-      else if (t.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
+      if (type.includes('image')) await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
+      else if (type.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
       else await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
       await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
     } catch (e) {
