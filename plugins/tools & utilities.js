@@ -29,20 +29,32 @@ function getViewOnceMedia(m) {
     media = media[type];
   }
 
-  if (!type.includes('image') && !type.includes('video') && !type.includes('audio') && !type.includes('voice')) {
+  if (!type || (!type.includes('image') && !type.includes('video') && !type.includes('audio') && !type.includes('voice'))) {
     return null;
   }
 
   return { type, media };
 }
 
-async function vvFetch(mediaObj, type) {
+// 🎯 NEW: Bulletproof fetcher that uses Baileys' native downloader first
+async function vvFetch(s, q, mediaObj, type) {
+  // 1. Try native Baileys downloader (handles view once, re-uploads, etc.)
+  if (q && q.download) {
+    try {
+      const buf = await q.download();
+      if (buf && buf.length > 0) return buf;
+    } catch (e) {
+      console.log('[VV NATIVE DOWNLOAD FAILED]', e.message);
+    }
+  }
+
+  // 2. Fallback to manual download
   const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
-  try { 
+  try {
     return await rd(await dl(mediaObj, mtype)); 
-  } catch (e1) {
-    console.log('[VV DOWNLOAD ERROR]', e1.message);
-    throw e1;
+  } catch (e) {
+    console.log('[VV MANUAL DOWNLOAD FAILED]', e.message);
+    throw e;
   }
 }
 
@@ -349,7 +361,7 @@ module.exports = [
     const { type, media } = vvData;
 
     try {
-      const b = await vvFetch(media, type);
+      const b = await vvFetch(s, m.quoted, media, type);
       if (type.includes('image')) await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
       else if (type.includes('video')) await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
       else { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply("✅ Voice saved"); }
@@ -363,7 +375,7 @@ module.exports = [
     const { type, media } = vvData;
 
     try {
-      const b = await vvFetch(media, type);
+      const b = await vvFetch(s, m.quoted, media, type);
       const dest = await resolveDest(s, m);
       if (type.includes('image')) await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
       else if (type.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
