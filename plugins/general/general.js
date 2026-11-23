@@ -171,11 +171,7 @@ function sectionByCategory(category) {
   return SECTIONS.find(sec => (sec.cat || []).some(k => c.startsWith(k))) || null;
 }
 
-// ======================================================
-// Shared data builder: returns [{ title, items[] }], used by both the
-// text menu (.menu text) and the native list menu (.menu).
-// ======================================================
-function buildSectionsData() {
+function buildSections() {
   const reg = getRegistry();
   const shown = new Set();     // names already printed (a command appears only once)
   const listed = new Set();    // every name mentioned in SECTIONS
@@ -214,6 +210,7 @@ function buildSectionsData() {
       const range = expandRange(entry);
 
       if (range) {
+        // show only the numbers that really exist, e.g. "2gb…9gb"
         const have = range.filter(n => !shown.has(n) && (!reg || reg.names.has(n)));
         if (!have.length) continue;
         have.forEach(n => shown.add(n));
@@ -232,136 +229,20 @@ function buildSectionsData() {
       if (!shown.has(name.toLowerCase())) { shown.add(name.toLowerCase()); items.push(name); }
     }
 
-    if (items.length) out.push({ title: sec.title, items });
+    if (items.length) out.push(box(sec.title, items));
   }
 
-  if (extra.length) out.push({ title: '🆕 MORE COMMANDS', items: extra });
+  if (extra.length) out.push(box('🆕 MORE COMMANDS', extra));
 
-  return out;
+  return out.join('\n\n');
 }
-
-function buildSections() {
-  return buildSectionsData().map(sec => box(sec.title, sec.items)).join('\n\n');
-}
-
-// ======================================================
-// NATIVE LIST MENU
-// Two levels: tap a category -> tap a command -> short usage reply.
-// NOTE: this has only been verified to build/encode correctly (tested with
-// Baileys' own encode/decode). It has not been confirmed on a real phone,
-// so if a category list looks cut off or a tap does nothing, tell me and
-// I'll adjust the row counts.
-// ======================================================
-const { proto, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
-
-// sock.sendMessage() has no built-in support for raw listMessage content in this
-// Baileys version - it tries to treat any content it doesn't recognise as media
-// and throws ("Invalid media type"). relayMessage sends the already-built proto
-// content directly, skipping that broken content-type guess entirely.
-async function sendListMessage(sock, jid, content, { quoted } = {}) {
-  const full = generateWAMessageFromContent(jid, content, { userJid: sock.user.id, quoted });
-  await sock.relayMessage(jid, full.message, { messageId: full.key.id });
-  return full;
-}
-
-const rowsPerSection = 10; // how many commands per "Part N" group inside a category
-
-function categoryListMessage() {
-  const data = buildSectionsData();
-
-  return {
-    listMessage: {
-      title: '📂 Alpha Menu',
-      description: 'Tap a category to see its commands.',
-      buttonText: 'Browse',
-      listType: proto.Message.ListMessage.ListType.SINGLE_SELECT,
-      sections: [{
-        title: 'Categories',
-        rows: data.map((sec, i) => ({
-          title: sec.title,
-          rowId: `cat:${i}`,
-          description: `${sec.items.length} command${sec.items.length === 1 ? '' : 's'}`
-        }))
-      }]
-    }
-  };
-}
-
-function commandListMessage(sec) {
-  const names = sec.items.map(baseName);
-  const sections = [];
-
-  for (let i = 0; i < names.length; i += rowsPerSection) {
-    const chunk = names.slice(i, i + rowsPerSection);
-    sections.push({
-      title: names.length > rowsPerSection ? `Part ${i / rowsPerSection + 1}` : sec.title,
-      rows: chunk.map(n => ({ title: `.${n}`, rowId: `cmd:${n}` }))
-    });
-  }
-
-  sections.push({ title: ' ', rows: [{ title: '⬅️ Back to categories', rowId: 'back' }] });
-
-  return {
-    listMessage: {
-      title: sec.title,
-      description: 'Tap a command to see how to use it.',
-      buttonText: 'Commands',
-      listType: proto.Message.ListMessage.ListType.SINGLE_SELECT,
-      sections
-    }
-  };
-}
-
-function commandInfoText(name) {
-  const reg = getRegistry();
-  const c = reg?.list.find(x => String(x.command).toLowerCase() === name || (x.aliases || []).some(a => String(a).toLowerCase() === name));
-  if (!c) return `❌ I couldn't find that command anymore. It may have been removed.`;
-
-  const aliases = (c.aliases || []).filter(a => a.toLowerCase() !== name);
-  return `ℹ️ *.${c.command}*${aliases.length ? `\n🔁 Also: ${aliases.map(a => '.' + a).join(', ')}` : ''}` +
-    `${c.category ? `\n📂 Category: ${c.category}` : ''}` +
-    (c.group ? `\n👥 Group only` : '') +
-    (c.admin ? `\n🛡️ Needs the bot to be a group admin` : '') +
-    (c.owner ? `\n👑 Owner only` : '') +
-    `\n\nType \`.${c.command}\` to use it (add any text/reply it needs).`;
-}
-
-// Called by message.js for ANY message whose list reply came back (private or group).
-async function onListReply(sock, m, { reply }) {
-  const rowId = m.msg?.singleSelectReply?.selectedRowId;
-  if (!rowId) return false;
-
-  if (rowId === 'back') {
-    await sendListMessage(sock, m.chat, categoryListMessage(), { quoted: m });
-    return true;
-  }
-
-  if (rowId.startsWith('cat:')) {
-    const data = buildSectionsData();
-    const idx = Number(rowId.slice(4));
-    const sec = data[idx];
-
-    if (!sec) { await reply('❌ That category list is out of date, run .menu again.'); return true; }
-    await sendListMessage(sock, m.chat, commandListMessage(sec), { quoted: m });
-    return true;
-  }
-
-  if (rowId.startsWith('cmd:')) {
-    await reply(commandInfoText(rowId.slice(4)));
-    return true;
-  }
-
-  return false;
-}
-
 
 module.exports = [
     {
         command: "menu",
         aliases: ["help", "commands"],
         category: "general",
-        onListReply,
-        execute: async (sock, m, { args, send, reply }) => {
+        execute: async (sock, m, { send }) => {
             try {
                 const loadMsg = await sock.sendMessage(m.chat, {
                     text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
@@ -380,8 +261,8 @@ module.exports = [
                 const uptime = runtime(process.uptime());
                 const country = await getCountry(m, sock);
 
-                const header =
-`╭───〔 ${config.settings.title} 〕───⬣
+                const menu = `
+╭───〔 ${config.settings.title} 〕───⬣
 
 👤 *User:* ${pushname}
 🌍 *Country:* ${country}
@@ -389,26 +270,22 @@ module.exports = [
 📅 *Date:* ${date}
 ⚡ *Uptime:* ${uptime}
 
-╰────────────⬣`;
+╰────────────⬣
 
-                // ---------------------------------------------------
-                // Default: native tap-to-browse list menu.
-                // ".menu text" still gives the full old-style text wall,
-                // in case the list doesn't render well on someone's app.
-                // ---------------------------------------------------
-                if ((args[0] || '').toLowerCase() === 'text') {
-                    const menu = `${header}\n\n${buildSections()}\n\n${config.settings.footer}`;
+${buildSections()}
 
-                    let image = null;
-                    try { image = await getMenuImg(); } catch (e) { console.log("Menu image error:", e.message); }
+${config.settings.footer}
+`;
 
-                    if (image) await send({ image, caption: menu });
-                    else await send({ text: menu });
-                    return;
+                // Menu image comes from a cached Buffer (falls back to text if it can't be loaded)
+                let image = null;
+                try { image = await getMenuImg(); } catch (e) { console.log("Menu image error:", e.message); }
+
+                if (image) {
+                    await send({ image, caption: menu });
+                } else {
+                    await send({ text: menu });
                 }
-
-                await sock.sendMessage(m.chat, { text: `${header}\n\n_Tap below to browse commands. Type .menu text for the full list._` }, { quoted: m });
-                await sendListMessage(sock, m.chat, categoryListMessage(), { quoted: m });
 
             } catch (err) {
                 console.log("Menu error:", err);
