@@ -12,10 +12,23 @@ const FormData = require('form-data');
 const cl = f => { try { fs.unlinkSync(f) } catch {} };
 const rd = async st => { const a = []; for await (const c of st) a.push(c); return Buffer.concat(a) };
 
-// 🎯 FIXED: Uses Baileys normalizer to bypass WhatsApp's URL stripping
+// 🎯 FIXED: Robust View Once fetcher with multiple fallback layers
 async function vvFetch(s, q) {
-  if (!q || !q.message) throw new Error("No quoted message found.");
+  if (!q) throw new Error("No quoted message found.");
 
+  // 1. Try framework's built-in download if available (most reliable for patched Baileys)
+  if (typeof q.download === 'function') {
+    try {
+      const buf = await q.download();
+      if (buf && buf.length > 0) return buf;
+    } catch (e) {
+      console.log('[VV q.download FAILED]', e.message);
+    }
+  }
+
+  if (!q.message) throw new Error("No quoted message content found.");
+
+  // 2. Normalize to handle viewOnce wrappers (viewOnceMessage, viewOnceMessageV2, etc.)
   const normalized = normalizeMessageContent(q.message);
   if (!normalized) throw new Error("Could not normalize message content.");
 
@@ -24,20 +37,15 @@ async function vvFetch(s, q) {
 
   if (!media) throw new Error("No media found in the normalized message.");
 
-  // Try the native Baileys downloader (handles viewOnce + re-uploads)
+  const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
+
+  // 3. Manual download via Baileys' downloadContentFromMessage
   try {
-    const buf = await s.downloadMediaMessage({ message: normalized }, type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio');
+    const stream = await dl(media, mtype);
+    const buf = await rd(stream);
     if (buf && buf.length > 0) return buf;
   } catch (e) {
-    console.log('[VV NATIVE DOWNLOAD FAILED]', e.message);
-  }
-
-  // Fallback: Manual download
-  const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
-  try {
-    return await rd(await dl(media, mtype)); 
-  } catch (e) {
-    console.log('[VV MANUAL DOWNLOAD FAILED]', e.message);
+    console.log('[VV dl FAILED]', e.message);
     throw e;
   }
 }
@@ -338,37 +346,80 @@ module.exports = [
     finally { cl(v); cl(a); }
   } },
   
+  // 🎯 FIXED: vv drops in the same chat
   { command: "vv", category: "tools", execute: async (s, m, { reply }) => {
     if (!m.quoted) return reply("❌ Reply to a View Once image, video, or audio.");
     try {
       const b = await vvFetch(s, m.quoted);
-      const normalized = normalizeMessageContent(m.quoted.message);
-      const type = Object.keys(normalized)[0];
       
-      if (type.includes('image')) await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
-      else if (type.includes('video')) await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
-      else { await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m }); reply("✅ Voice saved"); }
+      // Safely determine media type
+      let type = 'imageMessage';
+      if (m.quoted.message) {
+        const normalized = normalizeMessageContent(m.quoted.message);
+        if (normalized) {
+          type = Object.keys(normalized)[0];
+        }
+      }
+      // Fallback if normalization returned the wrapper or failed
+      if (!type.includes('image') && !type.includes('video') && !type.includes('audio')) {
+        if (m.quoted.mtype) {
+          if (m.quoted.mtype.includes('image')) type = 'imageMessage';
+          else if (m.quoted.mtype.includes('video')) type = 'videoMessage';
+          else if (m.quoted.mtype.includes('audio') || m.quoted.mtype.includes('ptt')) type = 'audioMessage';
+        }
+      }
+      
+      if (type.includes('image')) {
+        await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
+      } else if (type.includes('video')) {
+        await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
+      } else {
+        await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
+        reply("✅ Voice saved");
+      }
     } catch (e) { 
       reply(vvError(e)); 
     }
   } },
 
+  // 🎯 FIXED: vv2 sends directly to your private DM (m.sender)
   { command: "vv2", category: "tools", execute: async (s, m, { reply }) => {
-    if (!m.quoted) return;
+    if (!m.quoted) return reply("❌ Reply to a View Once image, video, or audio.");
     try {
       const b = await vvFetch(s, m.quoted);
-      const normalized = normalizeMessageContent(m.quoted.message);
-      const type = Object.keys(normalized)[0];
-      const dest = await resolveDest(s, m);
       
-      if (type.includes('image')) await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
-      else if (type.includes('video')) await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
-      else await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
+      // Safely determine media type
+      let type = 'imageMessage';
+      if (m.quoted.message) {
+        const normalized = normalizeMessageContent(m.quoted.message);
+        if (normalized) {
+          type = Object.keys(normalized)[0];
+        }
+      }
+      if (!type.includes('image') && !type.includes('video') && !type.includes('audio')) {
+        if (m.quoted.mtype) {
+          if (m.quoted.mtype.includes('image')) type = 'imageMessage';
+          else if (m.quoted.mtype.includes('video')) type = 'videoMessage';
+          else if (m.quoted.mtype.includes('audio') || m.quoted.mtype.includes('ptt')) type = 'audioMessage';
+        }
+      }
+      
+      // Explicitly route to the command invoker's private DM
+      const dest = m.sender; 
+      
+      if (type.includes('image')) {
+        await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
+      } else if (type.includes('video')) {
+        await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
+      } else {
+        await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
+      }
       
       await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
+      reply("✅ Sent to your DM!");
     } catch (e) {
       console.log("vv2 error:", e.message);
-      reply("❌ Failed to send privately. " + e.message);
+      reply("❌ Failed to send privately. " + vvError(e));
     }
   } },
 
