@@ -12,47 +12,82 @@ const FormData = require('form-data');
 const cl = f => { try { fs.unlinkSync(f) } catch {} };
 const rd = async st => { const a = []; for await (const c of st) a.push(c); return Buffer.concat(a) };
 
-// 🎯 FIXED: Robust View Once fetcher with multiple fallback layers
+// 🎯 ULTRA-ROBUST: 3-Tier View Once Fetcher
 async function vvFetch(s, q) {
   if (!q) throw new Error("No quoted message found.");
 
-  // 1. Try framework's built-in download if available (most reliable for patched Baileys)
+  // Tier 1: Framework's built-in download (if available)
   if (typeof q.download === 'function') {
     try {
       const buf = await q.download();
       if (buf && buf.length > 0) return buf;
     } catch (e) {
-      console.log('[VV q.download FAILED]', e.message);
+      console.log('[VV] Tier 1 (q.download) FAILED:', e.message);
     }
   }
 
-  if (!q.message) throw new Error("No quoted message content found.");
-
-  // 2. Normalize to handle viewOnce wrappers (viewOnceMessage, viewOnceMessageV2, etc.)
-  const normalized = normalizeMessageContent(q.message);
-  if (!normalized) throw new Error("Could not normalize message content.");
-
-  const type = Object.keys(normalized)[0];
-  const media = normalized[type];
-
-  if (!media) throw new Error("No media found in the normalized message.");
-
-  const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
-
-  // 3. Manual download via Baileys' downloadContentFromMessage
-  try {
-    const stream = await dl(media, mtype);
-    const buf = await rd(stream);
-    if (buf && buf.length > 0) return buf;
-  } catch (e) {
-    console.log('[VV dl FAILED]', e.message);
-    throw e;
+  // Tier 2: Baileys native downloadMediaMessage (Best for View Once decryption)
+  if (s.downloadMediaMessage) {
+    try {
+      const buf = await s.downloadMediaMessage(q, 'buffer', {}, { reuploadRequest: s.updateMediaMessage });
+      if (buf && buf.length > 0) return buf;
+    } catch (e) {
+      console.log('[VV] Tier 2 (s.downloadMediaMessage) FAILED:', e.message);
+    }
   }
+
+  // Tier 3: Manual unwrap and stream download
+  if (q.message) {
+    try {
+      const normalized = normalizeMessageContent(q.message);
+      if (!normalized) throw new Error("Could not normalize message content.");
+      
+      const type = Object.keys(normalized)[0];
+      const media = normalized[type];
+      if (!media) throw new Error("No media found in normalized message.");
+      
+      const mtype = type.includes('image') ? 'image' : type.includes('video') ? 'video' : 'audio';
+      const stream = await dl(media, mtype);
+      const buf = await rd(stream);
+      if (buf && buf.length > 0) return buf;
+    } catch (e) {
+      console.log('[VV] Tier 3 (Manual dl) FAILED:', e.message);
+    }
+  }
+
+  throw new Error("All download methods failed.");
 }
 
-const vvError = e => /40[34]|410|gone|not found|expired|No valid media URL/i.test(String(e.message))
-  ? "❌ WhatsApp no longer has that media (expired or already opened)."
-  : "❌ Failed: " + String(e.message).slice(0, 120);
+// 🎯 Smart Media Type Detector (bypasses viewOnceMessage wrappers)
+function getMediaType(q) {
+  if (!q || !q.message) return 'unknown';
+  
+  // Check direct mtype first (some wrappers auto-unwrap)
+  if (q.mtype) {
+    if (q.mtype.includes('image')) return 'image';
+    if (q.mtype.includes('video')) return 'video';
+    if (q.mtype.includes('audio') || q.mtype.includes('ptt')) return 'audio';
+  }
+  
+  // Check normalized message
+  const normalized = normalizeMessageContent(q.message);
+  if (normalized) {
+    const type = Object.keys(normalized)[0];
+    if (type.includes('image')) return 'image';
+    if (type.includes('video')) return 'video';
+    if (type.includes('audio') || type.includes('ptt')) return 'audio';
+  }
+  
+  return 'unknown';
+}
+
+const vvError = e => {
+  const msg = String(e.message);
+  if (/40[34]|410|gone|not found|expired|No valid media URL|stale/i.test(msg)) {
+    return "❌ WhatsApp no longer has that media. It expired or was already opened by the bot account.";
+  }
+  return "❌ Failed to download: " + msg.slice(0, 120);
+};
 
 const up = async (b, f = 'img.png') => {
   const fd = new FormData();
@@ -346,80 +381,57 @@ module.exports = [
     finally { cl(v); cl(a); }
   } },
   
-  // 🎯 FIXED: vv drops in the same chat
+  // 🎯 FIXED: vv drops in the SAME chat
   { command: "vv", category: "tools", execute: async (s, m, { reply }) => {
     if (!m.quoted) return reply("❌ Reply to a View Once image, video, or audio.");
     try {
       const b = await vvFetch(s, m.quoted);
+      const mediaType = getMediaType(m.quoted);
       
-      // Safely determine media type
-      let type = 'imageMessage';
-      if (m.quoted.message) {
-        const normalized = normalizeMessageContent(m.quoted.message);
-        if (normalized) {
-          type = Object.keys(normalized)[0];
-        }
-      }
-      // Fallback if normalization returned the wrapper or failed
-      if (!type.includes('image') && !type.includes('video') && !type.includes('audio')) {
-        if (m.quoted.mtype) {
-          if (m.quoted.mtype.includes('image')) type = 'imageMessage';
-          else if (m.quoted.mtype.includes('video')) type = 'videoMessage';
-          else if (m.quoted.mtype.includes('audio') || m.quoted.mtype.includes('ptt')) type = 'audioMessage';
-        }
-      }
-      
-      if (type.includes('image')) {
+      if (mediaType === 'image') {
         await s.sendMessage(m.chat, { image: b, caption: "✅ Unlocked" }, { quoted: m });
-      } else if (type.includes('video')) {
+      } else if (mediaType === 'video') {
         await s.sendMessage(m.chat, { video: b, caption: "✅ Unlocked" }, { quoted: m });
-      } else {
+      } else if (mediaType === 'audio') {
         await s.sendMessage(m.chat, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
         reply("✅ Voice saved");
+      } else {
+        reply("❌ Unknown media type.");
       }
     } catch (e) { 
       reply(vvError(e)); 
     }
   } },
 
-  // 🎯 FIXED: vv2 sends directly to your private DM (m.sender)
+  // 🎯 FIXED: vv2 sends directly to YOUR private DM (m.sender)
   { command: "vv2", category: "tools", execute: async (s, m, { reply }) => {
     if (!m.quoted) return reply("❌ Reply to a View Once image, video, or audio.");
     try {
       const b = await vvFetch(s, m.quoted);
-      
-      // Safely determine media type
-      let type = 'imageMessage';
-      if (m.quoted.message) {
-        const normalized = normalizeMessageContent(m.quoted.message);
-        if (normalized) {
-          type = Object.keys(normalized)[0];
-        }
-      }
-      if (!type.includes('image') && !type.includes('video') && !type.includes('audio')) {
-        if (m.quoted.mtype) {
-          if (m.quoted.mtype.includes('image')) type = 'imageMessage';
-          else if (m.quoted.mtype.includes('video')) type = 'videoMessage';
-          else if (m.quoted.mtype.includes('audio') || m.quoted.mtype.includes('ptt')) type = 'audioMessage';
-        }
-      }
+      const mediaType = getMediaType(m.quoted);
       
       // Explicitly route to the command invoker's private DM
       const dest = m.sender; 
       
-      if (type.includes('image')) {
+      if (mediaType === 'image') {
         await s.sendMessage(dest, { image: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
-      } else if (type.includes('video')) {
+      } else if (mediaType === 'video') {
         await s.sendMessage(dest, { video: b, caption: "🔓 VV2 Unlocked" }, { quoted: m });
-      } else {
+      } else if (mediaType === 'audio') {
         await s.sendMessage(dest, { audio: b, mimetype: "audio/mpeg", ptt: true }, { quoted: m });
+      } else {
+        throw new Error("Unknown media type");
       }
       
       await s.sendMessage(m.chat, { react: { text: "👀", key: m.key } });
       reply("✅ Sent to your DM!");
     } catch (e) {
       console.log("vv2 error:", e.message);
-      reply("❌ Failed to send privately. " + vvError(e));
+      if (e.message.includes('privacy') || e.message.includes('403')) {
+        reply("❌ Failed: You have privacy settings blocking the bot from DMing you.");
+      } else {
+        reply("❌ Failed to send privately. " + vvError(e));
+      }
     }
   } },
 
