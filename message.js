@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const config = require("./settings/config");
 const tenant = require("./library/tenant");
+const viewonce = require("./library/viewonce");
 
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
@@ -138,7 +139,7 @@ const hooks = commands.filter(c => typeof c.onMessage === 'function');
 
 // Plugins can add an onListReply(sock, m, helpers) function to a command to handle
 // taps on a native list menu (works in DMs and groups; return true once handled).
-const listReplyHooks = commands.filter(c => typeof c.onListReply === 'function');
+const listReplyHooks = commands.filter(c => typeof c.onMenuReply === 'function');
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
@@ -222,12 +223,18 @@ module.exports = async (sock, m) => {
             }
         };
 
-        // 📋 Native list-menu tap (works in DMs and groups, skipped for banned users)
-        if (m.mtype === 'listResponseMessage' && !isUserBanned(m.sender, sock)) {
+        // 📋 Numbered menu reply (works in DMs and groups; returns fast unless this
+        // exact person has an active .menu session in this exact chat)
+        if (!m.fromMe && m.text && !isUserBanned(m.sender, sock)) {
             for (const hook of listReplyHooks) {
-                try { if (await hook.onListReply(sock, m, { reply, send })) return; } catch (e) { console.log('[LIST REPLY]', e.message); }
+                try { if (await hook.onMenuReply(sock, m, { reply, send })) return; } catch (e) { console.log('[MENU REPLY]', e.message); }
             }
         }
+
+        // 👁️ Cache the FULL original view-once message (with real media keys) as soon
+        // as it arrives. The stripped "quoted" copy .vv sees later often lacks these,
+        // which is why downloads can fail with "No valid media URL or directPath".
+        if (m.viewOnce && m.id) viewonce.remember(m.id, m.message);
 
         const botNum = sock.user.id.split('@')[0].split(':')[0];
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
