@@ -12,7 +12,7 @@ const FormData = require('form-data');
 const cl = f => { try { fs.unlinkSync(f) } catch {} };
 const rd = async st => { const a = []; for await (const c of st) a.push(c); return Buffer.concat(a) };
 
-// 🎯 ULTRA-ROBUST: 3-Tier View Once Fetcher
+// 🎯 ULTRA-ROBUST: 3-Tier View Once Fetcher with Media Retry
 async function vvFetch(s, q) {
   if (!q) throw new Error("No quoted message found.");
 
@@ -26,7 +26,7 @@ async function vvFetch(s, q) {
     }
   }
 
-  // Tier 2: Baileys native downloadMediaMessage (Best for View Once decryption)
+  // Tier 2: Baileys native downloadMediaMessage with re-upload request
   if (s.downloadMediaMessage) {
     try {
       const buf = await s.downloadMediaMessage(q, 'buffer', {}, { reuploadRequest: s.updateMediaMessage });
@@ -58,18 +58,13 @@ async function vvFetch(s, q) {
   throw new Error("All download methods failed.");
 }
 
-// 🎯 Smart Media Type Detector (bypasses viewOnceMessage wrappers)
 function getMediaType(q) {
   if (!q || !q.message) return 'unknown';
-  
-  // Check direct mtype first (some wrappers auto-unwrap)
   if (q.mtype) {
     if (q.mtype.includes('image')) return 'image';
     if (q.mtype.includes('video')) return 'video';
     if (q.mtype.includes('audio') || q.mtype.includes('ptt')) return 'audio';
   }
-  
-  // Check normalized message
   const normalized = normalizeMessageContent(q.message);
   if (normalized) {
     const type = Object.keys(normalized)[0];
@@ -77,7 +72,6 @@ function getMediaType(q) {
     if (type.includes('video')) return 'video';
     if (type.includes('audio') || type.includes('ptt')) return 'audio';
   }
-  
   return 'unknown';
 }
 
