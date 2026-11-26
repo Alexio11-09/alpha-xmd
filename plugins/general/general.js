@@ -23,13 +23,12 @@ function runtime(seconds) {
 // 🎄 CHRISTMAS MENU IMAGES
 // ======================================================
 const MENU_IMAGES = [
-    "https://kommodo.ai/i/6kGpgWKC6ubPVRFAHAO4",
-    "https://kommodo.ai/i/54cvgf9MSP8qDjrn56bZ",
-    "https://kommodo.ai/i/Aeaz5ZkVVnBohXKDDe9t",
-    "https://kommodo.ai/i/QcU2m1NPiM0alGwRUfLa",
-    "https://kommodo.ai/i/vSzk7erwERSKHNyrroZY",
-    "https://kommodo.ai/i/Pc8X30w12t6MgufH6OC8",
-    "https://kommodo.ai/i/mPyVb3WDTAbG40ZWxt4R"
+    "https://files.catbox.moe/tbw1kw.png",
+    "https://files.catbox.moe/yj70un.png",
+    "https://files.catbox.moe/8cn35i.png",
+    "https://files.catbox.moe/15q7l0.png",
+    "https://files.catbox.moe/quqdx4.png",
+    "https://files.catbox.moe/xtluz8.png"
 ];
 
 // ======================================================
@@ -66,10 +65,6 @@ const getCountry = async (m, sock) => {
 
 // ======================================================
 // MENU SECTIONS
-// Move a command to another category by moving its name between these lists.
-//  - Commands that do not exist (plugin missing or not loaded) are hidden automatically.
-//  - Commands that DO exist but are not listed here show up under "MORE COMMANDS".
-//  - A name only appears once (the first section that lists it wins).
 // ======================================================
 const SECTIONS = [
   { title: '📊 GENERAL', cat: ['general', 'main'], cmds: ['menu', 'ping', 'alive', 'info', 'owner', 'repo', 'pair'] },
