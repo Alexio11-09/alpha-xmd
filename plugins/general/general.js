@@ -20,28 +20,17 @@ function runtime(seconds) {
 }
 
 // ======================================================
-// MENU IMAGE: download/read once, then reuse the Buffer
+// 🎄 CHRISTMAS MENU IMAGES
 // ======================================================
-let menuImg = null;
-
-async function getMenuImg() {
-    if (menuImg) return menuImg;
-
-    const src = config.thumbUrl;
-    let buf;
-
-    if (/^https?:\/\//i.test(src)) {
-        const res = await fetch(src);
-        if (!res.ok) throw new Error(`Menu image HTTP ${res.status}`);
-        buf = Buffer.from(await res.arrayBuffer());
-    } else {
-        buf = fs.readFileSync(src);
-    }
-
-    // Only keep it in memory if it is reasonably small
-    if (buf.length < 300 * 1024) menuImg = buf;
-    return buf;
-}
+const MENU_IMAGES = [
+    "https://kommodo.ai/i/6kGpgWKC6ubPVRFAHAO4",
+    "https://kommodo.ai/i/54cvgf9MSP8qDjrn56bZ",
+    "https://kommodo.ai/i/Aeaz5ZkVVnBohXKDDe9t",
+    "https://kommodo.ai/i/QcU2m1NPiM0alGwRUfLa",
+    "https://kommodo.ai/i/vSzk7erwERSKHNyrroZY",
+    "https://kommodo.ai/i/Pc8X30w12t6MgufH6OC8",
+    "https://kommodo.ai/i/mPyVb3WDTAbG40ZWxt4R"
+];
 
 // ======================================================
 // COUNTRY DETECTION
@@ -261,8 +250,11 @@ module.exports = [
                 const uptime = runtime(process.uptime());
                 const country = await getCountry(m, sock);
 
+                // 🎄 CHRISTMAS MENU HEADER
                 const menu = `
-╭───〔 ${config.settings.title} 〕───⬣
+╭───〔 🎄 ${config.settings.title} ⛄ 〕───⬣
+
+✨ *Merry Christmas & Happy Holidays!* 🎁
 
 👤 *User:* ${pushname}
 🌍 *Country:* ${country}
@@ -277,13 +269,13 @@ ${buildSections()}
 ${config.settings.footer}
 `;
 
-                // Menu image comes from a cached Buffer (falls back to text if it can't be loaded)
-                let image = null;
-                try { image = await getMenuImg(); } catch (e) { console.log("Menu image error:", e.message); }
+                // 🎄 PICK A RANDOM CHRISTMAS IMAGE
+                const randomImageUrl = MENU_IMAGES[Math.floor(Math.random() * MENU_IMAGES.length)];
 
-                if (image) {
-                    await send({ image, caption: menu });
-                } else {
+                try {
+                    await send({ image: { url: randomImageUrl }, caption: menu });
+                } catch (err) {
+                    console.log("Menu image failed, falling back to text:", err.message);
                     await send({ text: menu });
                 }
 
