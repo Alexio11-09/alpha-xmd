@@ -7,6 +7,7 @@ const { parsePhoneNumber } = require('awesome-phonenumber');
 const config = require("../../settings/config");
 
 const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
 function runtime(seconds) {
@@ -19,60 +20,27 @@ function runtime(seconds) {
 }
 
 // ======================================================
-// 🎄 CHRISTMAS MENU IMAGES
+// MENU IMAGE: download/read once, then reuse the Buffer
 // ======================================================
-const MENU_IMAGES = [
-    "https://files.catbox.moe/tbw1kw.png",
-    "https://files.catbox.moe/yj70un.png",
-    "https://files.catbox.moe/8cn35i.png",
-    "https://files.catbox.moe/15q7l0.png",
-    "https://files.catbox.moe/quqdx4.png",
-    "https://files.catbox.moe/xtluz8.png"
-];
+let menuImg = null;
 
-// ======================================================
-// 🎄 RANDOM GREETINGS
-// ======================================================
-const GREETINGS = [
-    "🎄 *Merry Christmas,*",
-    "🎅 *Ho Ho Ho,*",
-    "⛄ *Happy Holidays,*",
-    "❄️ *Season's Greetings,*",
-    "🎁 *Warm wishes,*"
-];
+async function getMenuImg() {
+    if (menuImg) return menuImg;
 
-// ======================================================
-// 💬 RANDOM QUOTES
-// ======================================================
-const QUOTES = [
-    `💬 *"The best way to spread Christmas cheer is singing loud for all to hear."* — *Elf* 🎄`,
-    `💬 *"Every gift from a friend is a wish for your happiness."* — *Richard Bach* 🎁`,
-    `💬 *"Christmas is not a time nor a season, but a state of mind."* — *Calvin Coolidge* ⛄`,
-    `💬 *"The joy of brightening other lives is the magic of Christmas."* — *W.C. Jones* ✨`,
-    `💬 *"Maybe Christmas doesn't come from a store. Maybe Christmas means a little bit more."* — *The Grinch* 🎅`,
-    `💬 *"What is Christmas? It is tenderness for the past, courage for the present, hope for the future."* — *Agnes M. Pahro* ❄️`,
-    `💬 *"The best and most beautiful things in the world cannot be seen, only felt."* — *Helen Keller* ❤️`,
-    `💬 *"Believe in the magic of Christmas, because it lives inside you."* — *Alpha Bot* 🎄`
-];
+    const src = config.thumbUrl;
+    let buf;
 
-// ======================================================
-// ✨ FONT STYLER (Converts normal text to bold unicode)
-// ======================================================
-const FONT_MAP = {
-    'a': '𝗮', 'b': '𝗯', 'c': '𝗰', 'd': '𝗱', 'e': '𝗲', 'f': '𝗳', 'g': '𝗴', 'h': '𝗵',
-    'i': '𝗶', 'j': '𝗷', 'k': '𝗸', 'l': '𝗹', 'm': '𝗺', 'n': '𝗻', 'o': '𝗼', 'p': '𝗽',
-    'q': '𝗾', 'r': '𝗿', 's': '𝘀', 't': '𝘁', 'u': '𝘂', 'v': '𝘃', 'w': '𝘄', 'x': '𝘅',
-    'y': '𝘆', 'z': '𝘇',
-    'A': '𝗔', 'B': '𝗕', 'C': '𝗖', 'D': '𝗗', 'E': '𝗘', 'F': '𝗙', 'G': '𝗚', 'H': '𝗛',
-    'I': '𝗜', 'J': '𝗝', 'K': '𝗞', 'L': '𝗟', 'M': '𝗠', 'N': '𝗡', 'O': '𝗢', 'P': '𝗣',
-    'Q': '𝗤', 'R': '𝗥', 'S': '𝗦', 'T': '𝗧', 'U': '𝗨', 'V': '𝗩', 'W': '𝗪', 'X': '𝗫',
-    'Y': '𝗬', 'Z': '𝗭',
-    '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰', '5': '𝟱', '6': '𝟲', '7': '𝟳',
-    '8': '𝟴', '9': '𝟵'
-};
+    if (/^https?:\/\//i.test(src)) {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error(`Menu image HTTP ${res.status}`);
+        buf = Buffer.from(await res.arrayBuffer());
+    } else {
+        buf = fs.readFileSync(src);
+    }
 
-function stylish(text) {
-    return text.split('').map(c => FONT_MAP[c] || c).join('');
+    // Only keep it in memory if it is reasonably small
+    if (buf.length < 300 * 1024) menuImg = buf;
+    return buf;
 }
 
 // ======================================================
@@ -80,9 +48,11 @@ function stylish(text) {
 // ======================================================
 const getCountry = async (m, sock) => {
     try {
+        // Baileys 7 puts the real phone JID in these fields when the sender is a LID
         let jid = m.key?.participantAlt || m.key?.remoteJidAlt || m.sender;
         let num = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 
+        // Rare fallback: only fetch group metadata if we still only have a LID
         if ((jid.includes('@lid') || num.length < 9) && m.isGroup) {
             const md = await sock.groupMetadata(m.chat);
             const p = md.participants.find(x => x.id === m.sender || x.lid === m.sender);
@@ -95,7 +65,10 @@ const getCountry = async (m, sock) => {
         const pn = parsePhoneNumber('+' + num);
         if (!pn.valid || !pn.regionCode) return "Unknown 🌍";
 
-        const flag = pn.regionCode.replace(/./g, c => String.fromCodePoint(c.charCodeAt(0) + 127397));
+        const flag = pn.regionCode.replace(/./g, c =>
+            String.fromCodePoint(c.charCodeAt(0) + 127397)
+        );
+
         return `${regionNames.of(pn.regionCode)} ${flag}`;
     } catch (e) {
         return "Unknown 🌍";
@@ -104,34 +77,62 @@ const getCountry = async (m, sock) => {
 
 // ======================================================
 // MENU SECTIONS
+// Move a command to another category by moving its name between these lists.
+//  - Commands that do not exist (plugin missing or not loaded) are hidden automatically.
+//  - Commands that DO exist but are not listed here show up under "MORE COMMANDS".
+//  - A name only appears once (the first section that lists it wins).
 // ======================================================
 const SECTIONS = [
   { title: '📊 GENERAL', cat: ['general', 'main'], cmds: ['menu', 'ping', 'alive', 'info', 'owner', 'repo', 'pair'] },
+
   { title: '👑 OWNER', cat: ['owner'], cmds: ['update', 'restart', 'shutdown', 'eval', 'bc', 'join', 'leave', 'block', 'unblock', 'blocklist', 'pm', 'addowner', 'delowner', 'owners', 'getchannel', 'anticall', 'poststatus', 'cleartmp', 'clearsession', 'sudo', 'clear', 'tostatus', 'toviewonce', 'autobio', 'channel', 'disk', 'deljunk'] },
+
   { title: '👥 GROUP', cat: ['group'], cmds: ['tagall', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute', 'hidetag', 'groupinfo', 'grouplink', 'getlink', 'revokelink', 'welcome on/off', 'goodbye on/off', 'antilink', 'antidemote', 'antisticker', 'antitag', 'antiforeign', 'antibot', 'antigroupmention', 'antistatusgroupmention', 'poll', 'listadmin', 'tagadmin', 'vcf', 'promoteall', 'demoteall', 'kickinactive', 'approveall', 'approve', 'disapproveall', 'invite', 'gcstatus', 'getname', 'getdeskgc', 'getppgc', 'setppgc', 'listactive', 'listinactive', 'totalmembers', 'addcode', 'delcode', 'listcode', 'removes', 'mediatag', 'ban', 'unban', 'banlist'] },
+
   { title: '⚙️ SETTINGS', cat: ['setting'], cmds: ['mode', 'autoread', 'autotyping', 'autorecording', 'autoreact', 'autostatus', 'antiblock', 'ghost', 'antiedit', 'antidelete', 'autoreply', 'autosticker', 'autovoice', 'dmblocker', 'antispam', 'chatbot', 'autosavestatus', 'lastseen', 'ppprivacy', 'readreceipts'] },
+
   { title: '📥 DOWNLOADER', cat: ['download'], cmds: ['play', 'video', 'tiktok', 'instagram', 'facebook', 'pindl', 'spotify', 'mediafire', 'gitclone', 'apk', 'ringtone', 'wallpaper', 'img', 'shazam', 'yts', 'ytpost', 'gdrive', 'movie'] },
+
   { title: '🔧 TOOLS', cat: ['tool'], cmds: ['calc', 'qr', 'tts', 'time', 'sticker', 'toimg', 'getpp', 'getpp2', 'setpp', 'getid', 'translate', 'weather', 'lyrics', 'removebg', 'tomp3', 'vv', 'vv2', 'url', 'take', 'steal', 'blur', 'attp', 'ttp', 'ss', 'stickertelegram', 'imgscan', 'tovideo', 'toptt', 'topdf', 'smeme', 'wasted', 'font', 'webzip', 'botip', 'debugid'] },
+
   { title: '🛠️ UTILITIES', cat: ['utilit'], cmds: ['save', 'delete', 'hack', 'tinyurl', 'fliptext', 'genpass', 'device', 'browse', 'fancy', 'carbon', 'obfuscate', 'tozip', 'readmore', 'ngldm'] },
+
   { title: '🤖 AI & IMAGE GEN', cat: ['ai', 'imagegen'], cmds: ['gpt', 'gemini', 'blackbox', 'deepseek', 'copilot', 'claude', 'perplexity', 'venice', 'dalle', 'flux', 'imagine', 'animagine', 'dreamshaper', 'pony', 'pixar', 'cartoon', 'seedream', 'toghibili'] },
+
   { title: '🔍 SEARCH', cat: ['search'], cmds: ['gsmarena', 'google', 'bing', 'livewallpapers', 'imdb', 'define', 'wiki'] },
+
   { title: '🌐 INFORMATION', cat: ['info'], cmds: ['news', 'countryinfo', 'check', 'bible', 'quran', 'inspect', 'webcrawl'] },
+
   { title: '🎨 PHOTO EFFECTS', cat: ['photo', 'effect', 'imageedit'], cmds: ['zombie', 'figure', 'underground', 'oldage', 'turky', 'train', 'streetwear', 'tatoo', 'satan', 'sdm', 'spirit', 'toroblox', 'mirror', 'partner', 'bf', 'gf', 'polaroid', 'punk', 'piramid', 'peci', 'island', 'mangu', 'liquor', 'mecca', 'mayan', 'maid', 'glasses', 'cambodia', 'japan', 'hijab', 'hitam', 'tupai', 'vintage'] },
+
   { title: '🎨 LOGO & TEXT MAKERS', cat: ['logo', 'textmaker', 'maker'], cmds: ['hacker', 'neon', 'fire', 'gold', 'logo', 'glitch', 'avenger', 'pubg', 'naruto', 'matrix', 'graffiti', '1000d', '3d', 'rainbow', 'metallic', 'ice', 'snow', 'purple', 'thunder', 'water', 'underwater', '4d', 'luxury', 'silver', 'foggyglass', 'wetglass', 'candy', 'christmas', '3dchristmas', 'sparklechristmas', 'deepsea', 'scifi', 'waterpipe', 'spooky', 'pencil', 'circuit', 'discovery', 'fiction', 'transformer', 'berry', 'magma', '3dstone', 'neonlight', 'harrypotter', 'brokenglass', 'papercut', 'watercolor', 'multicolor', 'neondevil', 'graffitibike', 'cloud', 'honey', 'fruitjuice', 'biscuit', 'wood', 'chocolate', 'strawberry', 'blood', 'dropwater', 'toxic', 'lava', 'rock', 'bloodglass', 'halloween', 'darkgold', 'joker', 'wicker', 'firework', 'skeleton', 'sand', 'glue', '1917', 'leaves'] },
+
   { title: '🎵 AUDIO EFFECTS', cat: ['audio'], cmds: ['deep', 'smooth', 'fat', 'blown', 'radio', 'robot', 'chipmunk', 'nightcore', 'earrape', 'bass', 'reverse', 'slow', 'fast', 'baby', 'demon'] },
+
   { title: '😂 EMOJI ANIMATIONS', cat: ['emoji'], cmds: ['happy', 'heart', 'angry', 'sad', 'shy', 'moon', 'confused', 'hot', 'nikal'] },
+
   { title: '🎮 GAMES & FUN', cat: ['game', 'fun'], cmds: ['tictactoe', 'hangman', 'guess', 'quiz', 'trivia', 'answer', 'truth', 'dare', '8ball', 'compliment', 'insult', 'flirt', 'shayari', 'simp', 'stupid', 'goodnight', 'meme', 'squidgame', 'konami', 'lovetest', 'aura', 'dice', 'roll', 'joke', 'quote', 'fact', 'flip', 'rps', 'ship', 'hug', 'emojimix', 'wcg'] },
+
   { title: '🎌 ANIME & REACTIONS', cat: ['anime', 'reaction'], cmds: ['waifu', 'neko', 'shinobu', 'megumin', 'aizen', 'animequote', 'anime', 'manga', 'topanime', 'topmanga', 'character', 'randomanime', 'seasonal', 'hentai 🔞', 'hentaigif 🔞', 'nom', 'poke', 'cry', 'kiss', 'pat', 'wink', 'facepalm', 'slap', 'bite'] },
+
   { title: '🎬 MOVIES / SERIES', cat: ['movie', 'series'], cmds: ['selectmovie', 'dlmovie', 'dlseries', 'selectseries', 'seriesinfo'] },
+
   { title: '⚽ FOOTBALL', cat: ['football', 'soccer', 'sport'], cmds: ['livescore', 'competitions', 'matches', 'standings', 'team', 'head2head', 'matchlist', 'teamperson', 'teammatches', 'areas'] },
+
   { title: '👁️ STALK', cat: ['stalk'], cmds: ['npmstalk', 'wastalk', 'igstalk', 'tiktokstalk', 'twitterstalk', 'ytstalk', 'tgstalk', 'minecraftstalk', 'xboxstalk', 'steamstalk', 'githubstalk'] },
+
   { title: '🐙 GITHUB', cat: ['github'], cmds: ['ghlogin', 'ghtoken', 'ghcreate', 'ghdelete', 'ghpush', 'ghpushall', 'ghcommit', 'ghfork', 'ghlist', 'ghbranches', 'ghdeletefile', 'ghcreatebranch', 'ghlogout'] },
+
   { title: '📺 CHANNEL', cat: ['channel'], cmds: ['createchannel', 'followchannel', 'unfollowchannel', 'updatechannelname', 'updatechannelpic', 'updatechanneldesc', 'mutechannel', 'unmutechannel', 'deletechannel'] },
+
   { title: '💰 FINANCE', cat: ['finance', 'money', 'currency', 'crypto'], cmds: ['currencylist', 'rates', 'exchange', 'forex'] },
+
   { title: '📧 TEMP MAIL / NUMBER', cat: ['temp', 'mail'], cmds: ['tempmail', 'tempinbox', 'tempnumber', 'checksms', 'listcountries'] },
+
   { title: '🖥️ CPANEL', cat: ['cpanel', 'panel', 'hosting'], cmds: ['addserver', 'delserver', 'listservers', 'sendpanel', '1gb…9gb', 'unli', 'admin', 'addprem', 'delprem', 'premiumlist', 'bothosting'] }
 ];
 
+// The loaded commands (message.js exports them). Returns null if they are not available.
 function getRegistry() {
   try {
     const list = require('../../message').commands;
@@ -143,11 +144,15 @@ function getRegistry() {
       for (const a of c.aliases || []) names.add(String(a).toLowerCase());
     }
     return { list, names };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
+// "welcome on/off" -> "welcome", "1gb…9gb" -> "1gb", "hentai 🔞" -> "hentai"
 const baseName = entry => entry.split(/[\s…]/)[0].toLowerCase();
 
+// "1gb…9gb" -> ["1gb","2gb",...,"9gb"]  (any other entry -> null)
 function expandRange(entry) {
   const r = /^(\d+)([a-z]+)…(\d+)([a-z]+)$/i.exec(entry);
   if (!r || r[2].toLowerCase() !== r[4].toLowerCase()) return null;
@@ -156,14 +161,10 @@ function expandRange(entry) {
   return Array.from({ length: to - from + 1 }, (_, i) => `${from + i}${r[2].toLowerCase()}`);
 }
 
-const box = (title, items) => {
-    const parts = title.split(' ');
-    const emoji = parts[0]; 
-    const text = parts.slice(1).join(' ');
-    const styledTitle = `${emoji} ${stylish(text)}`;
-    return `╭───〔 ${styledTitle} 〕───⬣\n${items.map(i => `│ • .${i}`).join('\n')}\n╰────────────⬣`;
-};
+const box = (title, items) =>
+  `╭───〔 ${title} 〕───⬣\n${items.map(i => `│ • .${i}`).join('\n')}\n╰────────────⬣`;
 
+// pick a section for a command that is not listed above, from the command's own "category"
 function sectionByCategory(category) {
   const c = String(category || '').toLowerCase().replace(/[^a-z]/g, '');
   if (!c) return null;
@@ -172,8 +173,8 @@ function sectionByCategory(category) {
 
 function buildSections() {
   const reg = getRegistry();
-  const shown = new Set();
-  const listed = new Set();
+  const shown = new Set();     // names already printed (a command appears only once)
+  const listed = new Set();    // every name mentioned in SECTIONS
   const out = [];
 
   for (const sec of SECTIONS) {
@@ -182,8 +183,9 @@ function buildSections() {
     }
   }
 
-  const auto = new Map();
-  const extra = [];
+  // commands that exist but are not in any list: put them in the section matching their category
+  const auto = new Map();      // section title -> [names]
+  const extra = [];            // no matching section -> MORE COMMANDS
 
   if (reg) {
     for (const c of reg.list) {
@@ -203,27 +205,35 @@ function buildSections() {
 
   for (const sec of SECTIONS) {
     const items = [];
+
     for (const entry of sec.cmds) {
       const range = expandRange(entry);
+
       if (range) {
+        // show only the numbers that really exist, e.g. "2gb…9gb"
         const have = range.filter(n => !shown.has(n) && (!reg || reg.names.has(n)));
         if (!have.length) continue;
         have.forEach(n => shown.add(n));
         items.push(have.length > 1 ? `${have[0]}…${have[have.length - 1]}` : have[0]);
         continue;
       }
+
       const base = baseName(entry);
       if (shown.has(base)) continue;
-      if (reg && !reg.names.has(base)) continue;
+      if (reg && !reg.names.has(base)) continue;   // command is not loaded -> hide it
       shown.add(base);
       items.push(entry);
     }
+
     for (const name of auto.get(sec.title) || []) {
       if (!shown.has(name.toLowerCase())) { shown.add(name.toLowerCase()); items.push(name); }
     }
+
     if (items.length) out.push(box(sec.title, items));
   }
+
   if (extra.length) out.push(box('🆕 MORE COMMANDS', extra));
+
   return out.join('\n\n');
 }
 
@@ -234,37 +244,15 @@ module.exports = [
         category: "general",
         execute: async (sock, m, { send }) => {
             try {
-                // 🎄 CHRISTMAS THEMED LOADING ANIMATION
                 const loadMsg = await sock.sendMessage(m.chat, {
-                    text: "🎄 *Preparing your gift...* 🎁\n\n⛄ ░░░░░░░░░░ 0%"
+                    text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
                 }, { quoted: m });
 
-                await new Promise(resolve => setTimeout(resolve, 400));
+                await new Promise(resolve => setTimeout(resolve, 700));
                 await sock.sendMessage(m.chat, {
-                    text: "❄️ *Wrapping presents...* 🎁\n\n🎅 ▓▓▓░░░░░░░ 30%",
+                    text: "⚡ Loaded 100% ████████████",
                     edit: loadMsg.key
                 });
-
-                await new Promise(resolve => setTimeout(resolve, 400));
-                await sock.sendMessage(m.chat, {
-                    text: "⛄ *Lighting the tree...* 🎄\n\n🎁 ▓▓▓▓▓▓░░░░ 60%",
-                    edit: loadMsg.key
-                });
-
-                await new Promise(resolve => setTimeout(resolve, 400));
-                await sock.sendMessage(m.chat, {
-                    text: "✨ *Almost ready...* 🦌\n\n❄️ ▓▓▓▓▓▓▓▓▓░ 90%",
-                    edit: loadMsg.key
-                });
-
-                await new Promise(resolve => setTimeout(resolve, 400));
-                await sock.sendMessage(m.chat, {
-                    text: "🎅 *Merry Christmas! Here is your menu.* 🎄\n\n⭐ ▓▓▓▓▓▓▓▓▓▓ 100%",
-                    edit: loadMsg.key
-                });
-
-                // Small delay so the user sees the finished loading bar
-                await new Promise(resolve => setTimeout(resolve, 600));
 
                 const now = new Date();
                 const time = now.toLocaleTimeString();
@@ -273,14 +261,8 @@ module.exports = [
                 const uptime = runtime(process.uptime());
                 const country = await getCountry(m, sock);
 
-                const greeting = R(GREETINGS);
-                const mentionJid = m.sender;
-                const randomQuote = R(QUOTES);
-
                 const menu = `
-╭───〔 🎄 ${config.settings.title} ⛄ 〕───⬣
-
-${greeting} @${pushname.split(' ')[0]}! 🎁
+╭───〔 ${config.settings.title} 〕───⬣
 
 👤 *User:* ${pushname}
 🌍 *Country:* ${country}
@@ -292,25 +274,17 @@ ${greeting} @${pushname.split(' ')[0]}! 🎁
 
 ${buildSections()}
 
-${randomQuote}
-
 ${config.settings.footer}
 `;
 
-                const randomImageUrl = MENU_IMAGES[Math.floor(Math.random() * MENU_IMAGES.length)];
+                // Menu image comes from a cached Buffer (falls back to text if it can't be loaded)
+                let image = null;
+                try { image = await getMenuImg(); } catch (e) { console.log("Menu image error:", e.message); }
 
-                try {
-                    await send({ 
-                        image: { url: randomImageUrl }, 
-                        caption: menu,
-                        mentions: [mentionJid] 
-                    });
-                } catch (err) {
-                    console.log("Menu image failed, falling back to text:", err.message);
-                    await send({ 
-                        text: menu,
-                        mentions: [mentionJid] 
-                    });
+                if (image) {
+                    await send({ image, caption: menu });
+                } else {
+                    await send({ text: menu });
                 }
 
             } catch (err) {
