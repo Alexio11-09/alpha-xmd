@@ -246,7 +246,7 @@ ${greeting} @${pushname.split(' ')[0]}! 🎁
 🌍 *Country:* ${country}
 🕒 *Time:* ${time}
 📅 *Date:* ${date}
-📊 *Status:* ${botStatus} | ⚡ *Uptime:* ${uptime}
+⚡ *Uptime:* ${uptime}
 
 ╰────────────⬣
 
