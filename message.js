@@ -1,7 +1,7 @@
-// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
+// © 2026 Alpha - MESSAGE HANDLER (MULTI-SESSION SAFE)
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios"); 
+const axios = require("axios");
 const config = require("./settings/config");
 const tenant = require("./library/tenant");
 const viewonce = require("./library/viewonce");
@@ -9,7 +9,7 @@ const viewonce = require("./library/viewonce");
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
 // ======================================================
-// GROUP ADMIN LOOKUP (cached for 60s, admins only)
+// GROUP ADMIN LOOKUP
 // ======================================================
 const adminCache = new Map();
 
@@ -80,8 +80,9 @@ const setGlobalSettings = (sock, newGlobal) => { try { tenant.write(sock, 'setti
 const getGlobalMode = (sock) => getGlobalSettings(sock).mode || 'public';
 
 // ======================================================
-// SESSION SETTINGS FILE (cached for 5s)
+// SESSION SETTINGS - FIXED FOR MULTI-SESSION
 // ======================================================
+// Cache per bot number to avoid reading disk every message
 const sessCache = new Map();
 
 function readSessionSettings(botNum) {
@@ -90,9 +91,21 @@ function readSessionSettings(botNum) {
 
     let v = {};
     try {
-        const p = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
-        if (fs.existsSync(p)) v = JSON.parse(fs.readFileSync(p, 'utf8'));
-    } catch {}
+        // 🎯 FIX: Try both possible paths for the session settings
+        const paths = [
+            path.join(process.cwd(), 'sessions', botNum, 'settings.json'),
+            path.join(__dirname, 'sessions', botNum, 'settings.json')
+        ];
+        
+        for (const p of paths) {
+            if (fs.existsSync(p)) {
+                v = JSON.parse(fs.readFileSync(p, 'utf8'));
+                break;
+            }
+        }
+    } catch (e) {
+        console.log(`[SETTINGS READ ERROR] ${botNum}:`, e.message);
+    }
 
     sessCache.set(botNum, { t: Date.now(), v });
     return v;
@@ -220,7 +233,15 @@ module.exports = async (sock, m) => {
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
         m.isOwner = tenant.isAccountOwner(m.sender, sock) || isTempOwnerBase(m.sender, sock);
 
-        const gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: ".", ...readSessionSettings(botNum) };
+        // 🎯 FIX: Read session settings from disk (works for every session)
+        const gs = { 
+            autoread: false, 
+            autotyping: false, 
+            autorecording: false, 
+            autoreact: false, 
+            prefix: ".", 
+            ...readSessionSettings(botNum) 
+        };
 
         if (gs.autoread && !sock._ghostMode && !m.viewOnce) { try { await sock.readMessages([m.key]); } catch {} }
 
@@ -257,38 +278,27 @@ module.exports = async (sock, m) => {
         if (!m.text) return;
 
         // ======================================================
-        // 🤖 CHATBOT HANDLER (Pollinations AI) - DEBUG VERSION
+        // 🤖 CHATBOT HANDLER (per-session)
         // ======================================================
         if (m.text && !m.text.startsWith(prefix) && !m.key.fromMe) {
-            
-            // 🎯 HUGE DEBUG LOG
-            console.log(`[CHATBOT DEBUG] Message received: "${m.text}" | gs.chatbot = ${gs.chatbot} | Type: ${typeof gs.chatbot}`);
-
             const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1 || gs.chatbot === 'true';
             
-            console.log(`[CHATBOT DEBUG] chatbotEnabled resolved to: ${chatbotEnabled}`);
+            console.log(`[CHATBOT] [${botNum}] "${m.text}" | chatbot = ${gs.chatbot} | enabled = ${chatbotEnabled}`);
 
             if (chatbotEnabled) {
                 try {
                     await sock.presenceSubscribe(m.chat);
                     await sock.sendPresenceUpdate("composing", m.chat);
 
-                    console.log('[CHATBOT DEBUG] Sending request to Pollinations AI...');
-                    
                     const prompt = encodeURIComponent(m.text);
                     const aiRes = await axios.get(`https://text.pollinations.ai/${prompt}`, { timeout: 20000 });
-
-                    console.log(`[CHATBOT DEBUG] API responded with status: ${aiRes.status}`);
-                    console.log(`[CHATBOT DEBUG] API Data: ${String(aiRes.data).substring(0, 100)}`);
 
                     if (aiRes.data) {
                         await sock.sendMessage(m.chat, { text: String(aiRes.data).trim() }, { quoted: m });
                         return;
-                    } else {
-                        console.log('[CHATBOT DEBUG] API returned empty data.');
                     }
                 } catch (e) {
-                    console.log('[CHATBOT DEBUG] API error:', e.message);
+                    console.log(`[CHATBOT] [${botNum}] API error:`, e.message);
                 }
             }
         }
