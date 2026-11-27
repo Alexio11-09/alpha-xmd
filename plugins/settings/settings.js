@@ -2,14 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const tenant = require('../../library/tenant');
 
-// 🎯 FIXED: Save directly to session folder, not tenant
+// 🎯 FIXED: Save directly to session folder, AND create it if missing
 const saveSessionSetting = (sock, key, value) => {
     try {
         const botNum = sock.user.id.split('@')[0].split(':')[0];
         const dir = path.join(process.cwd(), 'sessions', botNum);
         
+        // 🎯 THIS IS THE CRITICAL LINE
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
+            console.log(`[SETTINGS] Created folder: ${dir}`);
         }
 
         const p = path.join(dir, 'settings.json');
@@ -20,6 +22,7 @@ const saveSessionSetting = (sock, key, value) => {
         
         s[key] = value;
         fs.writeFileSync(p, JSON.stringify(s, null, 2));
+        console.log(`[SETTINGS] Saved ${key}=${value} to ${p}`);
         return true;
     } catch (e) {
         console.error("Save Error:", e.message);
