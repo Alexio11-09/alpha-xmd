@@ -1,4 +1,4 @@
-// © 2026 Alpha - GENERAL COMMANDS (FULL SYNCHRONIZED MENU)
+// © 2026 Alpha - GENERAL COMMANDS (FULL SYNCHRONIZED MENU) 🎄 CHRISTMAS EDITION
 
 const fs = require('fs');
 const os = require('os');
@@ -22,12 +22,25 @@ function runtime(seconds) {
 // ======================================================
 // MENU IMAGE: download/read once, then reuse the Buffer
 // ======================================================
-let menuImg = null;
+// 🎄 A different picture each time .menu is called, picked at random from this list.
+const MENU_IMAGES = [
+    'https://files.catbox.moe/tbw1kw.png',
+    'https://files.catbox.moe/yj70un.png',
+    'https://files.catbox.moe/8cn35i.png',
+    'https://files.catbox.moe/15q7l0.png',
+    'https://files.catbox.moe/quqdx4.png',
+    'https://files.catbox.moe/xtluz8.png'
+];
+
+const menuImgCache = new Map(); // url -> Buffer (each one only downloaded once, then reused)
 
 async function getMenuImg() {
-    if (menuImg) return menuImg;
+    const src = MENU_IMAGES.length ? R(MENU_IMAGES) : config.thumbUrl;
+    if (!src) throw new Error('No menu image configured');
 
-    const src = config.thumbUrl;
+    const cached = menuImgCache.get(src);
+    if (cached) return cached;
+
     let buf;
 
     if (/^https?:\/\//i.test(src)) {
@@ -39,7 +52,7 @@ async function getMenuImg() {
     }
 
     // Only keep it in memory if it is reasonably small
-    if (buf.length < 300 * 1024) menuImg = buf;
+    if (buf.length < 300 * 1024) menuImgCache.set(src, buf);
     return buf;
 }
 
@@ -74,6 +87,19 @@ const getCountry = async (m, sock) => {
         return "Unknown 🌍";
     }
 };
+
+// ======================================================
+// 🎄 CHRISTMAS COUNTDOWN
+// ======================================================
+function daysUntilChristmas(now) {
+    const year = now.getMonth() === 11 && now.getDate() > 25 ? now.getFullYear() + 1 : now.getFullYear();
+    const xmas = new Date(year, 11, 25);
+    const diff = Math.ceil((xmas.setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86400000);
+
+    if (diff === 0) return "🎅 IT'S CHRISTMAS DAY! 🎁";
+    if (diff < 0) return "🎉 Hope you had a merry Christmas!";
+    return `🎄 ${diff} day${diff === 1 ? '' : 's'} until Christmas!`;
+}
 
 // ======================================================
 // MENU SECTIONS
@@ -161,8 +187,9 @@ function expandRange(entry) {
   return Array.from({ length: to - from + 1 }, (_, i) => `${from + i}${r[2].toLowerCase()}`);
 }
 
+// 🎄 CHRISTMAS BORDERS — same box shape as before, festive trim instead of plain lines
 const box = (title, items) =>
-  `╭───〔 ${title} 〕───⬣\n${items.map(i => `│ • .${i}`).join('\n')}\n╰────────────⬣`;
+  `❅───「 ${title} 」───❅\n${items.map(i => `│ 🎁 .${i}`).join('\n')}\n❆───────────────❆`;
 
 // pick a section for a command that is not listed above, from the command's own "category"
 function sectionByCategory(category) {
@@ -245,12 +272,12 @@ module.exports = [
         execute: async (sock, m, { send }) => {
             try {
                 const loadMsg = await sock.sendMessage(m.chat, {
-                    text: "⏳ Loading 0% ███▒▒▒▒▒▒▒"
+                    text: "🎄 Loading 0% ███▒▒▒▒▒▒▒ ❄️"
                 }, { quoted: m });
 
                 await new Promise(resolve => setTimeout(resolve, 700));
                 await sock.sendMessage(m.chat, {
-                    text: "⚡ Loaded 100% ████████████",
+                    text: "✨ Loaded 100% ████████████ 🎁",
                     edit: loadMsg.key
                 });
 
@@ -260,9 +287,10 @@ module.exports = [
                 const pushname = m.pushName || "User";
                 const uptime = runtime(process.uptime());
                 const country = await getCountry(m, sock);
+                const xmas = daysUntilChristmas(now);
 
                 const menu = `
-╭───〔 ${config.settings.title} 〕───⬣
+❄️⋆｡‧˚ʚ 🎄 ${config.settings.title} 🎄 ɞ˚‧｡⋆❄️
 
 👤 *User:* ${pushname}
 🌍 *Country:* ${country}
@@ -270,11 +298,15 @@ module.exports = [
 📅 *Date:* ${date}
 ⚡ *Uptime:* ${uptime}
 
-╰────────────⬣
+🎅 ${xmas} 🎁
+
+❆━━━━━━━━━━━━━━━━━━❆
 
 ${buildSections()}
 
 ${config.settings.footer}
+
+🎄 Merry Christmas from ${config.settings.title}! ❄️✨
 `;
 
                 // Menu image comes from a cached Buffer (falls back to text if it can't be loaded)
@@ -301,11 +333,11 @@ ${config.settings.footer}
         execute: async (sock, m, { reply }) => {
             const latency = m.messageTimestamp ? (Date.now() - (m.messageTimestamp * 1000)) : '??';
             const pings = [
-                `🏓 Pong! ${latency}ms — faster than your WiFi on a good day.`,
-                `⚡ ${latency}ms — I'm basically speed.`,
-                `📡 ${latency}ms — the connection is so good I can hear you thinking.`,
-                `🛰️ ${latency}ms — signal came from Mars, apparently.`,
-                `🤖 ${latency}ms — beep boop, I'm alive!`
+                `🔔 Pong! ${latency}ms — faster than Santa's sleigh.`,
+                `❄️ ${latency}ms — ice cold speed.`,
+                `🎁 ${latency}ms — unwrapped and delivered fast.`,
+                `🎄 ${latency}ms — straight from the North Pole.`,
+                `🤖 ${latency}ms — beep boop, I'm alive and jolly!`
             ];
             reply(R(pings));
         }
@@ -321,11 +353,11 @@ ${config.settings.footer}
             const ping = m.messageTimestamp ? (Date.now() - (m.messageTimestamp * 1000)) : '??';
 
             const quotes = [
-                `✅ I'm alive and kicking! ⏳ Uptime: ${uptime} | 🧠 RAM: ${memory}MB | 📡 Ping: ${ping}ms`,
-                `🟢 Reporting for duty! Uptime: ${uptime} | Ping: ${ping}ms | RAM: ${memory}MB`,
-                `💪 Still breathing, human. Uptime: ${uptime} | Ping: ${ping}ms`,
-                `🤖 Beep boop… I'm online! Uptime: ${uptime} | Memory: ${memory}MB`,
-                `🏃‍♂️ Running like a champ. Uptime: ${uptime} | Ping: ${ping}ms`
+                `🎄 I'm alive and jolly! ⏳ Uptime: ${uptime} | 🧠 RAM: ${memory}MB | 📡 Ping: ${ping}ms`,
+                `🔔 Reporting for duty! Uptime: ${uptime} | Ping: ${ping}ms | RAM: ${memory}MB`,
+                `❄️ Still frosty and running. Uptime: ${uptime} | Ping: ${ping}ms`,
+                `🎅 Ho ho ho, I'm online! Uptime: ${uptime} | Memory: ${memory}MB`,
+                `🎁 Wrapped up and ready. Uptime: ${uptime} | Ping: ${ping}ms`
             ];
 
             reply(R(quotes));
@@ -347,9 +379,9 @@ ${config.settings.footer}
             const ownerJid = owner.includes('@') ? owner : owner + '@s.whatsapp.net';
 
             const infos = [
-                `📊 *${botName} Info*\n\n⏳ Uptime: ${uptime}\n🧠 Memory: ${memory} MB\n💻 Platform: ${platform}\n🖥️ Host: ${hostname}\n🔧 Node.js: ${nodeVersion}\n👑 Owner: @${owner}`,
-                `🤖 *Bot Status*\n\n🟢 Status: Online\n⏱️ Running: ${uptime}\n📡 Ping: Fast\n🧠 RAM: ${memory}MB\n👤 Owner: @${owner}`,
-                `📋 *Technical Info*\n\n⚡ Uptime: ${uptime}\n💾 Memory: ${memory}MB\n🖥️ OS: ${platform}\n🔢 Node: ${nodeVersion}\n👑 @${owner}`
+                `🎄 *${botName} Info*\n\n⏳ Uptime: ${uptime}\n🧠 Memory: ${memory} MB\n💻 Platform: ${platform}\n🖥️ Host: ${hostname}\n🔧 Node.js: ${nodeVersion}\n👑 Owner: @${owner}`,
+                `❄️ *Bot Status*\n\n🟢 Status: Online\n⏱️ Running: ${uptime}\n📡 Ping: Fast\n🧠 RAM: ${memory}MB\n👤 Owner: @${owner}`,
+                `🎁 *Technical Info*\n\n⚡ Uptime: ${uptime}\n💾 Memory: ${memory}MB\n🖥️ OS: ${platform}\n🔢 Node: ${nodeVersion}\n👑 @${owner}`
             ];
 
             reply(R(infos), { mentions: [ownerJid] });
@@ -366,10 +398,10 @@ ${config.settings.footer}
             const ownerJid = ownerNumber.includes('@') ? ownerNumber : ownerNumber + '@s.whatsapp.net';
 
             const messages = [
-                `👑 *Owner:* @${ownerNumber}\n👤 *Name:* ${ownerName}\n\n💬 DM anytime.`,
-                `🤴 *The Boss*\n📞 @${ownerNumber}\n👤 ${ownerName}\n\nMessage for business/support.`,
-                `🫅 *Contact*\n👤 ${ownerName}\n📱 @${ownerNumber}\n\nDMs open.`,
-                `👤 *Bot Creator*\n${ownerName}\n📞 @${ownerNumber}\n\nReach out anytime.`
+                `🎅 *Owner:* @${ownerNumber}\n👤 *Name:* ${ownerName}\n\n💬 DM anytime.`,
+                `🎄 *The Boss*\n📞 @${ownerNumber}\n👤 ${ownerName}\n\nMessage for business/support.`,
+                `🎁 *Contact*\n👤 ${ownerName}\n📱 @${ownerNumber}\n\nDMs open.`,
+                `❄️ *Bot Creator*\n${ownerName}\n📞 @${ownerNumber}\n\nReach out anytime.`
             ];
 
             reply(R(messages), { mentions: [ownerJid] });
@@ -387,9 +419,9 @@ ${config.settings.footer}
             const botName = config.settings?.title || "Alpha Bot";
 
             const texts = [
-                `📂 *${botName} – Source Code*\n\n🔗 *Repo:* ${repoLink}\n👤 *Owner:* ${ownerName}\n📞 *Contact:* ${ownerContact}\n\n⭐ Star & fork freely!`,
-                `🧬 *Open Source Bot*\n\n💻 *Repo:* ${repoLink}\n👑 *Dev:* ${ownerName}\n📱 *WhatsApp:* ${ownerContact}\n\n🤖 Build your own version.`,
-                `⚡ *Alpha XMD Repository*\n\n🔗 ${repoLink}\n👤 *Maintainer:* ${ownerName}\n📞 ${ownerContact}\n\n📥 Clone, modify, deploy.`
+                `🎄 *${botName} – Source Code*\n\n🔗 *Repo:* ${repoLink}\n👤 *Owner:* ${ownerName}\n📞 *Contact:* ${ownerContact}\n\n⭐ Star & fork freely!`,
+                `❄️ *Open Source Bot*\n\n💻 *Repo:* ${repoLink}\n👑 *Dev:* ${ownerName}\n📱 *WhatsApp:* ${ownerContact}\n\n🤖 Build your own version.`,
+                `🎁 *Alpha XMD Repository*\n\n🔗 ${repoLink}\n👤 *Maintainer:* ${ownerName}\n📞 ${ownerContact}\n\n📥 Clone, modify, deploy.`
             ];
 
             reply(texts[Math.floor(Math.random() * texts.length)]);
