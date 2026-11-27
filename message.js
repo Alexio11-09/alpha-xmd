@@ -1,6 +1,7 @@
 // © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios"); // 🎯 Added for chatbot
 const config = require("./settings/config");
 const tenant = require("./library/tenant");
 const viewonce = require("./library/viewonce");
@@ -133,45 +134,29 @@ const loadCommands = (dir) => {
 };
 loadCommands(path.join(__dirname, "plugins"));
 
-// Plugins can add an onMessage(sock, m, helpers) function to a command to look at every group message
-// (used by .antistatusgroupmention). It runs before the "is this a command?" check.
 const hooks = commands.filter(c => typeof c.onMessage === 'function');
-
-// Plugins can add an onListReply(sock, m, helpers) function to a command to handle
-// taps on a native list menu (works in DMs and groups; return true once handled).
 const listReplyHooks = commands.filter(c => typeof c.onMenuReply === 'function');
 
 const games = { tictactoe:{}, guess:{}, quiz:{}, riddle:{} };
 
-// ======================================================
-// SECURITY: commands only the MAIN owner may run.
-// (Every paired account counts as "owner" of its own session, but these
-// commands act on the whole shared process, so they are restricted.)
-// ======================================================
 const MAIN_ONLY = new Set([
     "eval", "restart", "shutdown", "update",
     "clearsession", "cleartmp", "deljunk", "disk",
     "sudo", "addowner", "delowner"
 ]);
 
-// ======================================================
-// HEAVY TASK QUEUE: downloads / ffmpeg / image tools run one at a time
-// across ALL sessions so memory spikes can't stack up.
-// ======================================================
 const HEAVY = new Set([
-    // Only commands that were reviewed. Add more names here once a plugin has been checked.
     "play", "video", "tiktok", "fb", "ig", "pin", "shazam", "apk"
 ]);
 
-let heavyPending = 0;          // running + waiting
-let heavyActive = 0;           // running right now
+let heavyPending = 0;
+let heavyActive = 0;
 const heavyWaiters = [];
-const HEAVY_LIMIT = 2;         // how many heavy commands may run at the same time
-const HEAVY_TIMEOUT = 120000;  // a stuck job frees its slot after 2 minutes
+const HEAVY_LIMIT = 2;
+const HEAVY_TIMEOUT = 120000;
 
 async function runHeavy(job) {
     if (heavyActive >= HEAVY_LIMIT) {
-        // wait for a slot; the finishing job hands its slot straight to us
         await new Promise(resolve => heavyWaiters.push(resolve));
     } else {
         heavyActive++;
@@ -187,8 +172,8 @@ async function runHeavy(job) {
     } finally {
         clearTimeout(timer);
         const next = heavyWaiters.shift();
-        if (next) next();      // give the slot to the next waiting command
-        else heavyActive--;    // nobody waiting: free the slot
+        if (next) next();
+        else heavyActive--;
     }
 }
 
@@ -223,17 +208,12 @@ module.exports = async (sock, m) => {
             }
         };
 
-        // 📋 Numbered menu reply (works in DMs and groups; returns fast unless this
-        // exact person has an active .menu session in this exact chat)
         if (!m.fromMe && m.text && !isUserBanned(m.sender, sock)) {
             for (const hook of listReplyHooks) {
                 try { if (await hook.onMenuReply(sock, m, { reply, send })) return; } catch (e) { console.log('[MENU REPLY]', e.message); }
             }
         }
 
-        // 👁️ Cache the FULL original view-once message (with real media keys) as soon
-        // as it arrives. The stripped "quoted" copy .vv sees later often lacks these,
-        // which is why downloads can fail with "No valid media URL or directPath".
         if (m.viewOnce && m.id) viewonce.remember(m.id, m.message);
 
         const botNum = sock.user.id.split('@')[0].split(':')[0];
@@ -242,10 +222,8 @@ module.exports = async (sock, m) => {
 
         const gs = { autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: ".", ...readSessionSettings(botNum) };
 
-        // 🎯 GHOST MODE: skip read receipt when ghost is ON so sender stays at one tick
         if (gs.autoread && !sock._ghostMode && !m.viewOnce) { try { await sock.readMessages([m.key]); } catch {} }
 
-        // 🎯 GHOST MODE: skip typing presence when ghost is ON to avoid leaking activity
         if (gs.autotyping && !sock._ghostMode) {
             try {
                 await sock.presenceSubscribe(m.chat);
@@ -253,7 +231,6 @@ module.exports = async (sock, m) => {
                 await new Promise(r => setTimeout(r, 1000));
             } catch(e){}
         }
-        // 🎯 GHOST MODE: skip recording presence when ghost is ON to avoid leaking activity
         if (gs.autorecording && !sock._ghostMode) {
             try {
                 await sock.presenceSubscribe(m.chat);
@@ -270,7 +247,6 @@ module.exports = async (sock, m) => {
             try { await sock.sendMessage(m.chat, { react: { text: emojis[Math.floor(Math.random() * emojis.length)], key: m.key } }); } catch {}
         }
 
-        // Plugin hooks (group messages only; they return quickly when the message is not relevant)
         if (m.isGroup && hooks.length && !m.fromMe) {
             for (const h of hooks) {
                 try { await h.onMessage(sock, m, { checkAdmin }); }
@@ -280,12 +256,39 @@ module.exports = async (sock, m) => {
 
         if (!m.text) return;
 
+        // ======================================================
+        // 🤖 CHATBOT HANDLER
+        // ======================================================
+        if (m.text && !m.text.startsWith(prefix) && !m.key.fromMe) {
+            const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1;
+            if (chatbotEnabled) {
+                try {
+                    const aiRes = await axios.get(`https://api.popcat.xyz/chatbot`, {
+                        params: { 
+                            msg: m.text,
+                            owner: 'Alpha',
+                            botname: config.settings?.title || 'Alpha Bot'
+                        },
+                        timeout: 15000
+                    });
+
+                    if (aiRes.data && aiRes.data.response) {
+                        await sock.sendMessage(m.chat, { 
+                            text: aiRes.data.response 
+                        }, { quoted: m });
+                        return;
+                    }
+                } catch (e) {
+                    console.log('[CHATBOT] API error:', e.message);
+                }
+            }
+        }
+
         if (!m.text.startsWith(prefix)) {
             if (m.isGroup && m.text) {
                 const gsets = getGroupSettings(m.chat, sock);
 
                 if (containsBadWord(m.text, m.chat, sock)) {
-                    // Admin status is normally only computed for commands; get it here (cached)
                     const st = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
                     m.isAdmin = st.isSenderAdmin;
                     m.isBotAdmin = st.isBotAdmin;
@@ -326,7 +329,6 @@ module.exports = async (sock, m) => {
         const command = commands.find(c => c.command === cmdName || (c.aliases && c.aliases.includes(cmdName)));
         if (!command) return;
 
-        // 🔒 Dangerous commands: main owner only
         if (MAIN_ONLY.has(command.command) && !tenant.isMainOwner(m.sender)) return reply(deny.owner);
 
         const isOwner = m.isOwner;
@@ -382,4 +384,4 @@ module.exports = async (sock, m) => {
 };
 
 module.exports.games = games;
-module.exports.commands = commands;   // lets the menu list the commands that are really loaded
+module.exports.commands = commands;
