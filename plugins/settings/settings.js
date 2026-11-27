@@ -2,15 +2,40 @@ const fs = require('fs');
 const path = require('path');
 const tenant = require('../../library/tenant');
 
+// 🎯 FIXED: Save directly to session folder, not tenant
 const saveSessionSetting = (sock, key, value) => {
     try {
-        const settings = tenant.read(sock, 'settings.json', {});
-        settings[key] = value;
-        tenant.write(sock, 'settings.json', settings);
+        const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const dir = path.join(process.cwd(), 'sessions', botNum);
+        
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        const p = path.join(dir, 'settings.json');
+        let s = {};
+        try { 
+            if (fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); 
+        } catch(e){}
+        
+        s[key] = value;
+        fs.writeFileSync(p, JSON.stringify(s, null, 2));
         return true;
-    } catch (e) { console.error("Save Error:", e.message); return false; }
+    } catch (e) {
+        console.error("Save Error:", e.message);
+        return false;
+    }
 };
-const getSessionSettings = (sock) => tenant.read(sock, 'settings.json', {});
+
+const getSessionSettings = (sock) => {
+    try {
+        const botNum = sock.user.id.split('@')[0].split(':')[0];
+        const p = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
+        if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch(e) {}
+    return {};
+};
+
 const getGlobalSettings = (sock) => tenant.read(sock, 'settings.json', {});
 const setGlobalSettings = (sock, value) => tenant.write(sock, 'settings.json', value);
 
