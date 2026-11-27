@@ -1,7 +1,7 @@
-// © 2026 Alpha - MESSAGE HANDLER (MULTI-SESSION SAFE)
+// © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
+const axios = require("axios"); 
 const config = require("./settings/config");
 const tenant = require("./library/tenant");
 const viewonce = require("./library/viewonce");
@@ -9,7 +9,7 @@ const viewonce = require("./library/viewonce");
 const clean = (jid) => { if (!jid) return ""; try { return jid.toString().replace(/[^0-9]/g, ""); } catch { return ""; } };
 
 // ======================================================
-// GROUP ADMIN LOOKUP
+// GROUP ADMIN LOOKUP (cached for 60s)
 // ======================================================
 const adminCache = new Map();
 
@@ -80,43 +80,19 @@ const setGlobalSettings = (sock, newGlobal) => { try { tenant.write(sock, 'setti
 const getGlobalMode = (sock) => getGlobalSettings(sock).mode || 'public';
 
 // ======================================================
-// SESSION SETTINGS - READ FROM TENANT + FILESYSTEM
+// SESSION SETTINGS (cached)
 // ======================================================
 const sessCache = new Map();
 
-function readSessionSettings(botNum, sock) {
+function readSessionSettings(botNum) {
     const hit = sessCache.get(botNum);
     if (hit && Date.now() - hit.t < 5000) return hit.v;
 
     let v = {};
-    
-    // 🎯 Read from disk
     try {
-        const paths = [
-            path.join(process.cwd(), 'sessions', botNum, 'settings.json'),
-            path.join(__dirname, 'sessions', botNum, 'settings.json')
-        ];
-        for (const p of paths) {
-            if (fs.existsSync(p)) {
-                v = JSON.parse(fs.readFileSync(p, 'utf8'));
-                break;
-            }
-        }
-    } catch (e) {
-        console.log(`[SETTINGS READ] ${botNum}:`, e.message);
-    }
-    
-    // 🎯 ALSO read from tenant (where settings.js saves)
-    try {
-        if (sock) {
-            const tenantSettings = tenant.read(sock, 'settings.json', {});
-            if (tenantSettings && typeof tenantSettings === 'object') {
-                v = { ...v, ...tenantSettings };
-            }
-        }
-    } catch (e) {
-        console.log(`[TENANT READ] ${botNum}:`, e.message);
-    }
+        const p = path.join(process.cwd(), 'sessions', botNum, 'settings.json');
+        if (fs.existsSync(p)) v = JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch {}
 
     sessCache.set(botNum, { t: Date.now(), v });
     return v;
@@ -166,9 +142,7 @@ async function runHeavy(job) {
     } else {
         heavyActive++;
     }
-
     let timer;
-
     try {
         return await Promise.race([
             job(),
@@ -215,7 +189,7 @@ module.exports = async (sock, m) => {
 
         if (!m.fromMe && m.text && !isUserBanned(m.sender, sock)) {
             for (const hook of listReplyHooks) {
-                try { if (await hook.onMenuReply(sock, m, { reply, send })) return; } catch (e) { console.log('[MENU REPLY]', e.message); }
+                try { if (await hook.onMenuReply(sock, m, { reply, send })) return; } catch (e) {}
             }
         }
 
@@ -225,31 +199,18 @@ module.exports = async (sock, m) => {
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
         m.isOwner = tenant.isAccountOwner(m.sender, sock) || isTempOwnerBase(m.sender, sock);
 
-        // 🎯 FIX: Pass sock to readSessionSettings so it reads from tenant too
         const gs = { 
-            autoread: false, 
-            autotyping: false, 
-            autorecording: false, 
-            autoreact: false, 
-            prefix: ".", 
-            ...readSessionSettings(botNum, sock) 
+            autoread: false, autotyping: false, autorecording: false, autoreact: false, prefix: ".", 
+            ...readSessionSettings(botNum) 
         };
 
         if (gs.autoread && !sock._ghostMode && !m.viewOnce) { try { await sock.readMessages([m.key]); } catch {} }
 
         if (gs.autotyping && !sock._ghostMode) {
-            try {
-                await sock.presenceSubscribe(m.chat);
-                await sock.sendPresenceUpdate("composing", m.chat);
-                await new Promise(r => setTimeout(r, 1000));
-            } catch(e){}
+            try { await sock.presenceSubscribe(m.chat); await sock.sendPresenceUpdate("composing", m.chat); await new Promise(r => setTimeout(r, 1000)); } catch(e){}
         }
         if (gs.autorecording && !sock._ghostMode) {
-            try {
-                await sock.presenceSubscribe(m.chat);
-                await sock.sendPresenceUpdate("recording", m.chat);
-                await new Promise(r => setTimeout(r, 1000));
-            } catch(e){}
+            try { await sock.presenceSubscribe(m.chat); await sock.sendPresenceUpdate("recording", m.chat); await new Promise(r => setTimeout(r, 1000)); } catch(e){}
         }
 
         const prefix = m.prefix || config.prefix || ".";
@@ -262,35 +223,29 @@ module.exports = async (sock, m) => {
 
         if (m.isGroup && hooks.length && !m.fromMe) {
             for (const h of hooks) {
-                try { await h.onMessage(sock, m, { checkAdmin }); }
-                catch (e) { console.log(`[HOOK ${h.command}]`, e.message); }
+                try { await h.onMessage(sock, m, { checkAdmin }); } catch (e) {}
             }
         }
 
         if (!m.text) return;
 
         // ======================================================
-        // 🤖 CHATBOT HANDLER
+        // 🤖 CHATBOT (Silent, only replies if enabled)
         // ======================================================
         if (m.text && !m.text.startsWith(prefix) && !m.key.fromMe) {
             const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1 || gs.chatbot === 'true';
-            
-            console.log(`[CHATBOT] [${botNum}] "${m.text}" | chatbot = ${gs.chatbot} | enabled = ${chatbotEnabled}`);
-
             if (chatbotEnabled) {
                 try {
                     await sock.presenceSubscribe(m.chat);
                     await sock.sendPresenceUpdate("composing", m.chat);
-
                     const prompt = encodeURIComponent(m.text);
                     const aiRes = await axios.get(`https://text.pollinations.ai/${prompt}`, { timeout: 20000 });
-
                     if (aiRes.data) {
                         await sock.sendMessage(m.chat, { text: String(aiRes.data).trim() }, { quoted: m });
                         return;
                     }
                 } catch (e) {
-                    console.log(`[CHATBOT] [${botNum}] API error:`, e.message);
+                    console.log(`[CHATBOT API ERROR]`, e.message);
                 }
             }
         }
@@ -303,7 +258,6 @@ module.exports = async (sock, m) => {
                     const st = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
                     m.isAdmin = st.isSenderAdmin;
                     m.isBotAdmin = st.isBotAdmin;
-
                     if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
                     await sock.sendMessage(m.chat, { text: `🤬 Watch your language, @${m.sender.split('@')[0]}!`, mentions:[m.sender] }, { quoted: m });
                     return;
@@ -312,13 +266,10 @@ module.exports = async (sock, m) => {
                 if (gsets.antilink && containsLink(m.text)) {
                     const mode = gsets.antilinkMode || 'admins';
                     const action = gsets.antilinkAction || 'delete';
-
                     const st = await checkAdmin(sock, m.chat, m.sender, sock.user.id);
                     m.isAdmin = st.isSenderAdmin;
                     m.isBotAdmin = st.isBotAdmin;
-
                     let allowed = (mode === 'admins' && m.isAdmin) || (mode === 'owner' && m.isOwner);
-
                     if (!allowed) {
                         if (action === 'delete') {
                             if (m.isBotAdmin) try { await sock.sendMessage(m.chat, { delete: m.key }); } catch {}
@@ -343,13 +294,11 @@ module.exports = async (sock, m) => {
         if (MAIN_ONLY.has(command.command) && !tenant.isMainOwner(m.sender)) return reply(deny.owner);
 
         const isOwner = m.isOwner;
-
         if (cmdName !== 'mode' && getGlobalMode(sock) === 'private' && !isOwner) return;
 
         await reactRandom(sock, m);
 
-        if (cmdName !== 'unbanuser' && cmdName !== 'unban' && isUserBanned(m.sender, sock) && !isOwner)
-            return reply(deny.banned);
+        if (cmdName !== 'unbanuser' && cmdName !== 'unban' && isUserBanned(m.sender, sock) && !isOwner) return reply(deny.banned);
 
         let isSenderAdmin = false;
         let isBotAdmin = false;
@@ -380,11 +329,7 @@ module.exports = async (sock, m) => {
             if (heavyPending >= 15) return reply("⏳ I'm a bit busy right now, please try again in a moment.");
             if (heavyPending >= HEAVY_LIMIT) reply(`⏳ Queued, ${heavyPending - HEAVY_LIMIT + 1} download(s) ahead of you...`);
             heavyPending++;
-            try {
-                await runHeavy(() => command.execute(sock, m, ctx));
-            } finally {
-                heavyPending--;
-            }
+            try { await runHeavy(() => command.execute(sock, m, ctx)); } finally { heavyPending--; }
         } else {
             await command.execute(sock, m, ctx);
         }
