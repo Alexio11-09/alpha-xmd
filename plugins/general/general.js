@@ -89,6 +89,46 @@ const getCountry = async (m, sock) => {
 };
 
 // ======================================================
+// 🎄 RANDOM GREETINGS & QUOTES
+// ======================================================
+const GREETINGS = [
+    "🎄 *Merry Christmas,*",
+    "🎅 *Ho Ho Ho,*",
+    "⛄ *Happy Holidays,*",
+    "❄️ *Season's Greetings,*",
+    "🎁 *Warm wishes,*"
+];
+
+const QUOTES = [
+    `💬 *"The best way to spread Christmas cheer is singing loud for all to hear."* — *Elf* 🎄`,
+    `💬 *"Every gift from a friend is a wish for your happiness."* — *Richard Bach* 🎁`,
+    `💬 *"Christmas is not a time nor a season, but a state of mind."* — *Calvin Coolidge* ⛄`,
+    `💬 *"The joy of brightening other lives is the magic of Christmas."* — *W.C. Jones* ✨`,
+    `💬 *"Maybe Christmas doesn't come from a store. Maybe Christmas means a little bit more."* — *The Grinch* 🎅`,
+    `💬 *"Believe in the magic of Christmas, because it lives inside you."* — *Alpha Bot* 🎄`
+];
+
+// ======================================================
+// ✨ FONT STYLER (plain letters/digits -> bold unicode, used for section titles)
+// ======================================================
+const FONT_MAP = {
+    'a': '𝗮', 'b': '𝗯', 'c': '𝗰', 'd': '𝗱', 'e': '𝗲', 'f': '𝗳', 'g': '𝗴', 'h': '𝗵',
+    'i': '𝗶', 'j': '𝗷', 'k': '𝗸', 'l': '𝗹', 'm': '𝗺', 'n': '𝗻', 'o': '𝗼', 'p': '𝗽',
+    'q': '𝗾', 'r': '𝗿', 's': '𝘀', 't': '𝘁', 'u': '𝘂', 'v': '𝘃', 'w': '𝘄', 'x': '𝘅',
+    'y': '𝘆', 'z': '𝘇',
+    'A': '𝗔', 'B': '𝗕', 'C': '𝗖', 'D': '𝗗', 'E': '𝗘', 'F': '𝗙', 'G': '𝗚', 'H': '𝗛',
+    'I': '𝗜', 'J': '𝗝', 'K': '𝗞', 'L': '𝗟', 'M': '𝗠', 'N': '𝗡', 'O': '𝗢', 'P': '𝗣',
+    'Q': '𝗤', 'R': '𝗥', 'S': '𝗦', 'T': '𝗧', 'U': '𝗨', 'V': '𝗩', 'W': '𝗪', 'X': '𝗫',
+    'Y': '𝗬', 'Z': '𝗭',
+    '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰', '5': '𝟱', '6': '𝟲', '7': '𝟳',
+    '8': '𝟴', '9': '𝟵'
+};
+
+function stylish(text) {
+    return text.split('').map(c => FONT_MAP[c] || c).join('');
+}
+
+// ======================================================
 // 🎄 CHRISTMAS COUNTDOWN
 // ======================================================
 function daysUntilChristmas(now) {
@@ -187,9 +227,13 @@ function expandRange(entry) {
   return Array.from({ length: to - from + 1 }, (_, i) => `${from + i}${r[2].toLowerCase()}`);
 }
 
-// 🎄 CHRISTMAS BORDERS — same box shape as before, festive trim instead of plain lines
-const box = (title, items) =>
-  `❅───「 ${title} 」───❅\n${items.map(i => `│ 🎁 .${i}`).join('\n')}\n❆───────────────❆`;
+// 🎄 CHRISTMAS BORDERS, with the category name in bold unicode (the leading emoji stays plain)
+const box = (title, items) => {
+    const parts = title.split(' ');
+    const emoji = parts[0];
+    const styledTitle = `${emoji} ${stylish(parts.slice(1).join(' '))}`;
+    return `❅───「 ${styledTitle} 」───❅\n${items.map(i => `│ 🎁 .${i}`).join('\n')}\n❆───────────────❆`;
+};
 
 // pick a section for a command that is not listed above, from the command's own "category"
 function sectionByCategory(category) {
@@ -272,12 +316,18 @@ module.exports = [
         execute: async (sock, m, { send }) => {
             try {
                 const loadMsg = await sock.sendMessage(m.chat, {
-                    text: "🎄 Loading 0% ███▒▒▒▒▒▒▒ ❄️"
+                    text: "🎄 *Preparing your gift...* 🎁\n\n⛄ ░░░░░░░░░░ 0%"
                 }, { quoted: m });
 
-                await new Promise(resolve => setTimeout(resolve, 700));
+                await new Promise(resolve => setTimeout(resolve, 450));
                 await sock.sendMessage(m.chat, {
-                    text: "✨ Loaded 100% ████████████ 🎁",
+                    text: "❄️ *Wrapping presents...* 🎁\n\n🎅 ▓▓▓▓▓░░░░░ 50%",
+                    edit: loadMsg.key
+                });
+
+                await new Promise(resolve => setTimeout(resolve, 450));
+                await sock.sendMessage(m.chat, {
+                    text: "🎅 *Merry Christmas! Here is your menu.* 🎄\n\n⭐ ▓▓▓▓▓▓▓▓▓▓ 100%",
                     edit: loadMsg.key
                 });
 
@@ -288,9 +338,13 @@ module.exports = [
                 const uptime = runtime(process.uptime());
                 const country = await getCountry(m, sock);
                 const xmas = daysUntilChristmas(now);
+                const greeting = R(GREETINGS);
+                const quote = R(QUOTES);
 
                 const menu = `
 ❄️⋆｡‧˚ʚ 🎄 ${config.settings.title} 🎄 ɞ˚‧｡⋆❄️
+
+${greeting} ${pushname.split(' ')[0]}! 🎁
 
 👤 *User:* ${pushname}
 🌍 *Country:* ${country}
@@ -303,6 +357,8 @@ module.exports = [
 ❆━━━━━━━━━━━━━━━━━━❆
 
 ${buildSections()}
+
+${quote}
 
 ${config.settings.footer}
 
