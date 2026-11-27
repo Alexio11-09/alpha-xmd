@@ -80,23 +80,22 @@ const setGlobalSettings = (sock, newGlobal) => { try { tenant.write(sock, 'setti
 const getGlobalMode = (sock) => getGlobalSettings(sock).mode || 'public';
 
 // ======================================================
-// SESSION SETTINGS - FIXED FOR MULTI-SESSION
+// SESSION SETTINGS - READ FROM TENANT + FILESYSTEM
 // ======================================================
-// Cache per bot number to avoid reading disk every message
 const sessCache = new Map();
 
-function readSessionSettings(botNum) {
+function readSessionSettings(botNum, sock) {
     const hit = sessCache.get(botNum);
     if (hit && Date.now() - hit.t < 5000) return hit.v;
 
     let v = {};
+    
+    // 🎯 Read from disk
     try {
-        // 🎯 FIX: Try both possible paths for the session settings
         const paths = [
             path.join(process.cwd(), 'sessions', botNum, 'settings.json'),
             path.join(__dirname, 'sessions', botNum, 'settings.json')
         ];
-        
         for (const p of paths) {
             if (fs.existsSync(p)) {
                 v = JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -104,31 +103,24 @@ function readSessionSettings(botNum) {
             }
         }
     } catch (e) {
-        console.log(`[SETTINGS READ ERROR] ${botNum}:`, e.message);
+        console.log(`[SETTINGS READ] ${botNum}:`, e.message);
+    }
+    
+    // 🎯 ALSO read from tenant (where settings.js saves)
+    try {
+        if (sock) {
+            const tenantSettings = tenant.read(sock, 'settings.json', {});
+            if (tenantSettings && typeof tenantSettings === 'object') {
+                v = { ...v, ...tenantSettings };
+            }
+        }
+    } catch (e) {
+        console.log(`[TENANT READ] ${botNum}:`, e.message);
     }
 
     sessCache.set(botNum, { t: Date.now(), v });
     return v;
 }
-
-const saveSessionSetting = (sock, key, value) => {
-    try {
-        const botNum = sock.user.id.split('@')[0].split(':')[0];
-        const dir = path.join(process.cwd(), 'sessions', botNum);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-        const p = path.join(dir, 'settings.json');
-        let s = {};
-        try { if(fs.existsSync(p)) s = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e){}
-        s[key] = value;
-        fs.writeFileSync(p, JSON.stringify(s, null, 2));
-        sessCache.delete(botNum);
-        return true;
-    } catch(e) {
-        console.log("Save error:", e);
-        return false;
-    }
-};
 
 // ======================================================
 // COMMAND LOADING
@@ -233,14 +225,14 @@ module.exports = async (sock, m) => {
         const senderNum = clean(m.sender.split('@')[0].split(':')[0]);
         m.isOwner = tenant.isAccountOwner(m.sender, sock) || isTempOwnerBase(m.sender, sock);
 
-        // 🎯 FIX: Read session settings from disk (works for every session)
+        // 🎯 FIX: Pass sock to readSessionSettings so it reads from tenant too
         const gs = { 
             autoread: false, 
             autotyping: false, 
             autorecording: false, 
             autoreact: false, 
             prefix: ".", 
-            ...readSessionSettings(botNum) 
+            ...readSessionSettings(botNum, sock) 
         };
 
         if (gs.autoread && !sock._ghostMode && !m.viewOnce) { try { await sock.readMessages([m.key]); } catch {} }
@@ -278,7 +270,7 @@ module.exports = async (sock, m) => {
         if (!m.text) return;
 
         // ======================================================
-        // 🤖 CHATBOT HANDLER (per-session)
+        // 🤖 CHATBOT HANDLER
         // ======================================================
         if (m.text && !m.text.startsWith(prefix) && !m.key.fromMe) {
             const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1 || gs.chatbot === 'true';
