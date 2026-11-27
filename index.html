@@ -3,49 +3,59 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ALPHA-XMD | Control Center — Christmas Movie Edition</title>
-<meta name="description" content="Alpha-XMD WhatsApp bot control center.">
-<meta name="theme-color" content="#070d1e">
+<title>ALPHA-XMD | Cloud Control Center</title>
+<meta name="description" content="Official Alpha-XMD WhatsApp automation platform and device control center.">
+<meta name="theme-color" content="#080b14">
 <link id="faviconLink" rel="icon" href="https://files.catbox.moe/tbw1kw.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.1/build/css/intlTelInput.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 <style>
 :root{
- --panel:rgba(11, 17, 34, 0.72);
- --panel2:rgba(16, 24, 46, 0.78);
- --line:rgba(255, 255, 255, 0.14);
- --text:#f4f8ff;
- --muted:#a6b4d0;
- --accent:#ff477e;
- --accent2:#9b5cff;
- --xmas-red:#e63946;
- --xmas-green:#20d996;
- --xmas-gold:#ffd166;
- --good:#20d996;
- --bad:#ff647c;
- --shadow:0 16px 45px rgba(0, 0, 0, 0.55);
+ --bg:#070a13;
+ --bg-elevated:rgba(12, 16, 28, 0.78);
+ --panel:rgba(15, 20, 35, 0.74);
+ --panel-hover:rgba(24, 31, 52, 0.84);
+ --line:rgba(255, 255, 255, 0.10);
+ --line-strong:rgba(255, 255, 255, 0.18);
+ --text:#f3f5fa;
+ --muted:#97a2ba;
+ --accent:#6366f1;
+ --accent-hover:#4f46e5;
+ --accent-soft:rgba(99, 102, 241, 0.16);
+ --good:#10b981;
+ --good-soft:rgba(16, 185, 129, 0.16);
+ --bad:#ef4444;
+ --bad-soft:rgba(239, 68, 68, 0.16);
+ --shadow:0 12px 36px rgba(0, 0, 0, 0.45);
 }
 body.light{
- --panel:rgba(255, 255, 255, 0.82);
- --panel2:rgba(247, 250, 255, 0.88);
- --line:rgba(20, 30, 55, 0.12);
- --text:#182032;
- --muted:#58657e;
- --shadow:0 12px 35px rgba(20, 35, 65, 0.12);
+ --bg:#eef3fa;
+ --bg-elevated:rgba(255, 255, 255, 0.84);
+ --panel:rgba(255, 255, 255, 0.80);
+ --panel-hover:rgba(248, 250, 252, 0.92);
+ --line:rgba(15, 23, 42, 0.09);
+ --line-strong:rgba(15, 23, 42, 0.16);
+ --text:#0f172a;
+ --muted:#5a667d;
+ --accent:#4f46e5;
+ --accent-hover:#4338ca;
+ --accent-soft:rgba(79, 70, 229, 0.10);
+ --shadow:0 8px 28px rgba(15, 23, 42, 0.08);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;overflow-x:hidden}
 body{
- background:#070d1e;
+ background:var(--bg);
  color:var(--text);
- font:14px 'DM Sans',sans-serif;
+ font:14px/1.5 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
  min-height:100vh;
+ -webkit-font-smoothing:antialiased;
 }
 
-/* CINEMATIC 3D WINTER MOVIE BACKGROUND */
+/* LIVE 3D WINTER FOREST & SANTA VAN CANVAS */
 #bg3d{
  position:fixed;
  inset:0;
@@ -55,20 +65,17 @@ body{
  pointer-events:auto;
 }
 
-/* CINEMA 3D VIEW TOGGLE MODE */
-body.cinema-mode .sidebar,
-body.cinema-mode .page,
-body.cinema-mode .support-footer,
-body.cinema-mode .topbar-left-text{
+/* CLEAN VIEW MODE (HIDES UI TO WATCH THE ANIMATION) */
+body.scene-only .sidebar,
+body.scene-only .page,
+body.scene-only .support-footer,
+body.scene-only .topbar-info{
  opacity:0 !important;
  pointer-events:none !important;
- transition:opacity .35s ease;
+ transition:opacity .3s ease;
 }
-body.cinema-mode .topbar{
- background:transparent;
+body.scene-only .topbar{
  border-color:transparent;
- backdrop-filter:none;
- -webkit-backdrop-filter:none;
 }
 
 button,input,select{font:inherit}
@@ -79,7 +86,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
  position:relative;
  z-index:2;
  display:grid;
- grid-template-columns:250px minmax(0,1fr);
+ grid-template-columns:256px minmax(0,1fr);
  min-height:100vh;
  pointer-events:none;
 }
@@ -90,79 +97,108 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 /* SIDEBAR */
 .sidebar{
  border-right:1px solid var(--line);
- background:var(--panel);
+ background:var(--bg-elevated);
  backdrop-filter:blur(16px);
  -webkit-backdrop-filter:blur(16px);
- padding:22px 15px;
+ padding:20px 14px;
  position:sticky;
  top:0;
  height:100vh;
  display:flex;
  flex-direction:column;
- z-index:20;
+ z-index:30;
  transition:left .25s ease, opacity .3s ease;
 }
 .brand{
  display:flex;
  align-items:center;
+ justify-content:space-between;
+ padding:4px 8px 20px;
+ border-bottom:1px solid var(--line);
+ margin-bottom:14px;
+}
+.brand-left{
+ display:flex;
+ align-items:center;
  gap:11px;
- padding:0 8px 22px;
- font:700 18px 'Space Grotesk';
+ font:800 17px 'Plus Jakarta Sans', sans-serif;
+ letter-spacing:-0.02em;
 }
 .brand img, .top-brand img{
- width:40px !important;
- height:40px !important;
- max-width:40px !important;
- max-height:40px !important;
- border-radius:11px;
+ width:36px !important;
+ height:36px !important;
+ border-radius:9px;
  object-fit:cover;
  flex-shrink:0;
- border:1px solid rgba(255,255,255,0.22);
- box-shadow:0 0 16px rgba(255,71,126,0.35);
+ border:1px solid var(--line-strong);
 }
-.brand em,.top-brand em{font-style:normal;color:var(--accent)}
-.xmas-badge{
- display:inline-flex;
- align-items:center;
- gap:4px;
- font-size:10px;
- font-weight:700;
- padding:3px 8px;
- border-radius:20px;
- background:linear-gradient(120deg, rgba(230,57,70,0.28), rgba(32,217,150,0.25));
- border:1px solid rgba(255,209,102,0.45);
- color:var(--xmas-gold);
- letter-spacing:.5px;
+.brand em, .top-brand em{font-style:normal;color:var(--accent)}
+.version-pill{
+ font:600 10px 'JetBrains Mono', monospace;
+ padding:3px 7px;
+ border-radius:6px;
+ background:var(--accent-soft);
+ color:var(--accent);
+ border:1px solid rgba(99,102,241,0.25);
 }
-.nav-label{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.5px;padding:10px 10px 6px}
-.nav{display:grid;gap:4px}
+
+.nav-label{
+ color:var(--muted);
+ font-size:11px;
+ font-weight:600;
+ letter-spacing:0.06em;
+ text-transform:uppercase;
+ padding:12px 10px 6px;
+}
+.nav{display:grid;gap:3px}
 .nav button{
  border:0;
  background:transparent;
  color:var(--muted);
- padding:11px 12px;
- border-radius:11px;
+ padding:10px 12px;
+ border-radius:9px;
  text-align:left;
  display:flex;
  gap:11px;
  align-items:center;
  cursor:pointer;
+ font-weight:500;
+ font-size:13.5px;
+ transition:all .15s ease;
+}
+.nav button:hover{
+ background:var(--panel-hover);
+ color:var(--text);
+}
+.nav button.active{
+ background:var(--accent-soft);
+ color:var(--accent);
  font-weight:600;
- transition:.18s;
 }
-.nav button:hover,.nav button.active{
- background:rgba(255,71,126,0.18);
- color:#fff;
-}
-body.light .nav button:hover, body.light .nav button.active{color:var(--accent)}
-.nav .ico{width:18px;text-align:center}
-.side-bottom{margin-top:auto;border-top:1px solid var(--line);padding:15px 8px 0;color:var(--muted);font-size:11px;line-height:1.6}
+.nav .ico{width:17px;text-align:center;font-size:13px}
 
-/* MAIN CONTENT */
+.side-bottom{
+ margin-top:auto;
+ border-top:1px solid var(--line);
+ padding:14px 8px 0;
+ color:var(--muted);
+ font-size:12px;
+ line-height:1.6;
+}
+.side-status{
+ display:flex;
+ align-items:center;
+ gap:8px;
+ font-weight:500;
+ color:var(--text);
+ margin-bottom:4px;
+}
+
+/* MAIN AREA */
 .main{
  min-width:0;
- padding:22px clamp(14px,3.5vw,42px) 60px;
- max-width:1440px;
+ padding:24px clamp(16px, 3vw, 40px) 60px;
+ max-width:1380px;
  width:100%;
  margin:0 auto;
 }
@@ -170,194 +206,299 @@ body.light .nav button:hover, body.light .nav button.active{color:var(--accent)}
  display:flex;
  align-items:center;
  justify-content:space-between;
- gap:12px;
- margin-bottom:24px;
- padding:14px 18px;
- border-radius:16px;
- background:var(--panel);
- border:1px solid var(--line);
- backdrop-filter:blur(14px);
- -webkit-backdrop-filter:blur(14px);
+ gap:16px;
+ margin-bottom:26px;
+ padding-bottom:18px;
+ border-bottom:1px solid var(--line);
 }
-.top-brand{display:flex;align-items:center;gap:10px;margin-bottom:4px}
-.top-brand span{font:700 17px 'Space Grotesk'}
-.topbar h1{font:700 clamp(21px,2.8vw,30px) 'Space Grotesk';margin:2px 0}
-.sub{color:var(--muted);margin:0;font-size:13px}
+.top-brand{display:none;align-items:center;gap:10px;margin-bottom:8px}
+.top-brand span{font:800 16px 'Plus Jakarta Sans', sans-serif}
+.topbar h1{
+ font:700 clamp(22px, 2.5vw, 28px) 'Plus Jakarta Sans', sans-serif;
+ letter-spacing:-0.02em;
+ margin:0 0 4px;
+}
+.sub{color:var(--muted);margin:0;font-size:13.5px}
 .top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
 .pill{
- display:flex;
+ display:inline-flex;
  align-items:center;
- gap:7px;
- padding:8px 12px;
+ gap:8px;
+ padding:7px 13px;
  border:1px solid var(--line);
- border-radius:30px;
- background:rgba(0,0,0,0.3);
+ border-radius:99px;
+ background:var(--panel);
+ backdrop-filter:blur(12px);
  color:var(--text);
  font-size:12px;
  font-weight:600;
 }
-.pulse{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 10px var(--good)}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px var(--good-soft)}
+.pulse.off{background:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)}
+
 .icon-btn{
  border:1px solid var(--line);
- background:rgba(255,255,255,0.07);
+ background:var(--panel);
+ backdrop-filter:blur(12px);
  color:var(--text);
- height:38px;
- min-width:38px;
- padding:0 11px;
- border-radius:11px;
+ height:36px;
+ min-width:36px;
+ padding:0 12px;
+ border-radius:9px;
  cursor:pointer;
  display:inline-flex;
  align-items:center;
  justify-content:center;
  gap:6px;
- font-weight:600;
- font-size:12px;
- transition:.2s;
+ font-weight:500;
+ font-size:13px;
+ transition:all .15s ease;
 }
-.icon-btn:hover{border-color:var(--accent);background:rgba(255,71,126,0.16)}
-.icon-btn.active-glow{
- border-color:var(--xmas-gold);
- background:rgba(255,209,102,0.22);
- color:var(--xmas-gold);
+.icon-btn:hover{border-color:var(--line-strong);background:var(--panel-hover)}
+.icon-btn.active-btn{
+ border-color:var(--accent);
+ background:var(--accent-soft);
+ color:var(--accent);
 }
 
-.page{display:none;animation:up .25s ease}
+.page{display:none;animation:fadeIn .2s ease}
 .page.active{display:block}
-@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
+/* CARDS & STATS */
 .grid{display:grid;gap:16px}
-.stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px}
+.stats{grid-template-columns:repeat(4, minmax(0,1fr));margin-bottom:20px}
 .card{
  background:var(--panel);
  backdrop-filter:blur(14px);
  -webkit-backdrop-filter:blur(14px);
  border:1px solid var(--line);
- border-radius:16px;
- padding:18px;
+ border-radius:14px;
+ padding:20px;
  box-shadow:var(--shadow);
  min-width:0;
 }
-.stat-head{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.5px}
-.stat-value{font:700 26px 'Space Grotesk';margin:10px 0 3px}
-.stat-foot{font-size:11px;color:var(--muted)}
-.two{grid-template-columns:minmax(0,1.25fr) minmax(270px,.75fr)}
-.card-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:15px}
-.card-title h2,.section-head h2{font:600 17px 'Space Grotesk';margin:0}
-.card-title span{color:var(--muted);font-size:11px}
-
-.btn{
- border:0;
- border-radius:10px;
- padding:12px 16px;
- background:linear-gradient(110deg,var(--accent),var(--accent2));
- color:#fff;
- font-weight:700;
- cursor:pointer;
- transition:.2s;
-}
-.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.btn.secondary{background:rgba(255,255,255,0.08);border:1px solid var(--line);color:var(--text)}
-.btn.danger{background:rgba(255,100,124,0.16);border:1px solid rgba(255,100,124,0.45);color:#ff8fa0}
-
-.field{margin:12px 0}
-.field label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:7px;letter-spacing:.4px}
-.field input,.field select,.search-input{
- width:100%;
- padding:12px 13px;
- background:rgba(6, 10, 22, 0.72);
- border:1px solid var(--line);
- border-radius:10px;
- color:var(--text);
-}
-body.light .field input,body.light .field select,body.light .search-input{background:rgba(255,255,255,0.9)}
-.iti{width:100%}
-.iti__country-list{background:#10172b;color:#f4f8ff;border-color:var(--line);max-width:calc(100vw - 32px);z-index:999}
-.iti__selected-dial-code{color:var(--text)}
-
-.feedback{display:none;padding:11px 13px;border-radius:10px;margin-top:12px;background:rgba(255,255,255,0.06);line-height:1.5;font-size:13px}
-.feedback.show{display:block}
-.feedback.error{background:rgba(255,100,124,0.18);color:#ff9aa9;border:1px solid rgba(255,100,124,0.35)}
-.feedback.success{background:rgba(32,217,150,0.16);color:#65f0be;border:1px solid rgba(32,217,150,0.35)}
-
-.pair-code{display:none;margin-top:14px;padding:14px;border:1px dashed var(--xmas-gold);border-radius:12px;text-align:center;background:rgba(0,0,0,0.35)}
-.pair-code strong{display:block;font:700 24px 'Space Grotesk';letter-spacing:4px;margin:8px;color:var(--xmas-gold)}
-.qr-image{display:block;max-width:200px;width:100%;margin:12px auto;border-radius:12px;background:#fff;padding:8px}
-.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.row .btn{flex:1}
-.mini{font-size:11px;color:var(--muted);line-height:1.6}
-
-.status-line{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);gap:10px}
-.status-line:last-child{border:0}
-.status-line span:first-child{color:var(--muted)}
-.tag{font-size:11px;padding:4px 10px;border-radius:20px;background:rgba(32,217,150,0.18);color:var(--good);font-weight:700}
-.tag.off{background:rgba(255,100,124,0.18);color:#ff8fa0}
-
-.bar{height:7px;border-radius:20px;background:rgba(255,255,255,0.1);overflow:hidden;margin:10px 0}
-.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:20px}
-
-.setting{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
-.setting b{display:block;font-size:13px}
-.setting small{display:block;color:var(--muted);margin-top:3px;font-size:11px}
-.switch{position:relative;width:44px;height:24px;flex-shrink:0}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;background:rgba(255,255,255,0.22);border-radius:30px;cursor:pointer;transition:.2s}
-.slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
-.switch input:checked+.slider{background:var(--accent)}
-.switch input:checked+.slider:before{transform:translateX(20px)}
-
-/* CHRISTMAS PREVIEW BOX */
-.xmas-preview{
- margin-top:16px;
- padding:14px;
- border-radius:12px;
- background:rgba(8, 12, 24, 0.78);
- border:1px solid rgba(255, 209, 102, 0.35);
-}
-.xmas-preview-head{
+.stat-head{
  display:flex;
  justify-content:space-between;
  align-items:center;
- font-size:11px;
- font-weight:700;
- color:var(--xmas-gold);
- margin-bottom:8px;
+ color:var(--muted);
+ font-size:12px;
+ font-weight:600;
 }
-.wa-bubble{
- background:#0b3b2e;
- color:#e9fdf5;
- padding:10px 13px;
- border-radius:10px 10px 10px 2px;
- font-size:12.5px;
- line-height:1.5;
- white-space:pre-line;
- border:1px solid rgba(32,217,150,0.25);
+.stat-head i{
+ width:28px;
+ height:28px;
+ border-radius:7px;
+ background:var(--accent-soft);
+ color:var(--accent);
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ font-size:12px;
 }
+.stat-value{
+ font:700 26px 'Plus Jakarta Sans', sans-serif;
+ letter-spacing:-0.02em;
+ margin:12px 0 4px;
+}
+.stat-foot{font-size:12px;color:var(--muted)}
 
-.section-head{display:flex;justify-content:space-between;align-items:end;margin:4px 0 16px}
-.section-head p{color:var(--muted);margin:5px 0 0}
-.activity{display:grid;gap:10px}
-.activity-item,.notification{display:flex;gap:11px;padding:12px;background:rgba(255,255,255,0.05);border:1px solid var(--line);border-radius:11px}
-.activity-item small{display:block;color:var(--muted);margin-top:3px}
+.two{grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr)}
+.card-title{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:10px;
+ margin-bottom:16px;
+ padding-bottom:12px;
+ border-bottom:1px solid var(--line);
+}
+.card-title h2,.section-head h2{
+ font:700 16px 'Plus Jakarta Sans', sans-serif;
+ margin:0;
+ letter-spacing:-0.01em;
+}
+.card-title span{color:var(--muted);font-size:12px}
+
+/* BUTTONS & INPUTS */
+.btn{
+ border:0;
+ border-radius:9px;
+ padding:11px 16px;
+ background:var(--accent);
+ color:#fff;
+ font-weight:600;
+ font-size:13.5px;
+ cursor:pointer;
+ transition:background .15s ease, transform .1s ease;
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ gap:8px;
+}
+.btn:hover{background:var(--accent-hover)}
+.btn:active{transform:scale(0.99)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.secondary{background:transparent;border:1px solid var(--line-strong);color:var(--text)}
+.btn.secondary:hover{background:var(--panel-hover)}
+.btn.danger{background:var(--bad-soft);border:1px solid rgba(239,68,68,0.35);color:#f87171}
+.btn.danger:hover{background:rgba(239,68,68,0.22)}
+
+.field{margin:14px 0}
+.field label{
+ display:block;
+ color:var(--muted);
+ font-size:12px;
+ font-weight:600;
+ margin-bottom:6px;
+}
+.field input,.field select,.search-input{
+ width:100%;
+ padding:11px 13px;
+ background:rgba(7, 10, 19, 0.72);
+ border:1px solid var(--line-strong);
+ border-radius:9px;
+ color:var(--text);
+ font-size:14px;
+ transition:border-color .15s ease;
+}
+body.light .field input,body.light .field select,body.light .search-input{background:rgba(255,255,255,0.92)}
+.field input:focus,.field select:focus,.search-input:focus{
+ border-color:var(--accent);
+ outline:none;
+}
+.iti{width:100%}
+.iti__country-list{background:#0f1423;color:#f3f5fa;border-color:var(--line-strong);max-width:calc(100vw - 32px);z-index:999}
+.iti__selected-dial-code{color:var(--text)}
+
+.feedback{display:none;padding:11px 14px;border-radius:9px;margin-top:12px;background:var(--panel-hover);line-height:1.5;font-size:13px}
+.feedback.show{display:block}
+.feedback.error{background:var(--bad-soft);color:#f87171;border:1px solid rgba(239,68,68,0.3)}
+.feedback.success{background:var(--good-soft);color:#34d399;border:1px solid rgba(16,185,129,0.3)}
+
+.pair-code{
+ display:none;
+ margin-top:16px;
+ padding:18px;
+ border:1px dashed var(--accent);
+ border-radius:11px;
+ text-align:center;
+ background:var(--accent-soft);
+}
+.pair-code strong{
+ display:block;
+ font:700 26px 'JetBrains Mono', monospace;
+ letter-spacing:5px;
+ margin:10px 0 12px;
+ color:var(--text);
+}
+.qr-image{display:block;max-width:190px;width:100%;margin:14px auto 4px;border-radius:10px;background:#fff;padding:8px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row .btn{flex:1}
+.mini{font-size:12px;color:var(--muted);line-height:1.6}
+
+/* STATUS & TELEMETRY */
+.status-line{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ padding:11px 0;
+ border-bottom:1px solid var(--line);
+ gap:10px;
+ font-size:13.5px;
+}
+.status-line:last-child{border:0}
+.status-line span:first-child{color:var(--muted)}
+.tag{
+ font-size:11.5px;
+ padding:3px 10px;
+ border-radius:99px;
+ background:var(--good-soft);
+ color:var(--good);
+ font-weight:600;
+}
+.tag.off{background:var(--bad-soft);color:var(--bad)}
+
+.bar{height:7px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 14px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .35s ease}
+
+/* SETTINGS SWITCHES */
+.setting{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:16px;
+ padding:14px 0;
+ border-bottom:1px solid var(--line);
+}
+.setting:last-child{border:0}
+.setting b{display:block;font-size:13.5px;font-weight:600}
+.setting small{display:block;color:var(--muted);margin-top:2px;font-size:12px}
+.switch{position:relative;width:42px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--line-strong);border-radius:99px;cursor:pointer;transition:.2s}
+.slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--accent)}
+.switch input:checked+.slider:before{transform:translateX(18px)}
+
+/* LISTS, FEATURES & DOCS */
+.section-head{display:flex;justify-content:space-between;align-items:end;margin:0 0 18px}
+.section-head p{color:var(--muted);margin:4px 0 0;font-size:13.5px}
+.activity{display:grid;gap:8px}
+.activity-item,.notification{
+ display:flex;
+ align-items:flex-start;
+ gap:12px;
+ padding:12px 14px;
+ background:rgba(7, 10, 19, 0.55);
+ border:1px solid var(--line);
+ border-radius:10px;
+ font-size:13px;
+}
+.activity-item small{display:block;color:var(--muted);margin-top:3px;font-size:11.5px}
 .feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-.feature i{font-size:20px;color:var(--xmas-gold)}
-.feature h3{font:600 15px 'Space Grotesk';margin:9px 0}
-.feature p{color:var(--muted);font-size:12px;line-height:1.6;margin:0}
-.codeblock{background:rgba(6,10,22,0.8);border:1px solid var(--line);padding:14px;border-radius:10px;color:var(--muted);overflow:auto;font:12px monospace;line-height:1.7}
+.feature-icon{
+ width:38px;
+ height:38px;
+ border-radius:9px;
+ background:var(--accent-soft);
+ color:var(--accent);
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ font-size:16px;
+}
+.feature h3{font:700 15px 'Plus Jakarta Sans', sans-serif;margin:12px 0 6px}
+.feature p{color:var(--muted);font-size:13px;line-height:1.6;margin:0}
+.codeblock{
+ background:rgba(7, 10, 19, 0.72);
+ border:1px solid var(--line);
+ padding:15px;
+ border-radius:10px;
+ color:var(--text);
+ overflow:auto;
+ font:12.5px/1.7 'JetBrains Mono', monospace;
+}
 
 /* FOOTER */
 .support-footer{
- display:block;
  border-top:1px solid var(--line);
- padding:22px;
- margin-top:34px;
- border-radius:16px;
- background:var(--panel);
- backdrop-filter:blur(14px);
- -webkit-backdrop-filter:blur(14px);
+ padding-top:24px;
+ margin-top:42px;
  color:var(--muted);
 }
-.support-heading{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:var(--text);font:600 16px 'Space Grotesk'}
+.support-heading{
+ display:flex;
+ align-items:center;
+ gap:8px;
+ margin-bottom:14px;
+ color:var(--text);
+ font:700 13px 'Plus Jakarta Sans', sans-serif;
+ letter-spacing:0.04em;
+ text-transform:uppercase;
+}
 .support-heading i{color:var(--accent)}
 .social-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .social-link{
@@ -365,29 +506,65 @@ body.light .field input,body.light .field select,body.light .search-input{backgr
  align-items:center;
  gap:11px;
  min-width:0;
- padding:12px 14px;
+ padding:11px 14px;
  border:1px solid var(--line);
- border-radius:12px;
- background:rgba(255,255,255,0.05);
+ border-radius:10px;
+ background:var(--panel);
+ backdrop-filter:blur(12px);
  color:var(--text);
  text-decoration:none;
- font-weight:600;
+ font-weight:500;
  font-size:13px;
- transition:.2s;
+ transition:all .15s ease;
 }
-.social-link:hover{transform:translateY(-2px);border-color:var(--accent);background:rgba(255,71,126,0.15)}
-.social-link i{width:22px;text-align:center;font-size:18px;color:var(--accent)}
+.social-link:hover{border-color:var(--accent);background:var(--panel-hover)}
+.social-link i{width:20px;text-align:center;font-size:16px;color:var(--accent)}
 .social-link span{overflow-wrap:anywhere}
-.copyright-footer{border-top:1px solid var(--line);padding-top:14px;margin-top:15px;color:var(--muted);font-size:11px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.copyright-footer{
+ border-top:1px solid var(--line);
+ padding-top:16px;
+ margin-top:18px;
+ color:var(--muted);
+ font-size:12px;
+ display:flex;
+ justify-content:space-between;
+ gap:10px;
+ flex-wrap:wrap;
+}
 
-.toast{position:fixed;right:20px;bottom:85px;background:#10172b;border:1px solid var(--xmas-gold);color:#fff;border-radius:12px;padding:12px 16px;box-shadow:var(--shadow);z-index:9999;display:none;max-width:90vw;font-weight:600}
+.toast{
+ position:fixed;
+ right:20px;
+ bottom:82px;
+ background:var(--bg-elevated);
+ backdrop-filter:blur(12px);
+ border:1px solid var(--line-strong);
+ color:var(--text);
+ border-radius:10px;
+ padding:12px 16px;
+ box-shadow:var(--shadow);
+ z-index:9999;
+ display:none;
+ max-width:90vw;
+ font-weight:500;
+ font-size:13px;
+}
 .toast.show{display:block}
 .mobile-menu{display:none}
-.plugin-card{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.05)}
-.plugin-card small{display:block;color:var(--muted);margin-top:4px}
+.plugin-card{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:12px;
+ padding:14px 16px;
+ border:1px solid var(--line);
+ border-radius:10px;
+ background:rgba(7, 10, 19, 0.55);
+}
+.plugin-card small{display:block;color:var(--muted);margin-top:3px;font-size:12px}
 .search-wrap{margin-bottom:14px}
 .search-input{max-width:420px}
-.notification-list{display:grid;gap:9px}
+.notification-list{display:grid;gap:8px}
 
 /* FLOATING WHATSAPP SUPPORT BUTTON */
 .floating-whatsapp{
@@ -397,18 +574,19 @@ body.light .field input,body.light .field select,body.light .search-input{backgr
  z-index:9998;
  display:flex;
  align-items:center;
- gap:10px;
- padding:12px 18px;
- border-radius:50px;
+ gap:9px;
+ padding:11px 18px;
+ border-radius:99px;
  background:#25D366;
  color:#fff;
  text-decoration:none;
- font-weight:700;
- box-shadow:0 8px 25px rgba(37,211,102,0.45);
- transition:.25s ease;
+ font-weight:600;
+ font-size:13.5px;
+ box-shadow:0 8px 24px rgba(37,211,102,0.32);
+ transition:transform .2s ease, background .2s ease;
 }
-.floating-whatsapp svg{width:24px;height:24px;flex-shrink:0}
-.floating-whatsapp:hover{transform:translateY(-4px);background:#128C7E}
+.floating-whatsapp svg{width:20px;height:20px;flex-shrink:0}
+.floating-whatsapp:hover{transform:translateY(-2px);background:#1ebe5d}
 
 @media(max-width:1050px){
  .stats{grid-template-columns:repeat(2,1fr)}
@@ -416,19 +594,20 @@ body.light .field input,body.light .field select,body.light .search-input{backgr
 }
 @media(max-width:760px){
  .app{display:block}
- .sidebar{position:fixed;left:-270px;width:255px;box-shadow:var(--shadow)}
+ .sidebar{position:fixed;left:-270px;width:256px;box-shadow:var(--shadow)}
  .sidebar.open{left:0}
  .mobile-menu{display:inline-flex}
- .main{padding:14px 12px 85px}
- .topbar{flex-direction:column;align-items:flex-start;padding:14px}
+ .top-brand{display:flex}
+ .main{padding:16px 14px 85px}
+ .topbar{flex-direction:column;align-items:flex-start}
  .top-actions{width:100%;justify-content:space-between}
  .two{grid-template-columns:1fr}
  .feature-grid{grid-template-columns:1fr}
  .stats{grid-template-columns:1fr 1fr;gap:10px}
- .card{padding:15px}
+ .card{padding:16px}
  .stat-value{font-size:22px}
  .social-links{grid-template-columns:1fr 1fr}
- .floating-whatsapp{right:14px;bottom:14px;width:52px;height:52px;padding:0;justify-content:center}
+ .floating-whatsapp{right:14px;bottom:14px;width:48px;height:48px;padding:0;justify-content:center}
  .floating-whatsapp span{display:none}
 }
 @media(max-width:420px){
@@ -438,210 +617,294 @@ body.light .field input,body.light .field select,body.light .search-input{backgr
 </head>
 
 <body>
+<!-- LIVE 3D WINTER FOREST & SANTA VAN SCENE -->
 <canvas id="bg3d"></canvas>
 
 <div class="app">
 <aside class="sidebar" id="sidebar">
  <div class="brand">
-  <img id="sidebarLogo" src="https://files.catbox.moe/tbw1kw.png" alt="ALPHA-XMD">
-  <div>
+  <div class="brand-left">
+   <img id="sidebarLogo" src="https://files.catbox.moe/tbw1kw.png" alt="ALPHA-XMD">
    <span>ALPHA<em>-XMD</em></span>
-   <div class="xmas-badge">🎄 CHRISTMAS</div>
   </div>
+  <span class="version-pill">v2.5</span>
  </div>
- <div class="nav-label">WORKSPACE</div>
+
+ <div class="nav-label">Platform</div>
  <div class="nav">
   <button class="active" data-page="overview"><span class="ico"><i class="fa-solid fa-border-all"></i></span>Overview</button>
-  <button data-page="pairing"><span class="ico"><i class="fa-solid fa-link"></i></span>Device pairing</button>
-  <button data-page="settings"><span class="ico"><i class="fa-solid fa-gear"></i></span>Bot settings</button>
-  <button data-page="plugins"><span class="ico"><i class="fa-solid fa-puzzle-piece"></i></span>Plugin manager</button>
-  <button data-page="monitor"><span class="ico"><i class="fa-solid fa-chart-line"></i></span>Server monitor</button>
-  <button data-page="activity"><span class="ico"><i class="fa-solid fa-list"></i></span>Activity log</button>
+  <button data-page="pairing"><span class="ico"><i class="fa-solid fa-link"></i></span>Device Pairing</button>
+  <button data-page="settings"><span class="ico"><i class="fa-solid fa-sliders"></i></span>Bot Settings</button>
+  <button data-page="plugins"><span class="ico"><i class="fa-solid fa-cubes"></i></span>Plugins</button>
+  <button data-page="monitor"><span class="ico"><i class="fa-solid fa-server"></i></span>Server Health</button>
+  <button data-page="activity"><span class="ico"><i class="fa-solid fa-clock-rotate-left"></i></span>Activity Log</button>
   <button data-page="notifications"><span class="ico"><i class="fa-regular fa-bell"></i></span>Notifications</button>
  </div>
- <div class="nav-label">RESOURCES</div>
+
+ <div class="nav-label">Developers</div>
  <div class="nav">
-  <button data-page="features"><span class="ico"><i class="fa-solid fa-wand-magic-sparkles"></i></span>Features</button>
-  <button data-page="docs"><span class="ico"><i class="fa-solid fa-book"></i></span>Documentation</button>
+  <button data-page="features"><span class="ico"><i class="fa-solid fa-bolt"></i></span>Capabilities</button>
+  <button data-page="docs"><span class="ico"><i class="fa-solid fa-book-open"></i></span>Documentation</button>
  </div>
+
  <div class="side-bottom">
-  Alpha-XMD Control Center<br><span id="sideApi">Connecting to API…</span><br>
-  © <span id="year"></span> Alpha Tech
+  <div class="side-status"><i class="pulse" id="sideDot"></i><span id="sideApi">Connecting to API…</span></div>
+  <div>© <span id="year"></span> Alpha Tech Systems</div>
  </div>
 </aside>
 
 <main class="main">
 <header class="topbar">
- <div class="topbar-left-text">
+ <div class="topbar-info">
   <div class="top-brand">
    <img id="topbarLogo" src="https://files.catbox.moe/tbw1kw.png" alt="ALPHA-XMD">
    <span>ALPHA<em>-XMD</em></span>
-   <span class="xmas-badge">🎅 HOLIDAY MOVIE EDITION</span>
   </div>
   <h1 id="pageTitle">Overview</h1>
-  <p class="sub" id="pageSub">Your bot operations at a glance.</p>
+  <p class="sub" id="pageSub">Real-time bot infrastructure and WhatsApp session management.</p>
  </div>
  <div class="top-actions">
   <button class="icon-btn mobile-menu" onclick="toggleSidebar()" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button>
   <div class="pill"><i class="pulse" id="apiDot"></i><span id="apiLabel">Checking API</span></div>
-  <button class="icon-btn" id="cinemaBtn" onclick="toggleCinema()" title="Watch 3D Christmas Movie Scene"><i class="fa-solid fa-film"></i> <span>3D View</span></button>
-  <button class="icon-btn" onclick="toggleTheme()" title="Toggle dark/light theme" aria-label="Toggle theme"><i id="themeIcon" class="fa-solid fa-sun"></i></button>
-  <button class="icon-btn" onclick="refreshAll()" title="Refresh"><i class="fa-solid fa-rotate"></i></button>
+  <button class="icon-btn" id="audioBtn" onclick="toggleAudio()" title="Toggle Christmas chime & jingle audio"><i id="audioIcon" class="fa-solid fa-volume-xmark"></i> <span>Sound</span></button>
+  <button class="icon-btn" id="viewBtn" onclick="toggleSceneView()" title="Toggle background scene view"><i class="fa-solid fa-eye"></i> <span>Scene</span></button>
+  <button class="icon-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme"><i id="themeIcon" class="fa-solid fa-sun"></i></button>
+  <button class="icon-btn" onclick="refreshAll()" title="Refresh telemetry"><i class="fa-solid fa-rotate"></i></button>
  </div>
 </header>
 
+<!-- OVERVIEW -->
 <section class="page active" id="page-overview">
  <div class="grid stats">
-  <div class="card"><div class="stat-head">ACTIVE SESSIONS <i class="fa-solid fa-mobile-screen"></i></div><div class="stat-value" id="statSessions">—</div><div class="stat-foot">Currently connected devices</div></div>
-  <div class="card"><div class="stat-head">SERVER UPTIME <i class="fa-regular fa-clock"></i></div><div class="stat-value" id="statUptime">—</div><div class="stat-foot">Since the last restart</div></div>
-  <div class="card"><div class="stat-head">HEAP MEMORY <i class="fa-solid fa-memory"></i></div><div class="stat-value" id="statMemory">—</div><div class="stat-foot">Node.js heap usage</div></div>
-  <div class="card"><div class="stat-head">PENDING PAIRINGS <i class="fa-solid fa-link"></i></div><div class="stat-value" id="statPairing">—</div><div class="stat-foot">Pair requests in progress</div></div>
- </div>
- <div class="grid two">
   <div class="card">
-   <div class="card-title"><h2>Quick connect</h2><span>WhatsApp linked devices</span></div>
-   <div class="field"><label for="phoneQuick">WHATSAPP PHONE NUMBER</label><input type="tel" id="phoneQuick" autocomplete="tel"></div>
-   <button class="btn" id="pairQuick" onclick="pairDevice()">Generate pairing code →</button>
-   <div id="pairFeedback" class="feedback" role="status"></div>
-   <div id="pairCode" class="pair-code"><div class="mini">Enter this code in WhatsApp → Linked devices → Link a device</div><strong id="codeValue">----</strong><button class="btn secondary" onclick="copyCode()">Copy code</button></div>
-   <div class="mini" style="margin-top:12px">Your phone number is used only to link and manage your session.</div>
+   <div class="stat-head">ACTIVE SESSIONS <i class="fa-solid fa-mobile-screen"></i></div>
+   <div class="stat-value" id="statSessions">—</div>
+   <div class="stat-foot">Connected WhatsApp instances</div>
   </div>
   <div class="card">
-   <div class="card-title"><h2>System status</h2><span>Live checks</span></div>
-   <div class="status-line"><span>API service</span><b class="tag" id="apiState">Checking</b></div>
-   <div class="status-line"><span>Bot process</span><b class="tag" id="botState">Checking</b></div>
-   <div class="status-line"><span>Runtime</span><b id="nodeVersion">—</b></div>
-   <div class="status-line"><span>Last checked</span><b id="lastChecked">—</b></div>
+   <div class="stat-head">SERVER UPTIME <i class="fa-regular fa-clock"></i></div>
+   <div class="stat-value" id="statUptime">—</div>
+   <div class="stat-foot">Continuous process runtime</div>
+  </div>
+  <div class="card">
+   <div class="stat-head">HEAP MEMORY <i class="fa-solid fa-microchip"></i></div>
+   <div class="stat-value" id="statMemory">—</div>
+   <div class="stat-foot">Allocated V8 heap footprint</div>
+  </div>
+  <div class="card">
+   <div class="stat-head">PAIRING QUEUE <i class="fa-solid fa-key"></i></div>
+   <div class="stat-value" id="statPairing">—</div>
+   <div class="stat-foot">Pending authentication requests</div>
+  </div>
+ </div>
+
+ <div class="grid two">
+  <div class="card">
+   <div class="card-title"><h2>Quick Device Connect</h2><span>8-digit pairing code</span></div>
+   <div class="field">
+    <label for="phoneQuick">WHATSAPP PHONE NUMBER</label>
+    <input type="tel" id="phoneQuick" autocomplete="tel">
+   </div>
+   <button class="btn" id="pairQuick" onclick="pairDevice()">Generate Pairing Code <i class="fa-solid fa-arrow-right"></i></button>
+   <div id="pairFeedback" class="feedback" role="status"></div>
+   <div id="pairCode" class="pair-code">
+    <div class="mini">Open WhatsApp → <b>Linked Devices</b> → <b>Link with phone number instead</b></div>
+    <strong id="codeValue">----</strong>
+    <button class="btn secondary" onclick="copyCode()"><i class="fa-regular fa-copy"></i> Copy Pairing Code</button>
+   </div>
+   <div class="mini" style="margin-top:14px">Sessions are end-to-end encrypted and isolated per phone number.</div>
+  </div>
+
+  <div class="card">
+   <div class="card-title"><h2>System Telemetry</h2><span>Live node status</span></div>
+   <div class="status-line"><span>Gateway API</span><b class="tag" id="apiState">Checking</b></div>
+   <div class="status-line"><span>Worker Process</span><b class="tag" id="botState">Checking</b></div>
+   <div class="status-line"><span>Node Runtime</span><b id="nodeVersion">—</b></div>
+   <div class="status-line"><span>Last Sync</span><b id="lastChecked">—</b></div>
   </div>
  </div>
 </section>
 
+<!-- DEVICE PAIRING -->
 <section class="page" id="page-pairing">
  <div class="grid two">
   <div class="card">
-   <div class="card-title"><h2>Link a WhatsApp device</h2><span>Secure pairing</span></div>
-   <div class="field"><label for="phoneFull">PHONE NUMBER</label><input type="tel" id="phoneFull" autocomplete="tel"></div>
-   <button class="btn" id="pairFull" onclick="pairDevice('full')">Generate pairing code →</button>
+   <div class="card-title"><h2>Link WhatsApp Account</h2><span>Multi-device authentication</span></div>
+   <div class="field">
+    <label for="phoneFull">PHONE NUMBER</label>
+    <input type="tel" id="phoneFull" autocomplete="tel">
+   </div>
+   <button class="btn" id="pairFull" onclick="pairDevice('full')">Generate Pairing Code <i class="fa-solid fa-arrow-right"></i></button>
    <div id="pairFeedbackFull" class="feedback" role="status"></div>
    <div id="pairCodeFull" class="pair-code">
-    <div class="mini">Enter the code in WhatsApp → Linked devices</div>
+    <div class="mini">Enter this code in WhatsApp → Linked Devices</div>
     <strong id="codeValueFull">----</strong>
-    <button class="btn secondary" onclick="copyCode('full')">Copy code</button>
+    <button class="btn secondary" onclick="copyCode('full')"><i class="fa-regular fa-copy"></i> Copy Pairing Code</button>
     <img id="pairQr" class="qr-image" alt="WhatsApp pairing QR code" hidden>
    </div>
   </div>
+
   <div class="card">
-   <div class="card-title"><h2>Current browser session</h2><span>Private to this browser</span></div>
-   <div class="status-line"><span>Saved number</span><b id="savedPhone">Not linked</b></div>
-   <div class="status-line"><span>Connection</span><b class="tag off" id="savedStatus">Unknown</b></div>
-   <button class="btn secondary" style="width:100%;margin-top:14px" onclick="checkSavedSession()">Check connection</button>
-   <button class="btn danger" style="width:100%;margin-top:9px" onclick="disconnectDevice()">Disconnect device</button>
-   <p class="mini" style="margin-top:11px">The dashboard never lists other users' phone numbers.</p>
+   <div class="card-title"><h2>Active Browser Session</h2><span>Local session state</span></div>
+   <div class="status-line"><span>Linked Number</span><b id="savedPhone">Not linked</b></div>
+   <div class="status-line"><span>Connection State</span><b class="tag off" id="savedStatus">Unknown</b></div>
+   <button class="btn secondary" style="width:100%;margin-top:16px" onclick="checkSavedSession()">Verify Connection</button>
+   <button class="btn danger" style="width:100%;margin-top:10px" onclick="disconnectDevice()">Terminate Session</button>
+   <p class="mini" style="margin-top:12px">Session credentials are stored strictly in your local browser storage.</p>
   </div>
  </div>
 </section>
 
+<!-- BOT SETTINGS -->
 <section class="page" id="page-settings">
  <div class="card">
-  <div class="card-title"><h2>Bot behaviour & Holiday Mode</h2><span id="settingsFor">Link a device first</span></div>
+  <div class="card-title"><h2>Bot Automation & Behavior</h2><span id="settingsFor">Link a device first</span></div>
   <div id="settingsNotice" class="feedback"></div>
-  <div id="settingsList"><p class="mini">Pair your device in this browser, then load your settings here.</p></div>
-  
-  <div class="xmas-preview">
-   <div class="xmas-preview-head">
-    <span>🎄 CHRISTMAS MODE COMMAND PREVIEW</span>
-    <span id="xmasPreviewBadge">ACTIVE</span>
-   </div>
-   <div class="wa-bubble" id="xmasPreviewBubble">🏓 Pong! Speed: 42ms
-
-🎄 *[ Merry Christmas & Happy Holidays! 🎅 ]* ❄️</div>
+  <div id="settingsList"><p class="mini">Link your WhatsApp number in this browser to configure remote bot settings.</p></div>
+  <div class="field">
+   <label for="prefix">COMMAND PREFIX</label>
+   <input id="prefix" maxlength="4" value="." placeholder=".">
   </div>
-
-  <div class="field"><label for="prefix">COMMAND PREFIX</label><input id="prefix" maxlength="4" value="." placeholder="."></div>
-  <div class="row"><button class="btn" onclick="saveSettings()">Save settings</button><button class="btn secondary" onclick="loadSettings()">Reload</button></div>
-  <p class="mini" style="margin-top:11px">Settings are saved to the linked account using your private dashboard access token.</p>
+  <div class="row">
+   <button class="btn" onclick="saveSettings()">Save Configuration</button>
+   <button class="btn secondary" onclick="loadSettings()">Reload</button>
+  </div>
+  <p class="mini" style="margin-top:12px">Changes sync directly to your active session via your private control token.</p>
  </div>
 </section>
 
+<!-- PLUGIN MANAGER -->
 <section class="page" id="page-plugins">
  <div class="card">
-  <div class="card-title"><h2>Plugin manager</h2><button class="btn secondary" onclick="loadPlugins()">Refresh plugins</button></div>
-  <div class="search-wrap"><input class="search-input" id="pluginSearch" placeholder="Search plugins..." oninput="filterPlugins()"></div>
-  <div id="pluginList" class="grid"><p class="mini">Load plugins from your bot server.</p></div>
-  <p class="mini" style="margin-top:14px">Plugin management requires the backend plugin API to be enabled.</p>
+  <div class="card-title">
+   <h2>Installed Plugins</h2>
+   <button class="btn secondary" onclick="loadPlugins()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+  </div>
+  <div class="search-wrap">
+   <input class="search-input" id="pluginSearch" placeholder="Filter plugins by name..." oninput="filterPlugins()">
+  </div>
+  <div id="pluginList" class="grid"><p class="mini">Loading module list from server...</p></div>
  </div>
 </section>
 
+<!-- SERVER MONITOR -->
 <section class="page" id="page-monitor">
  <div class="grid two">
   <div class="card">
-   <div class="card-title"><h2>Resource monitor</h2><span>Live process data</span></div>
-   <div class="status-line"><span>Heap used</span><b id="heapText">—</b></div>
+   <div class="card-title"><h2>Memory & Compute</h2><span>Node.js process metrics</span></div>
+   <div class="status-line"><span>Heap Used</span><b id="heapText">—</b></div>
    <div class="bar"><i id="heapBar"></i></div>
-   <div class="status-line"><span>Heap allocated</span><b id="heapTotal">—</b></div>
-   <div class="status-line"><span>Resident memory (RSS)</span><b id="rssText">—</b></div>
-   <div class="status-line"><span>CPU usage</span><b id="cpuText">Not provided</b></div>
-   <div class="status-line"><span>Node.js version</span><b id="nodeText">—</b></div>
+   <div class="status-line"><span>Heap Allocated</span><b id="heapTotal">—</b></div>
+   <div class="status-line"><span>Resident Set Size (RSS)</span><b id="rssText">—</b></div>
+   <div class="status-line"><span>CPU Load</span><b id="cpuText">Not reported</b></div>
+   <div class="status-line"><span>Engine Version</span><b id="nodeText">—</b></div>
   </div>
+
   <div class="card">
-   <div class="card-title"><h2>Service health</h2><span>API health endpoint</span></div>
-   <div class="status-line"><span>Health</span><b class="tag" id="healthTag">Waiting</b></div>
-   <div class="status-line"><span>Active sessions</span><b id="healthSessions">—</b></div>
-   <div class="status-line"><span>Pending pairings</span><b id="healthPairings">—</b></div>
+   <div class="card-title"><h2>Service Health</h2><span>Endpoint diagnostics</span></div>
+   <div class="status-line"><span>Status</span><b class="tag" id="healthTag">Waiting</b></div>
+   <div class="status-line"><span>Session Pool</span><b id="healthSessions">—</b></div>
+   <div class="status-line"><span>Pending Pairings</span><b id="healthPairings">—</b></div>
    <div class="status-line"><span>Uptime</span><b id="healthUptime">—</b></div>
-   <button class="btn secondary" style="width:100%;margin-top:14px" onclick="fetchHealth()">Run health check</button>
+   <button class="btn secondary" style="width:100%;margin-top:16px" onclick="fetchHealth()">Run Diagnostics</button>
   </div>
  </div>
 </section>
 
+<!-- ACTIVITY LOG -->
 <section class="page" id="page-activity">
  <div class="card">
-  <div class="card-title"><h2>Recent dashboard activity</h2><button class="btn secondary" onclick="clearActivity()">Clear history</button></div>
+  <div class="card-title">
+   <h2>Audit & Activity Log</h2>
+   <button class="btn secondary" onclick="clearActivity()">Clear Log</button>
+  </div>
   <div id="activityList" class="activity"></div>
  </div>
 </section>
 
+<!-- NOTIFICATIONS -->
 <section class="page" id="page-notifications">
  <div class="card">
-  <div class="card-title"><h2>Notifications</h2><button class="btn secondary" onclick="clearNotifications()">Clear all</button></div>
+  <div class="card-title">
+   <h2>System Notifications</h2>
+   <button class="btn secondary" onclick="clearNotifications()">Clear All</button>
+  </div>
   <div id="notificationList" class="notification-list"></div>
  </div>
 </section>
 
+<!-- CAPABILITIES -->
 <section class="page" id="page-features">
- <div class="section-head"><div><h2>Alpha-XMD features</h2><p>Tools available through the WhatsApp bot.</p></div></div>
- <div class="grid feature-grid">
-  <div class="card feature"><i class="fa-solid fa-sleigh"></i><h3>🎄 Christmas Mode</h3><p>Automatically wraps every command response with festive holiday banners and reacts with Christmas emojis.</p></div>
-  <div class="card feature"><i class="fa-solid fa-wand-magic-sparkles"></i><h3>AI & creation</h3><p>AI assistants and creative utilities available through supported bot commands.</p></div>
-  <div class="card feature"><i class="fa-solid fa-photo-film"></i><h3>Media & View Once</h3><p>View Once (.vv / .vv2) downloader, media search, and sticker tools.</p></div>
-  <div class="card feature"><i class="fa-solid fa-users"></i><h3>Group management</h3><p>Moderation, anti-link, badword filters, and group automation features.</p></div>
-  <div class="card feature"><i class="fa-solid fa-bullhorn"></i><h3>Channel tools</h3><p>Channel reactions and supported channel automation.</p></div>
-  <div class="card feature"><i class="fa-solid fa-gears"></i><h3>Chat automation</h3><p>Autoread, typing indicators, recording indicators, and anti-delete recovery.</p></div>
+ <div class="section-head">
+  <div>
+   <h2>Platform Capabilities</h2>
+   <p>Core modules built into the Alpha-XMD WhatsApp engine.</p>
+  </div>
  </div>
-</section>
-
-<section class="page" id="page-docs">
- <div class="card">
-  <div class="card-title"><h2>Getting started</h2><span>Quick guide</span></div>
-  <ol style="padding-left:20px;line-height:2.0;color:var(--muted)">
-   <li>Enter your WhatsApp number with the correct country selected.</li>
-   <li>Generate a pairing code and wait for it to appear.</li>
-   <li>Open WhatsApp on your phone → <b>Linked devices → Link a device → Link with phone number instead</b>.</li>
-   <li>Enter the code shown by Alpha-XMD.</li>
-   <li>Toggle <b>Christmas Mode</b> and your auto-features in <b>Bot settings</b>.</li>
-  </ol>
-  <div class="card-title" style="margin-top:22px"><h2>Dashboard API</h2><span>Current routes</span></div>
-  <div class="codeblock">
-   GET /api/stats | GET /api/health | GET /api/status?phoneNumber=…<br>
-   POST /api/pair | POST /api/disconnect<br>
-   GET /api/settings?phoneNumber=… | POST /api/settings<br>
-   GET /api/plugins | POST /api/plugins/toggle
+ <div class="grid feature-grid">
+  <div class="card feature">
+   <div class="feature-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+   <h3>AI & Natural Language</h3>
+   <p>Integrated conversational AI assistants, prompt tools, and automated query handling.</p>
+  </div>
+  <div class="card feature">
+   <div class="feature-icon"><i class="fa-solid fa-photo-film"></i></div>
+   <h3>Media & View-Once</h3>
+   <p>Retrieve View-Once media (.vv / .vv2), download social media clips, and generate stickers.</p>
+  </div>
+  <div class="card feature">
+   <div class="feature-icon"><i class="fa-solid fa-shield-halved"></i></div>
+   <h3>Group Moderation</h3>
+   <p>Automated anti-link enforcement, profanity filtering, welcome rules, and admin controls.</p>
+  </div>
+  <div class="card feature">
+   <div class="feature-icon"><i class="fa-solid fa-bullhorn"></i></div>
+   <h3>Channel Automation</h3>
+   <p>Automated newsletter reactions and channel management workflows.</p>
+  </div>
+  <div class="card feature">
+   <div class="feature-icon"><i class="fa-solid fa-robot"></i></div>
+   <h3>Presence & Anti-Delete</h3>
+   <p>Configurable auto-read, simulated typing/recording states, and deleted message recovery.</p>
+  </div>
+  <div class="card feature">
+   <div class="feature-icon"><i class="fa-solid fa-code"></i></div>
+   <h3>Modular Plugin Engine</h3>
+   <p>Hot-reloadable command plugins with granular per-account configuration.</p>
   </div>
  </div>
 </section>
 
+<!-- DOCUMENTATION -->
+<section class="page" id="page-docs">
+ <div class="card">
+  <div class="card-title"><h2>Quickstart Guide</h2><span>Setup instructions</span></div>
+  <ol style="padding-left:20px;line-height:1.9;color:var(--muted);margin-bottom:24px">
+   <li>Select your country code and enter your WhatsApp phone number on the <b>Overview</b> or <b>Device Pairing</b> page.</li>
+   <li>Click <b>Generate Pairing Code</b> to request an 8-character authentication key from the server.</li>
+   <li>On your mobile device, open WhatsApp and go to <b>Settings → Linked Devices → Link a Device</b>.</li>
+   <li>Tap <b>Link with phone number instead</b> and enter the code shown on your dashboard.</li>
+   <li>Once connected, open <b>Bot Settings</b> to customize your prefix and automation toggles.</li>
+  </ol>
+
+  <div class="card-title"><h2>REST API Reference</h2><span>Backend endpoints</span></div>
+  <div class="codeblock">
+GET  /api/stats                    # Active session count, uptime, and memory usage
+GET  /api/health                   # Detailed process health and capacity diagnostics
+GET  /api/status?phoneNumber=…     # Check connection status for a specific number
+POST /api/pair                     # Request a new WhatsApp pairing code
+POST /api/disconnect               # Terminate and purge an active session
+GET  /api/settings?phoneNumber=…   # Fetch account configuration (Bearer token required)
+POST /api/settings                 # Update account configuration (Bearer token required)
+GET  /api/plugins                  # List installed command modules
+POST /api/plugins/toggle           # Enable or disable a specific plugin
+  </div>
+ </div>
+</section>
+
+<!-- FOOTER -->
 <footer class="support-footer">
- <div class="support-heading"><i class="fa-solid fa-headset"></i> ALPHA-XMD SUPPORT & COMMUNITY</div>
+ <div class="support-heading"><i class="fa-solid fa-headset"></i> Official Channels & Support</div>
  <div class="social-links">
   <a class="social-link" href="https://whatsapp.com/channel/0029Vb7nHdBFnSzBDbvL6y1X" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp Channel</span></a>
   <a class="social-link" href="https://github.com/Alexio11-09/alpha-xmd" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>GitHub Repository</span></a>
@@ -651,14 +914,14 @@ body.light .field input,body.light .field select,body.light .search-input{backgr
   <a class="social-link" href="https://t.me/AlphaXmd" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-telegram"></i><span>Telegram</span></a>
  </div>
  <div class="copyright-footer">
-  <span>© <span id="yearFooter"></span> ALPHA-XMD · Built by Alpha Tech</span>
-  <span>Control Center · Christmas Movie 3D Edition</span>
+  <span>© <span id="yearFooter"></span> ALPHA-XMD · Engineered by Alpha Tech</span>
+  <span>All systems operational</span>
  </div>
 </footer>
 </main>
 </div>
 
-<!-- FLOATING WHATSAPP SUPPORT BUTTON -->
+<!-- FLOATING WHATSAPP SUPPORT -->
 <a
  href="https://wa.me/263784969735?text=Hello%20Alpha-XMD%20Support%2C%20I%20visited%20your%20control%20panel%20and%20would%20like%20assistance.%20Please%20help%20me%20with%20my%20enquiry."
  class="floating-whatsapp"
@@ -670,7 +933,7 @@ body.light .field input,body.light .field select,body.light .search-input{backgr
  <svg viewBox="0 0 32 32" aria-hidden="true">
   <path fill="currentColor" d="M16 .5C7.45.5.5 7.45.5 16c0 2.73.72 5.4 2.08 7.75L.5 31.5l7.95-2.08A15.4 15.4 0 0 0 16 31.5c8.55 0 15.5-6.95 15.5-15.5S24.55.5 16 .5Zm0 28.3c-2.35 0-4.65-.63-6.65-1.83l-.48-.28-4.72 1.24 1.26-4.6-.31-.5A12.76 12.76 0 1 1 16 28.8Zm7-9.55c-.38-.19-2.2-1.08-2.54-1.2-.34-.13-.59-.19-.84.19-.25.38-.97 1.2-1.19 1.45-.22.25-.44.28-.81.09-.38-.19-1.6-.59-3.05-1.88-1.13-1-1.89-2.24-2.11-2.62-.22-.38-.02-.58.17-.77.17-.17.38-.44.56-.66.19-.22.25-.38.38-.63.13-.25.06-.47-.03-.66-.09-.19-.84-2.02-1.15-2.77-.3-.72-.61-.62-.84-.63h-.72c-.25 0-.66.09-1 .47s-1.31 1.28-1.31 3.11 1.34 3.61 1.53 3.86c.19.25 2.63 4.02 6.37 5.64.89.38 1.59.61 2.13.78.89.28 1.7.24 2.34.15.71-.11 2.2-.9 2.52-1.77.31-.88.31-1.63.22-1.78-.09-.16-.34-.25-.72-.44Z"/>
  </svg>
- <span>Contact Support</span>
+ <span>Support</span>
 </a>
 
 <div class="toast" id="toast" role="status"></div>
@@ -709,24 +972,129 @@ function rotateBrandLogo() {
   if ($('faviconLink')) $('faviconLink').href = chosenUrl;
 }
 
+/* ============================================================
+   CHRISTMAS MUSIC-BOX & GIFT BURST SOUND ENGINE (Web Audio API)
+   ============================================================ */
+class ChristmasSoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.enabled = false;
+    this.melodyTimer = null;
+    this.noteIdx = 0;
+    // Jingle Bells + We Wish You a Merry Christmas music box notes (Hz)
+    this.melody = [
+      659.25, 659.25, 659.25, 0, 659.25, 659.25, 659.25, 0,
+      659.25, 783.99, 523.25, 587.33, 659.25, 0, 0, 0,
+      698.46, 698.46, 698.46, 698.46, 698.46, 659.25, 659.25, 659.25,
+      659.25, 587.33, 587.33, 659.25, 587.33, 0, 783.99, 0
+    ];
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  toggle() {
+    this.init();
+    this.enabled = !this.enabled;
+    $('audioIcon').className = this.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+    $('audioBtn').classList.toggle('active-btn', this.enabled);
+    if (this.enabled) {
+      this.startMelody();
+      toast('Christmas jingle & gift chime enabled');
+    } else {
+      this.stopMelody();
+      toast('Audio muted');
+    }
+  }
+
+  playBellNote(freq, duration = 0.45, volume = 0.045) {
+    if (!this.enabled || !this.ctx || !freq) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const overtone = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+
+    overtone.type = 'triangle';
+    overtone.frequency.setValueAtTime(freq * 2, now);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(gain);
+    overtone.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    overtone.start(now);
+    osc.stop(now + duration);
+    overtone.stop(now + duration);
+  }
+
+  playGiftBurstChime() {
+    if (!this.enabled || !this.ctx) return;
+    // Magical ascending sparkle arpeggio + sleigh bell shimmer
+    const chord = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+    chord.forEach((f, idx) => {
+      setTimeout(() => this.playBellNote(f, 0.55, 0.055), idx * 55);
+    });
+  }
+
+  startMelody() {
+    this.stopMelody();
+    this.melodyTimer = setInterval(() => {
+      if (!this.enabled) return;
+      const freq = this.melody[this.noteIdx % this.melody.length];
+      if (freq > 0) this.playBellNote(freq, 0.42, 0.035);
+      this.noteIdx++;
+    }, 340);
+  }
+
+  stopMelody() {
+    if (this.melodyTimer) {
+      clearInterval(this.melodyTimer);
+      this.melodyTimer = null;
+    }
+  }
+}
+const xmasAudio = new ChristmasSoundEngine();
+function toggleAudio() { xmasAudio.toggle(); }
+
+// Auto-unlock audio on first user interaction if desired
+window.addEventListener('pointerdown', () => {
+  if (xmasAudio.ctx && xmasAudio.ctx.state === 'suspended') {
+    xmasAudio.ctx.resume();
+  }
+}, { once: false });
+
 const tokenKey=p=>`alpha-xmd-control-${p}`;
 const tokenFor=p=>localStorage.getItem(tokenKey(p))||'';
 
 const titles={
- overview:['Overview','Your bot operations at a glance.'],
- pairing:['Device pairing','Link and manage your WhatsApp device.'],
- settings:['Bot settings','Configure the behaviours & Christmas Mode of your bot.'],
- plugins:['Plugin manager','View and manage installed bot plugins.'],
- monitor:['Server monitor','Live health and resource information.'],
- activity:['Activity log','Recent actions from this browser.'],
- notifications:['Notifications','Dashboard alerts and updates.'],
- features:['Features','Explore Alpha-XMD capabilities.'],
- docs:['Documentation','Pairing instructions and API reference.']
+ overview:['Overview','Real-time bot infrastructure and WhatsApp session management.'],
+ pairing:['Device Pairing','Link and manage your WhatsApp multi-device session.'],
+ settings:['Bot Settings','Configure remote automation behaviors and command prefix.'],
+ plugins:['Plugin Manager','Inspect and toggle installed bot command modules.'],
+ monitor:['Server Health','Live process memory, uptime, and endpoint diagnostics.'],
+ activity:['Activity Log','Audit trail of recent actions performed in this browser.'],
+ notifications:['Notifications','System alerts and operational status updates.'],
+ features:['Capabilities','Core modules built into the Alpha-XMD WhatsApp engine.'],
+ docs:['Documentation','Quickstart pairing guide and REST API reference.']
 };
 
 function nav(page){
- document.body.classList.remove('cinema-mode');
- $('cinemaBtn').classList.remove('active-glow');
+ document.body.classList.remove('scene-only');
+ $('viewBtn').classList.remove('active-btn');
  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));
  document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
  $('pageTitle').textContent=titles[page][0];
@@ -741,12 +1109,12 @@ function nav(page){
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.page)));
 function toggleSidebar(){$('sidebar').classList.toggle('open')}
 
-/* CINEMA 3D VIEW TOGGLE */
-function toggleCinema(){
- const active=document.body.classList.toggle('cinema-mode');
- $('cinemaBtn').classList.toggle('active-glow',active);
- $('cinemaBtn').innerHTML=active?'<i class="fa-solid fa-eye"></i> <span>Show UI</span>':'<i class="fa-solid fa-film"></i> <span>3D View</span>';
- toast(active?'Cinema Movie View: Drag to orbit the snowy trail[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span)!':'Dashboard UI restored');
+function toggleSceneView(){
+ const active = document.body.classList.toggle('scene-only');
+ $('viewBtn').classList.toggle('active-btn', active);
+ $('viewBtn').innerHTML = active
+  ? '<i class="fa-solid fa-table-columns"></i> <span>Dashboard</span>'
+  : '<i class="fa-solid fa-eye"></i> <span>Scene</span>';
 }
 
 /* THEME */
@@ -758,8 +1126,8 @@ function applyTheme(theme){
 function toggleTheme(){
  const next=document.body.classList.contains('light')?'dark':'light';
  applyTheme(next);
- toast(next==='light'?'Light theme enabled':'Dark theme enabled');
- activity('Changed dashboard appearance to '+next+' mode');
+ toast(next==='light'?'Switched to light mode':'Switched to dark mode');
+ activity('Switched interface theme to '+next+' mode');
 }
 
 /* TOASTS + NOTIFICATIONS */
@@ -777,8 +1145,8 @@ function renderNotifications(){
  let a=[];
  try{a=JSON.parse(localStorage.getItem('alpha-xmd-notifications')||'[]')}catch{}
  $('notificationList').innerHTML=a.length?a.map(x=>
-  `<div class="notification"><div>${escapeHtml(x.msg)}<small style="display:block;color:var(--muted);margin-top:4px">${escapeHtml(x.time)}</small></div></div>`
- ).join(''):'<p class="mini">No notifications yet.</p>';
+  `<div class="notification"><i class="fa-solid fa-circle-info" style="color:var(--accent);margin-top:2px"></i><div>${escapeHtml(x.msg)}<small style="display:block;color:var(--muted);margin-top:4px">${escapeHtml(x.time)}</small></div></div>`
+ ).join(''):'<p class="mini">No notifications recorded.</p>';
 }
 function clearNotifications(){
  localStorage.removeItem('alpha-xmd-notifications');renderNotifications();toast('Notifications cleared');
@@ -797,10 +1165,10 @@ function renderActivity(){
  try{a=JSON.parse(localStorage.getItem('alpha-xmd-activity')||'[]')}catch{}
  $('activityList').innerHTML=a.length
  ?a.map(x=>`<div class="activity-item"><span style="color:var(--accent)">●</span><div>${escapeHtml(x.msg)}<small>${escapeHtml(x.time)}</small></div></div>`).join('')
- :'<p class="mini">No activity recorded yet.</p>';
+ :'<p class="mini">No recent activity recorded.</p>';
 }
 function clearActivity(){
- localStorage.removeItem('alpha-xmd-activity');renderActivity();toast('Activity history cleared');
+ localStorage.removeItem('alpha-xmd-activity');renderActivity();toast('Activity log cleared');
 }
 function escapeHtml(s){
  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -827,13 +1195,14 @@ function fmtUptime(n){
  return d?`${d}d ${h}h`:`${h}h ${m}m`;
 }
 
-/* DASHBOARD */
+/* DASHBOARD TELEMETRY */
 async function refreshAll(){
  try{
   const d=await api('/api/stats');
-  $('apiLabel').textContent='API Online';$('apiState').textContent='Online';$('apiState').className='tag';
+  $('apiLabel').textContent='API Online';$('apiState').textContent='Operational';$('apiState').className='tag';
   $('botState').textContent='Running';$('botState').className='tag';
-  $('apiDot').style.background='var(--good)';$('sideApi').textContent='API connected';
+  $('apiDot').classList.remove('off');$('sideDot').classList.remove('off');
+  $('sideApi').textContent='Gateway connected';
   $('statSessions').textContent=(d.sessions??d.connected??0)+(d.capacity?` / ${d.capacity}`:'');
   $('statUptime').textContent=fmtUptime(d.uptime);
   $('statMemory').textContent=d.memory!=null?d.memory+' MB':'—';
@@ -846,9 +1215,10 @@ async function refreshAll(){
   if(d.nodeVersion||d.node)$('nodeText').textContent=d.nodeVersion||d.node;
   await fetchHealth(false);
  }catch(e){
-  $('apiLabel').textContent='API Offline';$('apiState').textContent='Offline';$('apiState').className='tag off';
-  $('botState').textContent='Unavailable';$('botState').className='tag off';
-  $('apiDot').style.background='var(--bad)';$('sideApi').textContent='API unavailable';
+  $('apiLabel').textContent='API Offline';$('apiState').textContent='Unreachable';$('apiState').className='tag off';
+  $('botState').textContent='Offline';$('botState').className='tag off';
+  $('apiDot').classList.add('off');$('sideDot').classList.add('off');
+  $('sideApi').textContent='Gateway disconnected';
   $('lastChecked').textContent=new Date().toLocaleTimeString();
  }
 }
@@ -868,7 +1238,7 @@ async function fetchHealth(show=true){
    $('heapBar').style.width=pct+'%';
   }
   if(d.cpu!=null)$('cpuText').textContent=d.cpu+'%';
-  if(show)toast('Health check completed');
+  if(show)toast('Server diagnostics updated');
  }catch(e){
   $('healthTag').textContent='Unavailable';$('healthTag').className='tag off';
   if(show)toast(e.message);
@@ -886,7 +1256,7 @@ function initPhone(id){
 }
 function validPhone(id){
  const iti=phoneInputs[id];
- if(!iti||!iti.isValidNumber())throw Error('Enter a valid phone number with the correct country code.');
+ if(!iti||!iti.isValidNumber())throw Error('Please enter a valid phone number with the correct country code.');
  return iti.getNumber().replace('+','').replace(/\D/g,'');
 }
 async function pairDevice(which='quick'){
@@ -897,16 +1267,16 @@ async function pairDevice(which='quick'){
  const code=which==='full'?'codeValueFull':'codeValue';
  try{
   const phone=validPhone(id);currentPhone=phone;
-  btn.disabled=true;btn.textContent='Connecting…';
-  feedback(fb,'Contacting Alpha-XMD server…');$(box).style.display='none';
+  btn.disabled=true;btn.textContent='Requesting code…';
+  feedback(fb,'Connecting to Alpha-XMD pairing service…');$(box).style.display='none';
   const d=await api('/api/pair',{
    method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({phoneNumber:phone})
   });
   if(d.alreadyPaired){
    localStorage.setItem('alpha-xmd-last-phone',phone);
-   feedback(fb,'This number is already connected. Check the session panel.','success');
-   activity('Checked an already-connected device');await checkSavedSession();return;
+   feedback(fb,'This account is already linked and active.','success');
+   activity('Verified active session for +'+phone);await checkSavedSession();return;
   }
   if(!d.code)throw Error('The server did not return a pairing code.');
   if(d.controlToken)localStorage.setItem(tokenKey(phone),d.controlToken);
@@ -918,21 +1288,21 @@ async function pairDevice(which='quick'){
    qrImg.src=qr.startsWith('data:')?qr:'data:image/png;base64,'+qr;
    qrImg.hidden=false;
   }
-  feedback(fb,'Pairing code generated. Open WhatsApp → Linked devices and enter the code.','success');
-  activity('Generated a WhatsApp pairing code');
+  feedback(fb,'Pairing code ready. Enter it in WhatsApp → Linked Devices.','success');
+  activity('Generated WhatsApp pairing code');
  }catch(e){feedback(fb,e.message,'error')}
- finally{btn.disabled=false;btn.textContent='Generate pairing code →'}
+ finally{btn.disabled=false;btn.innerHTML='Generate Pairing Code <i class="fa-solid fa-arrow-right"></i>'}
 }
 async function copyCode(which='quick'){
  const id=which==='full'?'codeValueFull':'codeValue';const v=$(id).textContent;
  if(!v||v==='----')return;
- try{await navigator.clipboard.writeText(v);toast('Pairing code copied')}
+ try{await navigator.clipboard.writeText(v);toast('Pairing code copied to clipboard')}
  catch{toast('Select and copy the code manually')}
 }
 async function checkSavedSession(){
  const p=localStorage.getItem('alpha-xmd-last-phone')||'';
  $('savedPhone').textContent=p?`+${p}`:'Not linked';
- if(!p){$('savedStatus').textContent='Unknown';$('savedStatus').className='tag off';return}
+ if(!p){$('savedStatus').textContent='Unlinked';$('savedStatus').className='tag off';return}
  try{
   const d=await api('/api/status?phoneNumber='+encodeURIComponent(p));
   $('savedStatus').textContent=d.connected?'Connected':'Disconnected';
@@ -941,8 +1311,8 @@ async function checkSavedSession(){
 }
 async function disconnectDevice(){
  const p=localStorage.getItem('alpha-xmd-last-phone')||'';
- if(!p||!tokenFor(p)){toast('No saved dashboard access token in this browser');return}
- if(!confirm('Disconnect this WhatsApp device? This removes its saved session.'))return;
+ if(!p||!tokenFor(p)){toast('No active control token found in this browser');return}
+ if(!confirm('Terminate this WhatsApp session? You will need to pair again to reconnect.'))return;
  try{
   await api('/api/disconnect',{
    method:'POST',
@@ -950,34 +1320,27 @@ async function disconnectDevice(){
    body:JSON.stringify({phoneNumber:p})
   });
   localStorage.removeItem(tokenKey(p));localStorage.removeItem('alpha-xmd-last-phone');
-  currentPhone='';activity('Disconnected the saved WhatsApp device');
-  toast('Device disconnected');checkSavedSession();
+  currentPhone='';activity('Terminated WhatsApp session');
+  toast('Session terminated');checkSavedSession();
  }catch(e){toast(e.message)}
 }
 
-/* BOT SETTINGS + CHRISTMAS MODE */
+/* BOT SETTINGS */
 const settingDefs=[
- ['christmasMode','🎄 Christmas Mode','Wrap every bot command reply with festive holiday banners & Christmas emoji reactions.'],
- ['autoread','Auto read','Automatically mark incoming messages as read.'],
- ['autotyping','Auto typing','Show typing status while preparing a response.'],
- ['autorecording','Auto recording','Show recording status where supported.'],
- ['autoreact','Auto react','Enable automatic message reactions.'],
- ['antidelete','Anti-delete','Keep supported deleted-message notifications.'],
- ['antiedit','Anti-edit','Track supported edited-message changes.'],
- ['antilink','Anti-link','Enable configured group link protection.']
+ ['autoread','Auto-Read Messages','Automatically mark incoming messages as read.'],
+ ['autotyping','Simulated Typing','Display typing indicator while processing commands.'],
+ ['autorecording','Simulated Recording','Display voice recording indicator where supported.'],
+ ['autoreact','Auto-React','Automatically react to incoming messages with emojis.'],
+ ['antidelete','Anti-Delete Recovery','Capture and forward deleted messages to your chat.'],
+ ['antiedit','Anti-Edit Tracker','Log and display original text when messages are edited.'],
+ ['antilink','Group Anti-Link','Automatically moderate unauthorized links in groups.']
 ];
 let loadedSettings={};
-function updateXmasPreview(enabled){
- $('xmasPreviewBadge').textContent=enabled?'🎄 ACTIVE':'STANDARD';
- $('xmasPreviewBubble').textContent=enabled
-  ?'🏓 Pong! Speed: 42ms\n\n🎄 *[ Merry Christmas & Happy Holidays! 🎅 ]* ❄️'
-  :'🏓 Pong! Speed: 42ms';
-}
 async function loadSettings(){
  const p=localStorage.getItem('alpha-xmd-last-phone')||'';
  const host=$('settingsList');
  if(!p||!tokenFor(p)){
-  host.innerHTML='<p class="mini">Pair your device in this browser first. The private access token is required to load settings.</p>';
+  host.innerHTML='<p class="mini">Link your WhatsApp number in this browser first to manage remote settings.</p>';
   $('settingsFor').textContent='No linked account';return;
  }
  try{
@@ -985,21 +1348,18 @@ async function loadSettings(){
    headers:{'Authorization':'Bearer '+tokenFor(p)}
   });
   loadedSettings=d||{};$('settingsFor').textContent='Account +'+p;
-  const xmasOn=loadedSettings.christmasMode!==false;
-  host.innerHTML=settingDefs.map(([k,n,desc])=>{
-   const checked=k==='christmasMode'?xmasOn:(loadedSettings[k]===true);
-   return `<div class="setting"><div><b>${n}</b><small>${desc}</small></div><label class="switch"><input type="checkbox" data-setting="${k}" ${checked?'checked':''} ${k==='christmasMode'?'onchange="updateXmasPreview(this.checked)"':''}><span class="slider"></span></label></div>`;
-  }).join('');
-  updateXmasPreview(xmasOn);
+  host.innerHTML=settingDefs.map(([k,n,desc])=>
+   `<div class="setting"><div><b>${n}</b><small>${desc}</small></div><label class="switch"><input type="checkbox" data-setting="${k}" ${loadedSettings[k]===true?'checked':''}><span class="slider"></span></label></div>`
+  ).join('');
   $('prefix').value=loadedSettings.prefix||'.';
  }catch(e){
   host.innerHTML='<p class="mini">'+escapeHtml(e.message)+'</p>';
-  $('settingsFor').textContent='Could not load';
+  $('settingsFor').textContent='Failed to load';
  }
 }
 async function saveSettings(){
  const p=localStorage.getItem('alpha-xmd-last-phone')||'';
- if(!p||!tokenFor(p)){toast('Pair a device in this browser first');return}
+ if(!p||!tokenFor(p)){toast('Link a device in this browser first');return}
  const settings={};
  document.querySelectorAll('[data-setting]').forEach(x=>settings[x.dataset.setting]=x.checked);
  settings.prefix=$('prefix').value.trim()||'.';
@@ -1009,21 +1369,21 @@ async function saveSettings(){
    headers:{'Content-Type':'application/json','Authorization':'Bearer '+tokenFor(p)},
    body:JSON.stringify({phoneNumber:p,settings})
   });
-  activity('Saved bot settings'+(settings.christmasMode?' (Christmas Mode ON)':''));
-  toast('Bot settings saved');
+  activity('Updated bot configuration');
+  toast('Configuration saved');
  }catch(e){toast(e.message)}
 }
 
 /* PLUGIN MANAGER */
 async function loadPlugins(){
  const host=$('pluginList');
- host.innerHTML='<p class="mini">Loading plugins…</p>';
+ host.innerHTML='<p class="mini">Fetching installed plugins…</p>';
  try{
   const d=await api('/api/plugins');
   pluginsCache=Array.isArray(d)?d:(d.plugins||[]);
   renderPlugins(pluginsCache);
  }catch(e){
-  host.innerHTML='<p class="mini">Plugin API is not available yet. Your backend must provide GET /api/plugins.</p>';
+  host.innerHTML='<p class="mini">Plugin management endpoint is not enabled on the backend server.</p>';
  }
 }
 function renderPlugins(list){
@@ -1031,10 +1391,10 @@ function renderPlugins(list){
   const name=typeof p==='string'?p:(p.name||p.filename||'Unnamed plugin');
   const enabled=typeof p==='string'?true:p.enabled!==false;
   return `<div class="plugin-card">
-   <div><b>${escapeHtml(name)}</b><small>${enabled?'Enabled':'Disabled'}</small></div>
+   <div><b>${escapeHtml(name)}</b><small>${enabled?'Active':'Disabled'}</small></div>
    <label class="switch"><input type="checkbox" ${enabled?'checked':''} onchange="togglePlugin('${escapeHtml(name).replace(/'/g,"\\'")}',this.checked)"><span class="slider"></span></label>
   </div>`;
- }).join(''):'<p class="mini">No plugins were returned by the server.</p>';
+ }).join(''):'<p class="mini">No plugins found.</p>';
 }
 function filterPlugins(){
  const q=$('pluginSearch').value.toLowerCase();
@@ -1049,14 +1409,14 @@ async function togglePlugin(name,enabled){
    body:JSON.stringify({name,enabled})
   });
   activity(`${enabled?'Enabled':'Disabled'} plugin: ${name}`);
-  toast('Plugin updated');loadPlugins();
+  toast('Plugin state updated');loadPlugins();
  }catch(e){
-  toast('Plugin action failed: '+e.message);loadPlugins();
+  toast('Failed to update plugin: '+e.message);loadPlugins();
  }
 }
 
 /* ============================================================
-   CINEMATIC CHRISTMAS MOVIE 3D SCENE (CAMPER VAN & FOREST TRAIL)
+   3D SANTA VEHICLE IN SNOWY FOREST + GIFT DROP & BURST ENGINE
    ============================================================ */
 function init3DScene(){
  const canvas=$('bg3d');
@@ -1068,61 +1428,51 @@ function init3DScene(){
  renderer.shadowMap.enabled=true;
  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
  renderer.toneMapping=THREE.ACESFilmicToneMapping;
- renderer.toneMappingExposure=1.22;
+ renderer.toneMappingExposure=1.2;
 
  const scene=new THREE.Scene();
- scene.background=new THREE.Color(0x091638);
- scene.fog=new THREE.FogExp2(0x0c1e4a,0.019);
+ scene.background=new THREE.Color(0x07112b);
+ scene.fog=new THREE.FogExp2(0x091636,0.020);
 
  const camera=new THREE.PerspectiveCamera(46,window.innerWidth/window.innerHeight,0.1,160);
 
+ // Starry Sky
  const starGeo=new THREE.BufferGeometry();
- const starPos=[],starColors=[];
- const palette=[new THREE.Color(0xffffff),new THREE.Color(0xc4b5fd),new THREE.Color(0x93c5fd),new THREE.Color(0xfde68a)];
- for(let i=0;i<1100;i++){
-  starPos.push((Math.random()-0.5)*150, 6+Math.random()*55, -20-Math.random()*80);
-  const c=palette[i%palette.length];
-  starColors.push(c.r,c.g,c.b);
+ const starPos=[];
+ for(let i=0;i<900;i++){
+  starPos.push((Math.random()-0.5)*150, 7+Math.random()*50, -18-Math.random()*75);
  }
  starGeo.setAttribute('position',new THREE.Float32BufferAttribute(starPos,3));
- starGeo.setAttribute('color',new THREE.Float32BufferAttribute(starColors,3));
- scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({size:0.28,vertexColors:true,transparent:true,opacity:0.9})));
+ scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:0.25,transparent:true,opacity:0.88})));
 
- const hemi=new THREE.HemisphereLight(0xa5c8ff,0x2a3b5c,1.05);
+ const hemi=new THREE.HemisphereLight(0xa5c8ff,0x24344d,1.0);
  scene.add(hemi);
 
- const moonLight=new THREE.DirectionalLight(0xdbeafe,1.35);
- moonLight.position.set(16,28,18);
+ const moonLight=new THREE.DirectionalLight(0xdbeafe,1.3);
+ moonLight.position.set(14,26,16);
  moonLight.castShadow=true;
  moonLight.shadow.mapSize.set(1024,1024);
  scene.add(moonLight);
 
+ // Sculpted Snowy Forest Trail
  const groundGeo=new THREE.PlaneGeometry(140,160,72,72);
  groundGeo.rotateX(-Math.PI/2);
  const pos=groundGeo.attributes.position;
  for(let i=0;i<pos.count;i++){
   const x=pos.getX(i),z=pos.getZ(i);
-  const trailCenter=Math.sin(z*0.06)*2.5;
-  const distFromTrail=Math.abs(x-trailCenter);
-  let y=0;
-  if(distFromTrail<2.4){
-   y=-0.12+Math.cos(distFromTrail*1.3)*0.06;
-  } else {
-   y=Math.min(4.5,(distFromTrail-2.4)*0.22)+Math.sin(x*0.25)*Math.cos(z*0.2)*0.45;
-  }
+  const trailCenter=Math.sin(z*0.06)*2.4;
+  const dist=Math.abs(x-trailCenter);
+  let y=dist<2.4 ? (-0.1+Math.cos(dist*1.3)*0.05) : (Math.min(4.2,(dist-2.4)*0.22)+Math.sin(x*0.25)*Math.cos(z*0.2)*0.4);
   pos.setY(i,y);
  }
  groundGeo.computeVertexNormals();
- const snowGround=new THREE.Mesh(groundGeo,new THREE.MeshStandardMaterial({
-  color:0xe8f2ff,
-  roughness:0.78,
-  metalness:0.06
- }));
+ const snowGround=new THREE.Mesh(groundGeo,new THREE.MeshStandardMaterial({color:0xe8f2ff,roughness:0.8,metalness:0.05}));
  snowGround.receiveShadow=true;
  scene.add(snowGround);
 
- const pineMat=new THREE.MeshStandardMaterial({color:0x133b3a,roughness:0.85});
- const snowBranchMat=new THREE.MeshStandardMaterial({color:0xf0f7ff,roughness:0.75});
+ // Snow-Covered Christmas Pine Forest
+ const pineMat=new THREE.MeshStandardMaterial({color:0x113d34,roughness:0.85});
+ const snowBranchMat=new THREE.MeshStandardMaterial({color:0xf2f8ff,roughness:0.75});
  const trunkMat=new THREE.MeshStandardMaterial({color:0x2b1b12,roughness:0.9});
 
  function createSnowyPine(scale=1){
@@ -1130,31 +1480,20 @@ function init3DScene(){
   const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.28,1.6,8),trunkMat);
   trunk.position.y=0.8;
   g.add(trunk);
-
-  const layers=[
-   {r:2.1,h:2.4,y:2.1},
-   {r:1.7,h:2.2,y:3.4},
-   {r:1.3,h:2.0,y:4.6},
-   {r:0.85,h:1.7,y:5.7}
-  ];
-  layers.forEach(l=>{
+  [{r:2.1,h:2.4,y:2.1},{r:1.7,h:2.2,y:3.4},{r:1.3,h:2.0,y:4.6},{r:0.85,h:1.7,y:5.7}].forEach(l=>{
    const b=new THREE.Mesh(new THREE.ConeGeometry(l.r,l.h,12),pineMat);
-   b.position.y=l.y;
-   b.castShadow=true;
-   g.add(b);
-
+   b.position.y=l.y;b.castShadow=true;g.add(b);
    const s=new THREE.Mesh(new THREE.ConeGeometry(l.r*0.86,l.h*0.58,12),snowBranchMat);
-   s.position.y=l.y+l.h*0.24;
-   g.add(s);
+   s.position.y=l.y+l.h*0.24;g.add(s);
   });
   g.scale.set(scale,scale,scale);
   return g;
  }
 
- for(let i=0;i<56;i++){
+ for(let i=0;i<54;i++){
   const side=(i%2===0)?-1:1;
-  const z=-65+(i*2.4);
-  const trailCenter=Math.sin(z*0.06)*2.5;
+  const z=-62+(i*2.3);
+  const trailCenter=Math.sin(z*0.06)*2.4;
   const x=trailCenter+side*(4.6+Math.random()*11);
   const tree=createSnowyPine(0.85+Math.random()*0.9);
   tree.position.set(x,0,z);
@@ -1162,159 +1501,184 @@ function init3DScene(){
   scene.add(tree);
  }
 
- const ornamentColors=[0xe63946,0x9b5de5,0xf4a261,0x3a86ff,0xff477e,0xffd166];
- const ornaments=[];
- for(let i=0;i<42;i++){
-  const r=0.14+Math.random()*0.11;
-  const orb=new THREE.Mesh(
-   new THREE.SphereGeometry(r,16,16),
-   new THREE.MeshStandardMaterial({
-    color:ornamentColors[i%ornamentColors.length],
-    roughness:0.18,
-    metalness:0.82
-   })
-  );
-  const cap=new THREE.Mesh(
-   new THREE.CylinderGeometry(r*0.28,r*0.28,r*0.3,8),
-   new THREE.MeshStandardMaterial({color:0xfde68a,metalness:0.9,roughness:0.2})
-  );
-  cap.position.y=r*0.95;
-  orb.add(cap);
-
-  const ox=(Math.random()-0.5)*7.5;
-  const oz=3.5+Math.random()*7.5;
-  orb.position.set(ox,r*0.75,oz);
-  orb.rotation.set(Math.random(),Math.random(),Math.random());
-  orb.castShadow=true;
-  scene.add(orb);
-  ornaments.push(orb);
- }
-
- /* VINTAGE CAMPER VAN */
+ // Santa's Retro Red & White Camper Van
  const van=new THREE.Group();
- const redPaint=new THREE.MeshStandardMaterial({color:0xb91c1c,roughness:0.28,metalness:0.35});
+ const redPaint=new THREE.MeshStandardMaterial({color:0xc1121f,roughness:0.28,metalness:0.35});
  const creamPaint=new THREE.MeshStandardMaterial({color:0xf8fafc,roughness:0.32,metalness:0.2});
  const chromeMat=new THREE.MeshStandardMaterial({color:0xe2e8f0,roughness:0.15,metalness:0.92});
 
  const lowerBody=new THREE.Mesh(new THREE.BoxGeometry(2.15,0.92,4.4),redPaint);
- lowerBody.position.y=0.86;
- lowerBody.castShadow=true;
- van.add(lowerBody);
+ lowerBody.position.y=0.86;lowerBody.castShadow=true;van.add(lowerBody);
 
  const upperBody=new THREE.Mesh(new THREE.BoxGeometry(2.06,0.82,4.25),creamPaint);
- upperBody.position.y=1.72;
- upperBody.castShadow=true;
- van.add(upperBody);
+ upperBody.position.y=1.72;upperBody.castShadow=true;van.add(upperBody);
 
  const roofCap=new THREE.Mesh(new THREE.CylinderGeometry(1.02,1.03,4.2,16),creamPaint);
- roofCap.rotation.x=Math.PI/2;
- roofCap.scale.set(1,0.32,1);
- roofCap.position.y=2.14;
- van.add(roofCap);
+ roofCap.rotation.x=Math.PI/2;roofCap.scale.set(1,0.32,1);roofCap.position.y=2.14;van.add(roofCap);
 
  const frontV=new THREE.Mesh(new THREE.ConeGeometry(0.95,0.85,3),creamPaint);
- frontV.rotation.x=Math.PI/2;
- frontV.rotation.z=Math.PI;
- frontV.position.set(0,1.05,2.21);
- van.add(frontV);
+ frontV.rotation.x=Math.PI/2;frontV.rotation.z=Math.PI;frontV.position.set(0,1.05,2.21);van.add(frontV);
 
  const frontBumper=new THREE.Mesh(new THREE.BoxGeometry(2.26,0.18,0.22),chromeMat);
- frontBumper.position.set(0,0.45,2.24);
- van.add(frontBumper);
+ frontBumper.position.set(0,0.45,2.24);van.add(frontBumper);
+ const rearBumper=frontBumper.clone();rearBumper.position.z=-2.24;van.add(rearBumper);
 
- const rearBumper=frontBumper.clone();
- rearBumper.position.z=-2.24;
- van.add(rearBumper);
-
+ // Warm Interior Windows
  const warmWinMat=new THREE.MeshBasicMaterial({color:0xffe082});
  const windshield=new THREE.Mesh(new THREE.PlaneGeometry(1.75,0.58),warmWinMat);
- windshield.position.set(0,1.74,2.14);
- van.add(windshield);
-
- const divider=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.62,0.04),creamPaint);
- divider.position.set(0,1.74,2.15);
- van.add(divider);
-
+ windshield.position.set(0,1.74,2.14);van.add(windshield);
  for(let s of [-1,1]){
   for(let w=-1;w<=1;w++){
    const sideWin=new THREE.Mesh(new THREE.PlaneGeometry(1.05,0.52),warmWinMat);
-   sideWin.rotation.y=s*Math.PI/2;
-   sideWin.position.set(s*1.04,1.74,w*1.25);
-   van.add(sideWin);
+   sideWin.rotation.y=s*Math.PI/2;sideWin.position.set(s*1.04,1.74,w*1.25);van.add(sideWin);
   }
  }
 
+ // Headlights & Volumetric Cones
  const headMat=new THREE.MeshBasicMaterial({color:0xffffff});
- const turnMat=new THREE.MeshBasicMaterial({color:0xff9f1c});
  const beamMat=new THREE.MeshBasicMaterial({color:0xfff3b0,transparent:true,opacity:0.14,depthWrite:false});
-
  [-0.72,0.72].forEach(hx=>{
   const hl=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.08,16),headMat);
-  hl.rotation.x=Math.PI/2;
-  hl.position.set(hx,0.85,2.21);
-  van.add(hl);
-
-  const blinker=new THREE.Mesh(new THREE.SphereGeometry(0.08,10,10),turnMat);
-  blinker.position.set(hx*1.05,1.15,2.21);
-  van.add(blinker);
-
+  hl.rotation.x=Math.PI/2;hl.position.set(hx,0.85,2.21);van.add(hl);
   const cone=new THREE.Mesh(new THREE.ConeGeometry(1.35,6.5,20,1,true),beamMat);
-  cone.rotation.x=-Math.PI/2;
-  cone.position.set(hx,0.65,5.4);
-  van.add(cone);
+  cone.rotation.x=-Math.PI/2;cone.position.set(hx,0.65,5.4);van.add(cone);
  });
 
- const headSpot=new THREE.SpotLight(0xfff4cc,3.2,24,0.55,0.5,1);
- headSpot.position.set(0,1.1,2.2);
- headSpot.target.position.set(0,0,10);
- van.add(headSpot);
- van.add(headSpot.target);
+ const headSpot=new THREE.SpotLight(0xfff4cc,3.0,22,0.55,0.5,1);
+ headSpot.position.set(0,1.1,2.2);headSpot.target.position.set(0,0,10);
+ van.add(headSpot);van.add(headSpot.target);
 
- const cabinGlow=new THREE.PointLight(0xffb703,1.8,7);
- cabinGlow.position.set(0,1.7,0);
- van.add(cabinGlow);
+ const cabinGlow=new THREE.PointLight(0xffb703,1.6,7);
+ cabinGlow.position.set(0,1.7,0);van.add(cabinGlow);
 
+ // Rotating Wheels
  const wheels=[];
  const tireMat=new THREE.MeshStandardMaterial({color:0x111827,roughness:0.85});
  const whiteWallMat=new THREE.MeshStandardMaterial({color:0xf1f5f9,roughness:0.4});
  [[-1.06,1.35],[1.06,1.35],[-1.06,-1.35],[1.06,-1.35]].forEach(([wx,wz])=>{
-  const wg=new THREE.Group();
-  wg.position.set(wx,0.42,wz);
-  const tire=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.28,20),tireMat);
-  tire.rotation.z=Math.PI/2;
-  const wall=new THREE.Mesh(new THREE.CylinderGeometry(0.31,0.31,0.29,20),whiteWallMat);
-  wall.rotation.z=Math.PI/2;
-  const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.30,16),chromeMat);
-  hub.rotation.z=Math.PI/2;
-  wg.add(tire,wall,hub);
-  van.add(wg);
-  wheels.push(wg);
+  const wg=new THREE.Group();wg.position.set(wx,0.42,wz);
+  const tire=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.28,20),tireMat);tire.rotation.z=Math.PI/2;
+  const wall=new THREE.Mesh(new THREE.CylinderGeometry(0.31,0.31,0.29,20),whiteWallMat);wall.rotation.z=Math.PI/2;
+  const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.30,16),chromeMat);hub.rotation.z=Math.PI/2;
+  wg.add(tire,wall,hub);van.add(wg);wheels.push(wg);
  });
 
+ // Roof Rack + Reserve Gift Box on Roof
  const rack=new THREE.Mesh(new THREE.BoxGeometry(1.75,0.08,2.4),chromeMat);
- rack.position.set(0,2.34,-0.2);
- van.add(rack);
+ rack.position.set(0,2.34,-0.2);van.add(rack);
 
- const giftGroup=new THREE.Group();
- giftGroup.position.set(0,2.92,-0.2);
- const boxMesh=new THREE.Mesh(
-  new THREE.BoxGeometry(1.15,1.08,1.15),
-  new THREE.MeshStandardMaterial({color:0xa8dadc,roughness:0.35,metalness:0.1})
- );
- boxMesh.castShadow=true;
- giftGroup.add(boxMesh);
+ function makeWrappedGift(size=1.0, boxColor=0xa8dadc, ribbonColor=0xd62828){
+  const g=new THREE.Group();
+  const box=new THREE.Mesh(
+   new THREE.BoxGeometry(size,size*0.92,size),
+   new THREE.MeshStandardMaterial({color:boxColor,roughness:0.35,metalness:0.15})
+  );
+  box.castShadow=true;
+  const rMat=new THREE.MeshStandardMaterial({color:ribbonColor,roughness:0.3});
+  const r1=new THREE.Mesh(new THREE.BoxGeometry(size*1.03,size*0.95,size*0.2),rMat);
+  const r2=new THREE.Mesh(new THREE.BoxGeometry(size*0.2,size*0.95,size*1.03),rMat);
+  const bow=new THREE.Mesh(new THREE.TorusKnotGeometry(size*0.18,size*0.05,24,8),rMat);
+  bow.position.y=size*0.52;
+  g.add(box,r1,r2,bow);
+  return g;
+ }
 
- const ribbonMat=new THREE.MeshStandardMaterial({color:0xd62828,roughness:0.3});
- const rib1=new THREE.Mesh(new THREE.BoxGeometry(1.19,1.11,0.24),ribbonMat);
- const rib2=new THREE.Mesh(new THREE.BoxGeometry(0.24,1.11,1.19),ribbonMat);
- const bow=new THREE.Mesh(new THREE.TorusKnotGeometry(0.22,0.06,32,8),ribbonMat);
- bow.position.y=0.62;
- giftGroup.add(rib1,rib2,bow);
- van.add(giftGroup);
-
+ const roofGift=makeWrappedGift(1.05,0xa8dadc,0xd62828);
+ roofGift.position.set(0,2.85,-0.2);
+ van.add(roofGift);
  scene.add(van);
 
- const snowCount=900;
+ // ============================================================
+ // DROPPING & BURSTING GIFT BOX + SCATTERED GIFTS SYSTEM
+ // ============================================================
+ const droppingGift=makeWrappedGift(0.85,0xfef08a,0xe11d48);
+ droppingGift.visible=false;
+ scene.add(droppingGift);
+
+ const burstParticles=[];
+ const scatteredGifts=[];
+ const burstColors=[0xff3b5c,0xffd166,0x38bdf8,0xa855f7,0x10b981,0xf43f5e];
+
+ let dropState={
+  active:false,
+  vx:0,vy:0,vz:0,
+  bounces:0,
+  lastDropCycle:-1
+ };
+
+ function triggerGiftDrop(originPos){
+  droppingGift.visible=true;
+  droppingGift.position.set(originPos.x, originPos.y+1.4, originPos.z-2.3);
+  droppingGift.rotation.set(0,0,0);
+  dropState.active=true;
+  dropState.vx=(Math.random()-0.5)*1.4;
+  dropState.vy=2.8;
+  dropState.vz=-1.8;
+  dropState.bounces=0;
+ }
+
+ function burstGiftAt(pos){
+  droppingGift.visible=false;
+  dropState.active=false;
+  xmasAudio.playGiftBurstChime();
+
+  // Golden sparkle burst particles
+  for(let i=0;i<26;i++){
+   const spark=new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.11,0),
+    new THREE.MeshBasicMaterial({color:burstColors[i%burstColors.length]})
+   );
+   spark.position.copy(pos);
+   spark.position.y+=0.3;
+   const angle=Math.random()*Math.PI*2;
+   const speed=2.2+Math.random()*3.8;
+   burstParticles.push({
+    mesh:spark,
+    vx:Math.cos(angle)*speed,
+    vy:3.2+Math.random()*3.5,
+    vz:Math.sin(angle)*speed,
+    life:1.0
+   });
+   scene.add(spark);
+  }
+
+  // Scatter mini gifts & shiny metallic ornaments onto the snow
+  for(let i=0;i<10;i++){
+   const isMiniBox=i%3===0;
+   const item=isMiniBox
+    ? makeWrappedGift(0.36, burstColors[i%burstColors.length], 0xffffff)
+    : new THREE.Mesh(
+       new THREE.SphereGeometry(0.18,14,14),
+       new THREE.MeshStandardMaterial({
+        color:burstColors[i%burstColors.length],
+        roughness:0.18,
+        metalness:0.85
+       })
+      );
+   item.position.copy(pos);
+   item.position.y+=0.35;
+   const ang=(i/10)*Math.PI*2 + Math.random()*0.4;
+   const spd=1.6+Math.random()*2.5;
+   scatteredGifts.push({
+    mesh:item,
+    vx:Math.cos(ang)*spd,
+    vy:2.5+Math.random()*2.2,
+    vz:Math.sin(ang)*spd,
+    grounded:false,
+    age:0
+   });
+   scene.add(item);
+  }
+
+  // Cap total scattered items on the snow so performance stays smooth
+  while(scatteredGifts.length>45){
+   const old=scatteredGifts.shift();
+   scene.remove(old.mesh);
+  }
+ }
+
+ // Falling Winter Snow
+ const snowCount=850;
  const snowGeo=new THREE.BufferGeometry();
  const snowPos=new Float32Array(snowCount*3);
  const snowVel=[];
@@ -1325,23 +1689,17 @@ function init3DScene(){
   snowVel.push(0.035+Math.random()*0.05);
  }
  snowGeo.setAttribute('position',new THREE.BufferAttribute(snowPos,3));
- const snowPoints=new THREE.Points(snowGeo,new THREE.PointsMaterial({
-  color:0xffffff,
-  size:0.17,
-  transparent:true,
-  opacity:0.9
- }));
- scene.add(snowPoints);
+ scene.add(new THREE.Points(snowGeo,new THREE.PointsMaterial({color:0xffffff,size:0.17,transparent:true,opacity:0.9})));
 
- let targetAngle=0.22,currentAngle=0.22,targetElev=0,currentElev=0;
+ // Camera Controls
+ let targetAngle=0.32,currentAngle=0.32,targetElev=0,currentElev=0;
  let dragging=false,lastX=0,lastY=0;
-
  canvas.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY});
  window.addEventListener('pointerup',()=>dragging=false);
  window.addEventListener('pointermove',e=>{
   if(dragging){
    targetAngle-=(e.clientX-lastX)*0.006;
-   targetElev=Math.max(-1.2,Math.min(3.5,targetElev+(e.clientY-lastY)*0.012));
+   targetElev=Math.max(-1.0,Math.min(3.5,targetElev+(e.clientY-lastY)*0.012));
    lastX=e.clientX;lastY=e.clientY;
   }
  });
@@ -1354,36 +1712,96 @@ function init3DScene(){
  const clock=new THREE.Clock();
  function animate(){
   requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05);
   const t=clock.getElapsedTime();
 
-  const cycle=((t*3.2)%52)-34;
-  const trailX=Math.sin(cycle*0.06)*2.5;
-  const nextX=Math.sin((cycle+0.5)*0.06)*2.5;
+  // Drive Santa's van along the forest path
+  const loopIndex=Math.floor((t*3.3)/52);
+  const cycle=((t*3.3)%52)-34;
+  const trailX=Math.sin(cycle*0.06)*2.4;
+  const nextX=Math.sin((cycle+0.5)*0.06)*2.4;
   van.position.set(trailX, Math.sin(t*14)*0.025, cycle);
   van.rotation.y=Math.atan2(nextX-trailX, 0.5);
   van.rotation.z=Math.sin(t*7)*0.015;
 
   wheels.forEach(w=>w.rotation.x=t*7.5);
-  giftGroup.rotation.z=Math.sin(t*6)*0.03;
+  roofGift.rotation.z=Math.sin(t*6)*0.03;
 
+  // Drop a gift box when the van passes near center view
+  if(cycle>-6 && cycle<-4 && dropState.lastDropCycle!==loopIndex && !dropState.active){
+   dropState.lastDropCycle=loopIndex;
+   triggerGiftDrop(van.position);
+  }
+
+  // Physics for dropping gift box -> bounce -> burst!
+  if(dropState.active){
+   dropState.vy-=12.5*dt;
+   droppingGift.position.x+=dropState.vx*dt;
+   droppingGift.position.y+=dropState.vy*dt;
+   droppingGift.position.z+=dropState.vz*dt;
+   droppingGift.rotation.x+=4.5*dt;
+   droppingGift.rotation.z+=3.2*dt;
+
+   if(droppingGift.position.y<=0.42){
+    droppingGift.position.y=0.42;
+    dropState.bounces++;
+    if(dropState.bounces===1){
+     dropState.vy=3.4; // First bounce on the snow
+    } else {
+     burstGiftAt(droppingGift.position); // Burst open on second impact!
+    }
+   }
+  }
+
+  // Update burst sparkle particles
+  for(let i=burstParticles.length-1;i>=0;i--){
+   const p=burstParticles[i];
+   p.vy-=9.8*dt;
+   p.mesh.position.x+=p.vx*dt;
+   p.mesh.position.y+=p.vy*dt;
+   p.mesh.position.z+=p.vz*dt;
+   p.life-=dt*1.1;
+   p.mesh.scale.setScalar(Math.max(0.01,p.life));
+   if(p.life<=0){
+    scene.remove(p.mesh);
+    burstParticles.splice(i,1);
+   }
+  }
+
+  // Update scattered gifts & ornaments landing on snow
+  for(let i=0;i<scatteredGifts.length;i++){
+   const g=scatteredGifts[i];
+   g.age+=dt;
+   if(!g.grounded){
+    g.vy-=11.0*dt;
+    g.mesh.position.x+=g.vx*dt;
+    g.mesh.position.y+=g.vy*dt;
+    g.mesh.position.z+=g.vz*dt;
+    g.mesh.rotation.x+=3*dt;
+    g.mesh.rotation.y+=3*dt;
+    if(g.mesh.position.y<=0.18){
+     g.mesh.position.y=0.18;
+     g.grounded=true;
+    }
+   }
+  }
+
+  // Smooth Cinematic Camera
   const isPortrait=window.innerHeight>window.innerWidth;
-  if(!dragging)targetAngle=0.26+Math.sin(t*0.22)*0.18;
+  if(!dragging)targetAngle=0.32+Math.sin(t*0.2)*0.16;
   currentAngle+=(targetAngle-currentAngle)*0.05;
   currentElev+=(targetElev-currentElev)*0.05;
 
-  const camDist=isPortrait?14.5:10.5;
-  const focusZ=Math.max(-10,Math.min(4,cycle+1.5));
+  const camDist=isPortrait?14.5:10.8;
+  const focusZ=Math.max(-9,Math.min(3,cycle+1.2));
   camera.position.set(
    trailX+Math.sin(currentAngle)*camDist,
    (isPortrait?3.6:2.8)+currentElev,
    focusZ+Math.cos(currentAngle)*camDist
   );
-  camera.lookAt(trailX*0.7, 1.45, focusZ-1.2);
+  camera.lookAt(trailX*0.7, 1.35, focusZ-1.2);
 
-  ornaments.forEach((o,idx)=>{
-   o.rotation.y+=0.005*(idx%2===0?1:-1);
-  });
-
+  // Falling Snowflakes
   const arr=snowGeo.attributes.position.array;
   for(let i=0;i<snowCount;i++){
    arr[i*3+1]-=snowVel[i];
