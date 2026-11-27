@@ -257,26 +257,38 @@ module.exports = async (sock, m) => {
         if (!m.text) return;
 
         // ======================================================
-        // 🤖 CHATBOT HANDLER (Pollinations AI)
+        // 🤖 CHATBOT HANDLER (Pollinations AI) - DEBUG VERSION
         // ======================================================
         if (m.text && !m.text.startsWith(prefix) && !m.key.fromMe) {
-            const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1;
+            
+            // 🎯 HUGE DEBUG LOG
+            console.log(`[CHATBOT DEBUG] Message received: "${m.text}" | gs.chatbot = ${gs.chatbot} | Type: ${typeof gs.chatbot}`);
+
+            const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1 || gs.chatbot === 'true';
+            
+            console.log(`[CHATBOT DEBUG] chatbotEnabled resolved to: ${chatbotEnabled}`);
+
             if (chatbotEnabled) {
                 try {
-                    // Simulate typing so it looks human
                     await sock.presenceSubscribe(m.chat);
                     await sock.sendPresenceUpdate("composing", m.chat);
 
-                    // 🎯 Pollinations AI - Free & Reliable
+                    console.log('[CHATBOT DEBUG] Sending request to Pollinations AI...');
+                    
                     const prompt = encodeURIComponent(m.text);
                     const aiRes = await axios.get(`https://text.pollinations.ai/${prompt}`, { timeout: 20000 });
+
+                    console.log(`[CHATBOT DEBUG] API responded with status: ${aiRes.status}`);
+                    console.log(`[CHATBOT DEBUG] API Data: ${String(aiRes.data).substring(0, 100)}`);
 
                     if (aiRes.data) {
                         await sock.sendMessage(m.chat, { text: String(aiRes.data).trim() }, { quoted: m });
                         return;
+                    } else {
+                        console.log('[CHATBOT DEBUG] API returned empty data.');
                     }
                 } catch (e) {
-                    console.log('[CHATBOT] API error:', e.message);
+                    console.log('[CHATBOT DEBUG] API error:', e.message);
                 }
             }
         }
