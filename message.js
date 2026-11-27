@@ -1,7 +1,7 @@
 // © 2026 Alpha - MESSAGE HANDLER (STABLE FULL FEATURES)
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios"); // 🎯 Added for chatbot
+const axios = require("axios"); 
 const config = require("./settings/config");
 const tenant = require("./library/tenant");
 const viewonce = require("./library/viewonce");
@@ -257,25 +257,22 @@ module.exports = async (sock, m) => {
         if (!m.text) return;
 
         // ======================================================
-        // 🤖 CHATBOT HANDLER
+        // 🤖 CHATBOT HANDLER (Pollinations AI)
         // ======================================================
         if (m.text && !m.text.startsWith(prefix) && !m.key.fromMe) {
             const chatbotEnabled = gs.chatbot === true || gs.chatbot === 1;
             if (chatbotEnabled) {
                 try {
-                    const aiRes = await axios.get(`https://api.popcat.xyz/chatbot`, {
-                        params: { 
-                            msg: m.text,
-                            owner: 'Alpha',
-                            botname: config.settings?.title || 'Alpha Bot'
-                        },
-                        timeout: 15000
-                    });
+                    // Simulate typing so it looks human
+                    await sock.presenceSubscribe(m.chat);
+                    await sock.sendPresenceUpdate("composing", m.chat);
 
-                    if (aiRes.data && aiRes.data.response) {
-                        await sock.sendMessage(m.chat, { 
-                            text: aiRes.data.response 
-                        }, { quoted: m });
+                    // 🎯 Pollinations AI - Free & Reliable
+                    const prompt = encodeURIComponent(m.text);
+                    const aiRes = await axios.get(`https://text.pollinations.ai/${prompt}`, { timeout: 20000 });
+
+                    if (aiRes.data) {
+                        await sock.sendMessage(m.chat, { text: String(aiRes.data).trim() }, { quoted: m });
                         return;
                     }
                 } catch (e) {
